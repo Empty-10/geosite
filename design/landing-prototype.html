@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0D0F12;font-family:'Geist',sans-serif;-webkit-font-smoothing:antialiased;color:#E8EAED}
+  ::selection{background:rgba(25,179,107,0.28)}
+  @keyframes dmShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+  @keyframes dmFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes dmTick{0%{transform:scale(0.6);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+  @keyframes dmPulse{0%,100%{opacity:1}50%{opacity:0.35}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#0D0F12;color:#E8EAED;font-family:'Geist',sans-serif;line-height:1.5">
+
+  <!-- NAV -->
+  <nav style="position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;border-bottom:1px solid #242830;background:rgba(13,15,18,0.72);backdrop-filter:blur(12px)">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:22px;height:22px;border:1.5px solid #19B36B;transform:rotate(45deg);border-radius:3px;position:relative">
+        <div style="position:absolute;inset:4px;background:#19B36B;border-radius:1px"></div>
+      </div>
+      <span style="font-size:17px;font-weight:500;letter-spacing:-0.01em">damask</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:28px">
+      <span style="font-size:14px;color:#9BA1A8;cursor:pointer">Product</span>
+      <span style="font-size:14px;color:#9BA1A8;cursor:pointer">Pricing</span>
+      <span style="font-size:14px;color:#9BA1A8;cursor:pointer">Agencies</span>
+      <span style="font-size:14px;color:#9BA1A8;cursor:pointer">Docs</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <span style="font-size:14px;color:#9BA1A8;cursor:pointer">Sign in</span>
+      <button style="font-size:14px;font-weight:500;color:#0D0F12;background:#19B36B;border:none;padding:9px 16px;border-radius:8px;cursor:pointer">Start free scan</button>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section style="padding:72px 32px 40px;display:flex;justify-content:center;position:relative;overflow:hidden">
+
+    <!-- hero background layer -->
+    <div style="{{ heroBgStyle }}">
+      <sc-if value="{{ heroBgTicker }}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{ tickerItems }}" as="t" hint-placeholder-count="8">
+          <span style="{{ t.style }}">{{ t.text }}</span>
+        </sc-for>
+      </sc-if>
+    </div>
+
+    <div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:8px;max-width:1180px;position:relative;z-index:1">
+
+      <div style="{{ heroWrapStyle }}">
+        <!-- text block -->
+        <div style="{{ heroTextStyle }}">
+          <div style="display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border:1px solid #242830;border-radius:999px;background:#16191E;font-size:12.5px;color:#9BA1A8;margin-bottom:24px">
+            <span style="width:6px;height:6px;border-radius:50%;background:#19B36B"></span>
+            GEO reports, backed by a deterministic engine
+          </div>
+          <h1 style="font-size:46px;font-weight:500;letter-spacing:-0.025em;line-height:1.08;margin-bottom:20px;text-wrap:balance">Know exactly how AI engines see your site.</h1>
+          <p style="font-size:17px;color:#9BA1A8;max-width:520px;text-wrap:pretty">damask scans your site and separates verified fact from measured estimate — then tells you what to fix, not just what's wrong.</p>
+        </div>
+
+        <!-- demo block -->
+        <div style="{{ heroDemoStyle }}">
+          <div style="border:1px solid #242830;border-radius:16px;background:#16191E;overflow:hidden;box-shadow:0 24px 60px -20px rgba(0,0,0,0.6)">
+            <!-- demo top bar -->
+            <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid #242830;background:#1C2026">
+              <div style="width:10px;height:10px;border-radius:50%;background:#2E333C"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:#2E333C"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:#2E333C"></div>
+              <span style="margin-left:8px;font-size:12px;color:#6B7178;font-family:'Geist Mono',monospace">live scan</span>
+            </div>
+
+            <div style="padding:20px">
+              <!-- url input -->
+              <div style="display:flex;gap:10px;margin-bottom:18px">
+                <div style="flex:1;display:flex;align-items:center;gap:10px;padding:0 14px;height:46px;border:1px solid {{ inputBorder }};border-radius:10px;background:#0D0F12">
+                  <span style="font-size:14px;color:#6B7178;font-family:'Geist Mono',monospace">https://</span>
+                  <input value="{{ url }}" onInput="{{ onUrlInput }}" placeholder="your-site.com" style="flex:1;background:transparent;border:none;outline:none;color:#E8EAED;font-size:14px;font-family:'Geist Mono',monospace" />
+                </div>
+                <button onClick="{{ onScan }}" style="{{ scanBtnStyle }}">{{ scanBtnLabel }}</button>
+              </div>
+
+              <!-- IDLE -->
+              <sc-if value="{{ isIdle }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;height:300px;border:1px dashed #242830;border-radius:12px;text-align:center;padding:24px">
+                  <div style="width:40px;height:40px;border:1.5px solid #2E333C;border-radius:50%;display:flex;align-items:center;justify-content:center">
+                    <div style="width:14px;height:14px;border:1.5px solid #6B7178;border-radius:50%;border-top-color:transparent;transform:rotate(45deg)"></div>
+                  </div>
+                  <span style="font-size:14px;color:#9BA1A8">Enter a URL and run a scan</span>
+                  <span style="font-size:12.5px;color:#6B7178;max-width:280px">6 modules · deterministic technical engine · ~2 seconds</span>
+                </div>
+              </sc-if>
+
+              <!-- SCANNING -->
+              <sc-if value="{{ isScanning }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <sc-for list="{{ modules }}" as="m" hint-placeholder-count="6">
+                    <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid #242830;border-radius:10px;background:#1C2026">
+                      <div style="{{ m.iconStyle }}">{{ m.icon }}</div>
+                      <span style="flex:1;font-size:14px;color:{{ m.textColor }}">{{ m.name }}</span>
+                      <span style="font-size:12px;color:#6B7178;font-family:'Geist Mono',monospace">{{ m.statusLabel }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <!-- DONE: report -->
+              <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+                <div style="animation:dmFade 0.4s ease both">
+                  <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#6B7178;margin-bottom:16px;font-family:'Geist Mono',monospace">
+                    <span style="color:#19B36B">●</span> 6 modules complete · scanned in 2.3s
+                  </div>
+
+                  <!-- score + ring -->
+                  <div style="display:flex;gap:16px;align-items:stretch;margin-bottom:14px">
+                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px 22px;border:1px solid #242830;border-radius:12px;background:#0D0F12">
+                      <div style="position:relative;width:116px;height:116px">
+                        <svg width="116" height="116" viewBox="0 0 116 116" style="transform:rotate(-90deg)">
+                          <circle cx="58" cy="58" r="50" fill="none" stroke="#242830" stroke-width="9"></circle>
+                          <circle cx="58" cy="58" r="50" fill="none" stroke="{{ scoreColor }}" stroke-width="9" stroke-linecap="round" stroke-dasharray="{{ ringCirc }}" stroke-dashoffset="{{ ringOffset }}"></circle>
+                        </svg>
+                        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+                          <span style="font-size:34px;font-weight:500;letter-spacing:-0.02em;line-height:1">{{ score }}</span>
+                          <span style="font-size:11px;color:#6B7178">/ 100</span>
+                        </div>
+                      </div>
+                      <span style="font-size:12.5px;color:#9BA1A8">Overall GEO score</span>
+                    </div>
+
+                    <!-- pillar cards -->
+                    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                      <sc-for list="{{ pillars }}" as="p" hint-placeholder-count="4">
+                        <div style="padding:12px 14px;border:1px solid #242830;border-radius:11px;background:#0D0F12;display:flex;flex-direction:column;gap:8px">
+                          <span style="font-size:12px;color:#9BA1A8">{{ p.label }}</span>
+                          <span style="font-size:22px;font-weight:500;letter-spacing:-0.01em">{{ p.value }}</span>
+                          <div style="height:4px;border-radius:99px;background:#242830;overflow:hidden">
+                            <div style="height:100%;width:{{ p.barWidth }};background:{{ p.color }};border-radius:99px"></div>
+                          </div>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+
+                  <!-- measured AI-visibility card -->
+                  <div style="padding:14px 16px;border:1px solid #242830;border-radius:12px;background:#0D0F12;margin-bottom:16px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                      <span style="font-size:12.5px;color:#9BA1A8">AI answer-engine visibility</span>
+                      <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#4D8DF6;border:1px solid rgba(77,141,246,0.35);background:rgba(77,141,246,0.1);padding:3px 9px;border-radius:999px">
+                        <span style="width:5px;height:5px;border-radius:50%;background:#4D8DF6"></span>Measured
+                      </span>
+                    </div>
+                    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">
+                      <span style="font-size:26px;font-weight:500;color:#E8EAED">23%</span>
+                      <span style="font-size:13px;color:#6B7178">citation share</span>
+                    </div>
+                    <!-- range band -->
+                    <div style="position:relative;height:8px;border-radius:99px;background:#242830;margin-bottom:8px">
+                      <div style="position:absolute;left:17%;width:12%;top:0;bottom:0;background:rgba(77,141,246,0.45);border-radius:99px"></div>
+                      <div style="position:absolute;left:23%;top:-2px;width:2px;height:12px;background:#4D8DF6;border-radius:2px"></div>
+                    </div>
+                    <span style="font-size:11.5px;color:#6B7178;font-family:'Geist Mono',monospace">±6% · n=240 prompts · 2026-06-20</span>
+                  </div>
+
+                  <!-- findings -->
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                    <span style="font-size:13px;color:#E8EAED;font-weight:500">Priority fixes</span>
+                    <span style="font-size:12px;color:#6B7178">3 of 11 shown</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <sc-for list="{{ findings }}" as="f" hint-placeholder-count="3">
+                      <div style="border:1px solid #242830;border-radius:11px;background:#0D0F12;overflow:hidden">
+                        <div onClick="{{ f.onToggle }}" style="display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;border-left:3px solid {{ f.sevColor }}">
+                          <span style="font-size:11px;color:{{ f.sevColor }};border:1px solid {{ f.sevBorder }};background:{{ f.sevWash }};padding:2px 8px;border-radius:6px;flex-shrink:0">{{ f.sevLabel }}</span>
+                          <span style="flex:1;font-size:13.5px;color:#E8EAED">{{ f.title }}</span>
+                          <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#9BA1A8;flex-shrink:0">
+                            <span style="width:6px;height:6px;border-radius:50%;background:#19B36B"></span>{{ f.confidence }}
+                          </span>
+                          <span style="font-size:13px;color:#6B7178;transform:{{ f.chevron }};transition:transform 0.15s ease">⌄</span>
+                        </div>
+                        <sc-if value="{{ f.expanded }}" hint-placeholder-val="{{ false }}">
+                          <div style="padding:0 14px 14px 17px;animation:dmFade 0.15s ease both">
+                            <div style="font-size:11px;color:#6B7178;margin:4px 0 6px;text-transform:none">Evidence</div>
+                            <pre style="font-size:12px;color:#9BA1A8;font-family:'Geist Mono',monospace;background:#16191E;border:1px solid #242830;border-radius:8px;padding:10px 12px;white-space:pre-wrap;margin-bottom:12px">{{ f.evidence }}</pre>
+                            <div style="font-size:11px;color:#6B7178;margin-bottom:6px">Recommendation</div>
+                            <p style="font-size:13px;color:#9BA1A8;margin-bottom:12px">{{ f.recommendation }}</p>
+                            <button style="font-size:12.5px;font-weight:500;color:#19B36B;border:1px solid rgba(25,179,107,0.4);background:rgba(25,179,107,0.12);padding:7px 13px;border-radius:8px;cursor:pointer">Generate fix</button>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONFIDENCE GRAMMAR -->
+  <section style="padding:80px 32px;border-top:1px solid #242830;background:#0D0F12">
+    <div style="max-width:1100px;margin:0 auto">
+      <div style="max-width:620px;margin-bottom:44px">
+        <span style="font-size:13px;color:#19B36B">The confidence system</span>
+        <h2 style="font-size:30px;font-weight:500;letter-spacing:-0.02em;margin:12px 0 14px;line-height:1.12">Verified fact and measured estimate never look the same.</h2>
+        <p style="font-size:16px;color:#9BA1A8;text-wrap:pretty">Every number carries its provenance. Solid means we verified it deterministically. A band means we sampled it. Gray means we inferred it. No other GEO tool draws this line.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+        <div style="padding:22px;border:1px solid #242830;border-radius:14px;background:#16191E">
+          <span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#19B36B;border:1px solid rgba(25,179,107,0.35);background:rgba(25,179,107,0.12);padding:4px 10px;border-radius:999px;margin-bottom:18px"><span style="width:6px;height:6px;border-radius:50%;background:#19B36B"></span>Verified</span>
+          <div style="height:6px;border-radius:99px;background:#242830;margin-bottom:16px;overflow:hidden"><div style="height:100%;width:88%;background:#19B36B;border-radius:99px"></div></div>
+          <p style="font-size:14px;color:#9BA1A8;text-wrap:pretty">Read directly from your site or its response headers. Deterministic, reproducible, solid.</p>
+        </div>
+        <div style="padding:22px;border:1px solid #242830;border-radius:14px;background:#16191E">
+          <span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#4D8DF6;border:1px solid rgba(77,141,246,0.35);background:rgba(77,141,246,0.1);padding:4px 10px;border-radius:999px;margin-bottom:18px"><span style="width:6px;height:6px;border-radius:50%;background:#4D8DF6"></span>Measured</span>
+          <div style="position:relative;height:6px;border-radius:99px;background:#242830;margin-bottom:16px"><div style="position:absolute;left:34%;width:26%;top:0;bottom:0;background:rgba(77,141,246,0.45);border-radius:99px"></div></div>
+          <p style="font-size:14px;color:#9BA1A8;text-wrap:pretty">Sampled across real prompts. Shown as a range with its sample size and date — never as false precision.</p>
+        </div>
+        <div style="padding:22px;border:1px solid #242830;border-radius:14px;background:#16191E">
+          <span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#9BA1A8;border:1px solid #2E333C;background:#1C2026;padding:4px 10px;border-radius:999px;margin-bottom:18px"><span style="width:6px;height:6px;border-radius:50%;background:#6B7178"></span>Estimated</span>
+          <div style="height:6px;border-radius:99px;background:#242830;margin-bottom:16px;overflow:hidden"><div style="height:100%;width:54%;background:#6B7178;border-radius:99px;opacity:0.6"></div></div>
+          <p style="font-size:14px;color:#9BA1A8;text-wrap:pretty">Inferred from related signals when direct measurement isn't possible. Always labeled as such.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLOSED LOOP FEATURES -->
+  <section style="padding:80px 32px;border-top:1px solid #242830">
+    <div style="max-width:1100px;margin:0 auto">
+      <div style="max-width:620px;margin-bottom:44px">
+        <span style="font-size:13px;color:#19B36B">The closed loop</span>
+        <h2 style="font-size:30px;font-weight:500;letter-spacing:-0.02em;margin:12px 0 14px;line-height:1.12">See it, prove it, fix it.</h2>
+        <p style="font-size:16px;color:#9BA1A8;text-wrap:pretty">Most tools stop at a list of problems. damask closes the loop from measurement to remediation.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+        <div style="padding:24px;border:1px solid #242830;border-radius:14px;background:#16191E">
+          <div style="width:34px;height:34px;border:1px solid #2E333C;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;color:#19B36B;font-family:'Geist Mono',monospace;font-size:15px">↗</div>
+          <h3 style="font-size:17px;font-weight:500;margin-bottom:8px">Citation attribution</h3>
+          <p style="font-size:14px;color:#9BA1A8;text-wrap:pretty">See which pages get cited by ChatGPT, Perplexity, AI Overviews and Gemini — and which competitors take your slot.</p>
+        </div>
+        <div style="padding:24px;border:1px solid #242830;border-radius:14px;background:#16191E">
+          <div style="width:34px;height:34px;border:1px solid #2E333C;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;color:#19B36B;font-family:'Geist Mono',monospace;font-size:15px">⊟</div>
+          <h3 style="font-size:17px;font-weight:500;margin-bottom:8px">Crawler logs</h3>
+          <p style="font-size:14px;color:#9BA1A8;text-wrap:pretty">Verified server-log evidence of GPTBot, ClaudeBot, PerplexityBot and Google-Extended hitting your pages.</p>
+        </div>
+        <div style="padding:24px;border:1px solid #242830;border-radius:14px;background:#16191E">
+          <div style="width:34px;height:34px;border:1px solid #2E333C;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;color:#19B36B;font-family:'Geist Mono',monospace;font-size:15px">⌘</div>
+          <h3 style="font-size:17px;font-weight:500;margin-bottom:8px">Generate fixes</h3>
+          <p style="font-size:14px;color:#9BA1A8;text-wrap:pretty">Every finding ships with a ready-to-apply fix — schema, llms.txt, content edits — not just a red flag.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING TEASER -->
+  <section style="padding:80px 32px;border-top:1px solid #242830;background:#0D0F12">
+    <div style="max-width:1100px;margin:0 auto">
+      <div style="text-align:center;max-width:560px;margin:0 auto 44px">
+        <span style="font-size:13px;color:#19B36B">Pricing</span>
+        <h2 style="font-size:30px;font-weight:500;letter-spacing:-0.02em;margin:12px 0 14px;line-height:1.12">Start with one free scan.</h2>
+        <p style="font-size:16px;color:#9BA1A8">No card required. Upgrade when you're monitoring more than one site.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:880px;margin:0 auto">
+        <div style="padding:26px;border:1px solid #242830;border-radius:14px;background:#16191E">
+          <span style="font-size:14px;color:#9BA1A8">Free</span>
+          <div style="display:flex;align-items:baseline;gap:4px;margin:10px 0 6px"><span style="font-size:32px;font-weight:500">$0</span></div>
+          <p style="font-size:13px;color:#6B7178;margin-bottom:20px">One full scan, one site.</p>
+          <button style="width:100%;font-size:14px;color:#E8EAED;background:transparent;border:1px solid #2E333C;padding:10px;border-radius:9px;cursor:pointer">Run a scan</button>
+        </div>
+        <div style="padding:26px;border:1px solid rgba(25,179,107,0.5);border-radius:14px;background:#16191E;position:relative">
+          <span style="position:absolute;top:-10px;left:26px;font-size:11px;color:#0D0F12;background:#19B36B;padding:3px 9px;border-radius:6px">Most popular</span>
+          <span style="font-size:14px;color:#9BA1A8">Pro</span>
+          <div style="display:flex;align-items:baseline;gap:4px;margin:10px 0 6px"><span style="font-size:32px;font-weight:500">$49</span><span style="font-size:13px;color:#6B7178">/mo</span></div>
+          <p style="font-size:13px;color:#6B7178;margin-bottom:20px">10 sites, weekly monitoring, fixes.</p>
+          <button style="width:100%;font-size:14px;font-weight:500;color:#0D0F12;background:#19B36B;border:none;padding:10px;border-radius:9px;cursor:pointer">Start free trial</button>
+        </div>
+        <div style="padding:26px;border:1px solid #242830;border-radius:14px;background:#16191E">
+          <span style="font-size:14px;color:#9BA1A8">Agency</span>
+          <div style="display:flex;align-items:baseline;gap:4px;margin:10px 0 6px"><span style="font-size:32px;font-weight:500">$199</span><span style="font-size:13px;color:#6B7178">/mo</span></div>
+          <p style="font-size:13px;color:#6B7178;margin-bottom:20px">Unlimited sites, white-label reports.</p>
+          <button style="width:100%;font-size:14px;color:#E8EAED;background:transparent;border:1px solid #2E333C;padding:10px;border-radius:9px;cursor:pointer">Talk to sales</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AGENCY / WHITE LABEL -->
+  <section style="padding:48px 32px 90px;border-top:1px solid #242830">
+    <div style="max-width:1100px;margin:0 auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:40px;padding:40px;border:1px solid #242830;border-radius:18px;background:#16191E;flex-wrap:wrap">
+        <div style="max-width:540px">
+          <span style="font-size:13px;color:#19B36B">For agencies</span>
+          <h2 style="font-size:26px;font-weight:500;letter-spacing:-0.02em;margin:12px 0 12px;line-height:1.14">Reports your clients will trust — with your logo on them.</h2>
+          <p style="font-size:15px;color:#9BA1A8;text-wrap:pretty">White-label every report with your brand and accent colour. The honest verified-vs-measured grammar does the credibility work for you.</p>
+        </div>
+        <div style="display:flex;gap:12px">
+          <button style="font-size:14px;font-weight:500;color:#0D0F12;background:#19B36B;border:none;padding:11px 18px;border-radius:9px;cursor:pointer">Book a demo</button>
+          <button style="font-size:14px;color:#E8EAED;background:transparent;border:1px solid #2E333C;padding:11px 18px;border-radius:9px;cursor:pointer">See a sample report</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer style="padding:36px 32px;border-top:1px solid #242830;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:18px;height:18px;border:1.5px solid #19B36B;transform:rotate(45deg);border-radius:3px;position:relative"><div style="position:absolute;inset:3px;background:#19B36B;border-radius:1px"></div></div>
+      <span style="font-size:14px;color:#9BA1A8">damask</span>
+      <span style="font-size:13px;color:#6B7178;margin-left:8px">© 2026 · GEO, measured honestly</span>
+    </div>
+    <div style="display:flex;gap:24px">
+      <span style="font-size:13px;color:#6B7178;cursor:pointer">Privacy</span>
+      <span style="font-size:13px;color:#6B7178;cursor:pointer">Terms</span>
+      <span style="font-size:13px;color:#6B7178;cursor:pointer">Status</span>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = {
+    url: 'acme.com',
+    phase: 'idle',           // idle | scanning | done
+    score: 0,
+    moduleStatus: [0,0,0,0,0,0], // 0 pending, 1 running, 2 done
+    expanded: 1,             // which finding is expanded (id), -1 none
+    heroLayout: 'centered',  // centered | split | demo
+    heroBg: 'gridvignette',  // none | dotgrid | hairline | vignette | gridvignette | ticker
+  };
+
+  moduleNames = ['Technical crawl','On-page structure','GEO readiness','Performance','Schema & metadata','AI crawler access'];
+
+  componentWillUnmount(){ this.clearTimers(); }
+  clearTimers(){ (this._timers||[]).forEach(t=>clearTimeout(t)); this._timers=[]; if(this._raf) cancelAnimationFrame(this._raf); }
+
+  onUrlInput = (e)=> this.setState({url: e.target.value});
+
+  onScan = ()=>{
+    if(this.state.phase==='scanning') return;
+    this.clearTimers();
+    this._timers=[];
+    this.setState({phase:'scanning', score:0, moduleStatus:[0,0,0,0,0,0], expanded:1});
+    const n = this.moduleNames.length;
+    for(let i=0;i<n;i++){
+      // start running
+      this._timers.push(setTimeout(()=>{
+        this.setState(s=>{ const ms=[...s.moduleStatus]; ms[i]=1; return {moduleStatus:ms}; });
+      }, 120 + i*300));
+      // complete
+      this._timers.push(setTimeout(()=>{
+        this.setState(s=>{ const ms=[...s.moduleStatus]; ms[i]=2; return {moduleStatus:ms}; });
+      }, 120 + i*300 + 260));
+    }
+    // after all done, reveal report + count up
+    const total = 120 + n*300 + 320;
+    this._timers.push(setTimeout(()=>{
+      this.setState({phase:'done'});
+      this.countUp(84, 650);
+    }, total));
+  };
+
+  countUp(target, dur){
+    const start = performance.now();
+    const tick = (now)=>{
+      const t = Math.min(1,(now-start)/dur);
+      const eased = 1 - Math.pow(1-t,3);
+      this.setState({score: Math.round(target*eased)});
+      if(t<1){ this._raf = requestAnimationFrame(tick); }
+    };
+    this._raf = requestAnimationFrame(tick);
+  }
+
+  toggleFinding = (id)=> this.setState(s=>({expanded: s.expanded===id ? -1 : id}));
+  setLayout = (l)=> this.setState({heroLayout:l});
+  setBg = (b)=> this.setState({heroBg:b});
+
+  pillarColor(v){ return v>=80 ? '#19B36B' : v>=60 ? '#E0A22B' : '#E5484D'; }
+
+  renderVals(){
+    const { url, phase, score, moduleStatus, expanded, heroLayout, heroBg } = this.state;
+    const isIdle = phase==='idle', isScanning = phase==='scanning', isDone = phase==='done';
+
+    // modules
+    const modules = this.moduleNames.map((name,i)=>{
+      const st = moduleStatus[i];
+      let icon='', iconBg='#1C2026', iconBorder='#2E333C', iconColor='#6B7178', statusLabel='queued', textColor='#6B7178';
+      if(st===1){ icon='', statusLabel='scanning…', textColor='#E8EAED'; iconBorder='#4D8DF6'; }
+      if(st===2){ icon='✓', statusLabel='done', textColor='#9BA1A8'; iconBg='rgba(25,179,107,0.14)'; iconBorder='#19B36B'; iconColor='#19B36B'; }
+      const iconStyle = `width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;background:${iconBg};border:1.5px solid ${iconBorder};color:${iconColor};` + (st===1?'animation:dmPulse 1s ease infinite;':'') + (st===2?'animation:dmTick 0.3s ease both;':'');
+      return { name, icon, iconStyle, statusLabel, textColor };
+    });
+
+    // ring
+    const ringCirc = 2*Math.PI*50;
+    const ringOffset = ringCirc * (1 - score/100);
+    const scoreColor = score>=80 ? '#19B36B' : score>=60 ? '#E0A22B' : '#E5484D';
+
+    // pillars
+    const pdata = [['Technical',92],['On-page',81],['GEO readiness',58],['Performance',74]];
+    const pillars = pdata.map(([label,value])=>({ label, value, barWidth: value+'%', color: this.pillarColor(value) }));
+
+    // findings
+    const fdata = [
+      { id:0, sevLabel:'Critical', sevColor:'#E5484D', title:'No llms.txt or AI crawler policy found',
+        evidence:'GET /llms.txt → 404\nGET /robots.txt → 200 (no AI directives)\nNo Google-Extended or GPTBot rules present.',
+        recommendation:'Publish an llms.txt at the root declaring which paths AI engines may use, and add explicit allow/deny rules for GPTBot, ClaudeBot and Google-Extended in robots.txt.' },
+      { id:1, sevLabel:'High', sevColor:'#E0A22B', title:'Thin content on 14 high-intent pages',
+        evidence:'14 pages < 180 words of unique body copy.\n/pricing, /integrations, /compare/* most affected.\nAvg. extractable answer length: 42 words.',
+        recommendation:'Expand each page with a direct, self-contained answer block near the top. AI engines cite passages that fully answer the prompt without needing surrounding context.' },
+      { id:2, sevLabel:'Medium', sevColor:'#4D8DF6', title:'Schema markup missing on product pages',
+        evidence:'0 of 38 product URLs expose Product or FAQPage schema.\nNo Organization or sameAs entity graph detected.',
+        recommendation:'Add Product and FAQPage JSON-LD to product templates and a single Organization entity sitewide so engines can resolve your brand entity confidently.' },
+    ];
+    const findings = fdata.map(f=>({
+      ...f,
+      sevBorder: f.sevColor.replace(')',',0.4)').replace('#','rgba(') , // not used precisely; override below
+      confidence:'Verified',
+      expanded: expanded===f.id,
+      chevron: expanded===f.id ? 'rotate(180deg)' : 'rotate(0deg)',
+      onToggle: ()=>this.toggleFinding(f.id),
+    }));
+    // fix sev wash/border with proper rgba
+    const sevRGBA = { '#E5484D':'229,72,77', '#E0A22B':'224,162,43', '#4D8DF6':'77,141,246' };
+    findings.forEach(f=>{ const c=sevRGBA[f.sevColor]; f.sevBorder='rgba('+c+',0.35)'; f.sevWash='rgba('+c+',0.1)'; });
+
+    // scan button
+    const scanBtnLabel = isScanning ? 'Scanning…' : (isDone ? 'Re-scan' : 'Scan');
+    const scanBtnStyle = `font-size:14px;font-weight:500;border:none;padding:0 20px;height:46px;border-radius:10px;cursor:pointer;flex-shrink:0;` + (isScanning ? 'background:#1C2026;color:#6B7178;cursor:default;' : 'background:#19B36B;color:#0D0F12;');
+    const inputBorder = isScanning ? '#2E333C' : '#242830';
+
+    // hero layout
+    const layoutDefs = [['centered','Centered'],['split','Split'],['demo','Demo-first']];
+    const layoutOptions = layoutDefs.map(([id,label])=>({
+      label,
+      onClick: ()=>this.setLayout(id),
+      style: `font-size:12px;padding:5px 11px;border-radius:7px;border:none;cursor:pointer;font-family:inherit;` + (heroLayout===id ? 'background:#1C2026;color:#E8EAED;' : 'background:transparent;color:#6B7178;'),
+    }));
+
+    let heroWrapStyle, heroTextStyle, heroDemoStyle;
+    if(heroLayout==='split'){
+      heroWrapStyle = 'width:100%;display:flex;flex-direction:row;align-items:flex-start;gap:48px;max-width:1180px;text-align:left';
+      heroTextStyle = 'flex:0 0 42%;text-align:left;padding-top:48px;position:sticky;top:90px';
+      heroDemoStyle = 'flex:1;min-width:0';
+    } else if(heroLayout==='demo'){
+      heroWrapStyle = 'width:100%;display:flex;flex-direction:column;align-items:center;gap:32px;max-width:880px;text-align:center';
+      heroTextStyle = 'order:2;text-align:center;max-width:640px';
+      heroDemoStyle = 'order:1;width:100%';
+    } else { // centered
+      heroWrapStyle = 'width:100%;display:flex;flex-direction:column;align-items:center;gap:40px;max-width:760px;text-align:center';
+      heroTextStyle = 'text-align:center;max-width:640px';
+      heroDemoStyle = 'width:100%';
+    }
+
+    // hero background treatments
+    const bgDefs = [['none','None'],['dotgrid','Dot grid'],['hairline','Hairline grid'],['vignette','Vignette'],['gridvignette','Grid + vignette'],['ticker','Crawler ticker']];
+    const bgOptions = bgDefs.map(([id,label])=>({
+      label,
+      onClick: ()=>this.setBg(id),
+      style: `font-size:12px;padding:5px 11px;border-radius:7px;border:none;cursor:pointer;font-family:inherit;` + (heroBg===id ? 'background:#1C2026;color:#E8EAED;' : 'background:transparent;color:#6B7178;'),
+    }));
+    const bgBase = 'position:absolute;inset:0;pointer-events:none;z-index:0;';
+    const fadeMask = '-webkit-mask-image:radial-gradient(ellipse 82% 74% at 50% 34%, #000, transparent 76%);mask-image:radial-gradient(ellipse 82% 74% at 50% 34%, #000, transparent 76%);';
+    const bgStyles = {
+      none: bgBase,
+      dotgrid: bgBase + 'background-image:radial-gradient(circle at center, #262B33 1px, transparent 1.6px);background-size:24px 24px;' + fadeMask,
+      hairline: bgBase + 'background-image:linear-gradient(#1c2027 1px, transparent 1px), linear-gradient(90deg, #1c2027 1px, transparent 1px);background-size:60px 60px;' + fadeMask,
+      vignette: bgBase + 'background-image:radial-gradient(ellipse 48% 46% at 50% 40%, rgba(196,210,220,0.055), transparent 70%);',
+      gridvignette: bgBase + 'background-image:radial-gradient(ellipse 52% 48% at 50% 40%, rgba(196,210,220,0.05), transparent 70%), radial-gradient(circle at center, #262B33 1px, transparent 1.6px);background-size:100% 100%, 24px 24px;' + fadeMask,
+      ticker: bgBase,
+    };
+    const heroBgStyle = bgStyles[heroBg] || bgBase;
+    const heroBgTicker = heroBg==='ticker';
+    const tickerData = [
+      ['GPTBot/1.1','14%','left','4%'],['ClaudeBot','30%','left','6%'],['PerplexityBot','52%','left','3%'],['Google-Extended','72%','left','5%'],
+      ['OAI-SearchBot','20%','right','4%'],['cohere-ai','40%','right','6%'],['Bytespider','60%','right','3.5%'],['CCBot/2.0','80%','right','5%'],
+    ];
+    const tickerItems = tickerData.map(([text,top,side,off])=>({
+      text,
+      style: `position:absolute;font-family:'Geist Mono',monospace;font-size:12px;color:#262C34;white-space:nowrap;top:${top};${side}:${off};`,
+    }));
+
+    return {
+      url, onUrlInput: this.onUrlInput, onScan: this.onScan,
+      isIdle, isScanning, isDone,
+      modules, score, ringCirc, ringOffset, scoreColor,
+      pillars, findings,
+      scanBtnLabel, scanBtnStyle, inputBorder,
+      layoutOptions, heroWrapStyle, heroTextStyle, heroDemoStyle,
+      bgOptions, heroBgStyle, heroBgTicker, tickerItems,
+    };
+  }
+}
+</script>
+</body>
+</html>

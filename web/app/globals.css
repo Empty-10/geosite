@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap');
+
+:root {
+  --ink: #0D0F12;
+  --surface: #16191E;
+  --raised: #1C2026;
+  --border: #242830;
+  --border-strong: #2E333C;
+  --text: #E8EAED;
+  --text-2: #9BA1A8;
+  --text-3: #6B7178;
+  --accent: #19B36B;
+  --accent-hover: #15A05F;
+  --accent-wash: rgba(25, 179, 107, 0.12);
+  --measured: #4D8DF6;
+  --warn: #E0A22B;
+  --fail: #E5484D;
+  --mono: 'Geist Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: 'Geist', system-ui, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: rgba(25, 179, 107, 0.28); }
+
+button { font-family: inherit; }
+input { font-family: inherit; }
+
+@keyframes dmFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes dmTick {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes dmPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Hero backdrop: faint grid fading into a soft vignette. */
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(ellipse 52% 48% at 50% 40%, rgba(196, 210, 220, 0.05), transparent 70%),
+    radial-gradient(circle at center, #262B33 1px, transparent 1.6px);
+  background-size: 100% 100%, 24px 24px;
+  -webkit-mask-image: radial-gradient(ellipse 82% 74% at 50% 34%, #000, transparent 76%);
+  mask-image: radial-gradient(ellipse 82% 74% at 50% 34%, #000, transparent 76%);
+}
