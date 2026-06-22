@@ -44,9 +44,12 @@ def main() -> None:
     ap = argparse.ArgumentParser(prog="damask", description="GEO/SEO scan engine.")
     ap.add_argument("url", help="URL to scan, e.g. https://example.com")
     ap.add_argument("--json", action="store_true", help="output machine-readable JSON")
+    ap.add_argument("--render", action="store_true",
+                    help="render JavaScript with Playwright and scan the resulting DOM "
+                         "(needs the [render] extra + `playwright install chromium`)")
     args = ap.parse_args()
 
-    report = scan(args.url)
+    report = scan(args.url, render=args.render)
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))

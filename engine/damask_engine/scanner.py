@@ -39,11 +39,20 @@ def scan_html(url: str, html: str, *, online: bool = False,
     return build_report(url, findings, meta)
 
 
+def _render_delta(res: FetchResult) -> dict | None:
+    """Visible-word counts for raw HTML vs rendered DOM, for the JS-dependency check."""
+    if res.rendered_html is None:
+        return None
+    raw_words = word_count(visible_text(make_soup(res.html)))
+    rendered_words = word_count(visible_text(make_soup(res.rendered_html)))
+    return {"raw_words": raw_words, "rendered_words": rendered_words}
+
+
 def _gather_network(res: FetchResult) -> NetInputs:
     """Fetch the auxiliary resources the technical module parses (robots, sitemap, TLS)."""
     parsed = urlparse(res.final_url)
     if parsed.scheme not in ("http", "https"):
-        return NetInputs(redirect_chain=res.redirect_chain)
+        return NetInputs(redirect_chain=res.redirect_chain, render_delta=_render_delta(res))
     base = f"{parsed.scheme}://{parsed.netloc}"
 
     robots_status, robots_txt = fetch_resource(urljoin(base, "/robots.txt"))
@@ -66,16 +75,26 @@ def _gather_network(res: FetchResult) -> NetInputs:
         sitemap_status=sitemap_status,
         sitemap_xml=sitemap_xml,
         tls=tls,
+        render_delta=_render_delta(res),
     )
 
 
-def scan(url: str) -> Report:
-    """Fetch a live URL and scan it."""
-    res = fetch(url)
+def scan(url: str, *, render: bool = False) -> Report:
+    """Fetch a live URL and scan it.
+
+    With render=True, capture the post-JavaScript DOM (Playwright) and scan that — what a
+    JS-executing crawler sees — while still flagging how much content was JS-dependent.
+    """
+    res = fetch(url, render=render)
     if res.error or not res.html:
         return Report(url=url, meta={"error": res.error or "empty response",
                                      "status_code": res.status_code})
-    return scan_html(
-        url, res.html, online=True, status_code=res.status_code,
+    # Scan the rendered DOM when available (closest to what crawlers/AI see); else raw HTML.
+    html_to_scan = res.rendered_html or res.html
+    meta_extra = {"rendered": res.rendered_html is not None}
+    report = scan_html(
+        url, html_to_scan, online=True, status_code=res.status_code,
         headers=res.headers, final_url=res.final_url, net=_gather_network(res),
     )
+    report.meta.update(meta_extra)
+    return report

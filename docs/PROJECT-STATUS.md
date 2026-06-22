@@ -33,6 +33,10 @@ pip install -e .
 python -m damask_engine https://stripe.com          # human-readable report
 python -m damask_engine https://stripe.com --json    # JSON
 pytest                                               # offline tests
+
+# Optional: scan the post-JavaScript DOM (flags JS-dependent content)
+pip install -e ".[render]" && playwright install chromium
+python -m damask_engine https://example.com --render
 ```
 
 Web app:
@@ -57,7 +61,10 @@ A pure, offline-testable scan engine. Give it a URL (or raw HTML) and it returns
   rule, enforced in the data model.
 - `scanner.py` — `scan(url)` fetches then runs modules; `scan_html(url, html)` runs
   offline (used by tests). Returns a scored `Report`.
-- `fetch.py` — plain HTTP GET for now. Playwright rendering is a planned upgrade.
+- `fetch.py` — HTTP GET, plus optional Playwright rendering (`fetch(url, render=True)` /
+  `render_dom`): captures the post-JS DOM so the engine can scan what a JS-executing crawler
+  sees and flag content that's only present after rendering. Degrades to raw HTML if
+  Playwright isn't installed.
 - `scoring.py` — each pillar starts at 100 and loses severity-weighted points; overall =
   weighted average of the pillars present (weights renormalize for partial scans).
 - `modules/` — pure functions returning `list[Finding]`, one per area:
@@ -128,8 +135,14 @@ uses Claude Design's runtime and won't run standalone).
    `requests` import) — network material flows in through `NetInputs`. JSON report carries
    `schema_version` ("1"); fixture tests (`test_technical.py`) and a schema snapshot
    (`test_schema.py`) cover it. 20 tests pass.
-3. **Playwright rendering in `fetch.py`** — capture raw HTML + rendered DOM; flag pages
-   where they differ materially (JS-dependent content the engine would otherwise miss).
+3. ~~**Playwright rendering in `fetch.py`**~~ ✅ **Done.** `fetch(url, render=True)` captures
+   the post-JavaScript DOM via headless Chromium; `scan(url, render=True)` (CLI `--render`)
+   scans that DOM and a `tech.render.js_dependent` finding warns when the rendered page has
+   materially more text than the raw HTML (ratio ≥1.5 and ≥50 extra words). Playwright is an
+   optional `[render]` extra (`pip install -e ".[render]" && playwright install chromium`);
+   without it, scans degrade to raw HTML. The web `/api/scan` route does **not** pass
+   `--render` (keeps the demo fast — no browser per request); opt in later if needed.
+   Verified live: todomvc CSR React app flagged (13→118 words); static pages pass.
 4. **Report screen** (`web/app/report/...`) — the full scan-report view per design brief
    §7.3, reusing HeroDemo's score ring / pillar cards / findings components.
 5. **PageSpeed performance module** — needs a Google API key in env (`.env`, gitignored).

@@ -13,6 +13,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.5", "black>=24.0", "httpx>=0.27"]
 service = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
+render = ["playwright>=1.44"]
 
 [project.scripts]
 damask = "damask_engine.cli:main"

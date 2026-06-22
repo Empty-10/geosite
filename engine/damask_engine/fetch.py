@@ -18,6 +18,7 @@ import requests
 USER_AGENT = "damaskbot/0.1 (+https://example.com/bot; GEO/SEO scanner)"
 TIMEOUT = 20
 RESOURCE_TIMEOUT = 10
+RENDER_TIMEOUT_MS = 15000
 
 
 @dataclass
@@ -25,16 +26,24 @@ class FetchResult:
     url: str
     final_url: str
     status_code: int
-    html: str
+    html: str  # raw HTML as served (the GET response body)
     headers: dict[str, str]
     redirected: bool
     # Each hop that led here: (status_code, url). Empty when no redirect occurred.
     redirect_chain: list[tuple[int, str]] = field(default_factory=list)
+    # DOM after JS execution (Playwright). None when rendering was off or unavailable.
+    rendered_html: str | None = None
     error: str | None = None
 
 
-def fetch(url: str) -> FetchResult:
-    """GET a URL, following redirects. Never raises — failures come back on `.error`."""
+def fetch(url: str, *, render: bool = False) -> FetchResult:
+    """GET a URL, following redirects. Never raises — failures come back on `.error`.
+
+    With render=True, also capture the post-JavaScript DOM via Playwright (if installed)
+    into `rendered_html`, so the caller can scan what a JS-executing crawler sees and flag
+    pages whose content only appears after rendering. Rendering failures degrade silently
+    (rendered_html stays None); the raw GET is always returned.
+    """
     try:
         resp = requests.get(
             url,
@@ -43,7 +52,7 @@ def fetch(url: str) -> FetchResult:
             allow_redirects=True,
         )
         chain = [(h.status_code, h.url) for h in resp.history]
-        return FetchResult(
+        result = FetchResult(
             url=url,
             final_url=resp.url,
             status_code=resp.status_code,
@@ -57,6 +66,34 @@ def fetch(url: str) -> FetchResult:
             url=url, final_url=url, status_code=0, html="", headers={},
             redirected=False, error=str(exc),
         )
+
+    if render and result.html:
+        result.rendered_html = render_dom(result.final_url)
+    return result
+
+
+def render_dom(url: str) -> str | None:
+    """Return the post-JavaScript DOM via headless Chromium, or None if it can't.
+
+    Playwright is an optional extra (`pip install -e ".[render]"` + `playwright install
+    chromium`). If it isn't installed, or rendering errors/times out, return None so the
+    engine falls back to the raw HTML rather than failing the scan.
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return None
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(user_agent=USER_AGENT)
+                page.goto(url, wait_until="networkidle", timeout=RENDER_TIMEOUT_MS)
+                return page.content()
+            finally:
+                browser.close()
+    except Exception:  # noqa: BLE001 — any render failure degrades to "no rendered DOM"
+        return None
 
 
 def fetch_resource(url: str) -> tuple[int, str]:
