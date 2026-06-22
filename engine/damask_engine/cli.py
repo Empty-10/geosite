@@ -47,9 +47,12 @@ def main() -> None:
     ap.add_argument("--render", action="store_true",
                     help="render JavaScript with Playwright and scan the resulting DOM "
                          "(needs the [render] extra + `playwright install chromium`)")
+    ap.add_argument("--performance", action="store_true",
+                    help="add the Core Web Vitals / Lighthouse pillar via PageSpeed Insights "
+                         "(slow; uses PAGESPEED_API_KEY from engine/.env when set)")
     args = ap.parse_args()
 
-    report = scan(args.url, render=args.render)
+    report = scan(args.url, render=args.render, performance=args.performance)
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))

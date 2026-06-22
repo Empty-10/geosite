@@ -38,6 +38,10 @@ pytest                                               # offline tests
 # Optional: scan the post-JavaScript DOM (flags JS-dependent content)
 pip install -e ".[render]" && playwright install chromium
 python -m damask_engine https://example.com --render
+
+# Optional: add the PageSpeed performance pillar (Core Web Vitals + Lighthouse)
+cp .env.example .env && echo "PAGESPEED_API_KEY=…" >> .env   # key optional (works key-less)
+python -m damask_engine https://example.com --performance
 ```
 
 Web app:
@@ -79,6 +83,8 @@ A pure, offline-testable scan engine. Give it a URL (or raw HTML) and it returns
   - `geo_readiness.py` — front-loaded answer, definitive-vs-hedged language, lists/tables,
     question-style headings, content depth. Deterministic (VERIFIED) — NOT citation
     sampling (that's a later MEASURED module).
+  - `performance.py` — Core Web Vitals + Lighthouse from PageSpeed Insights (authoritative
+    API, VERIFIED). Pure parser; the scanner fetches PSI at the boundary. Opt-in (`--performance`).
 - `tests/test_engine.py` — offline tests on fixed HTML. Run with `pytest`.
 
 Known scoring nuance: a page can miss its title yet still score ~74 overall because
@@ -151,7 +157,14 @@ uses Claude Design's runtime and won't run standalone).
    legend, score ring + pillar cards + measured sample card, priority fixes, and per-pillar
    tabs (Technical / On-page / GEO). HeroDemo was refactored onto the same shared components
    (no duplication) and now links to the full report. Verified end-to-end in a real browser.
-5. **PageSpeed performance module** — needs a Google API key in env (`.env`, gitignored).
+5. ~~**PageSpeed performance module**~~ ✅ **Done.** `modules/performance.py` (pure) parses a
+   PageSpeed Insights response into the Performance pillar: Lighthouse 0–100 score, Core Web
+   Vitals (LCP, CLS, TBT, FCP, Speed Index) with standard thresholds, and the CrUX real-user
+   field category. The pillar score is the authoritative Lighthouse number (via
+   `scoring.build_report(pillar_overrides=…)`), not a re-derived penalty. Opt-in and slow, so
+   it's behind `scan(performance=True)` / CLI `--performance`; the web demo doesn't enable it.
+   The key is read from `engine/.env` (`PAGESPEED_API_KEY`, gitignored) via `config.py`, and
+   the API also works key-less at a low rate limit. Verified live (example.com → 100/100).
 
 After that: GEO citation sampling (MEASURED), then the closed-loop features (attribution,
 crawler logs, fix generation), then accounts/billing. Full arc in `CLAUDE.md` → Roadmap.

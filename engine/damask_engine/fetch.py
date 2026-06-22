@@ -110,6 +110,29 @@ def fetch_resource(url: str) -> tuple[int, str]:
         return 0, ""
 
 
+PAGESPEED_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+PAGESPEED_TIMEOUT = 60
+
+
+def fetch_pagespeed(url: str, api_key: str | None = None, strategy: str = "mobile") -> dict | None:
+    """Call Google PageSpeed Insights for `url`. Returns the parsed JSON, or None on failure.
+
+    Boundary helper (kept out of the module so performance.py stays a pure JSON parser).
+    Works key-less at a low rate limit; pass api_key to raise it. Slow (lab run), hence the
+    long timeout and opt-in nature.
+    """
+    params = {"url": url, "strategy": strategy, "category": "performance"}
+    if api_key:
+        params["key"] = api_key
+    try:
+        r = requests.get(PAGESPEED_ENDPOINT, params=params, timeout=PAGESPEED_TIMEOUT)
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except (requests.RequestException, ValueError):
+        return None
+
+
 def tls_info(hostname: str, port: int = 443) -> dict | None:
     """Read the server's TLS leaf cert. Returns expiry info, or None if it can't connect.
 

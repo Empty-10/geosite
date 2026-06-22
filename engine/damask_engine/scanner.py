@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from urllib.parse import urljoin, urlparse
 
-from .fetch import FetchResult, fetch, fetch_resource, tls_info
-from .models import Report
-from .modules import geo_readiness, onpage, technical
+from .config import get_pagespeed_key
+from .fetch import FetchResult, fetch, fetch_pagespeed, fetch_resource, tls_info
+from .models import Pillar, Report
+from .modules import geo_readiness, onpage, performance, technical
 from .modules.technical import NetInputs, parse_robots
 from .scoring import build_report
 from .util import make_soup, visible_text, word_count
@@ -14,11 +15,12 @@ from .util import make_soup, visible_text, word_count
 
 def scan_html(url: str, html: str, *, online: bool = False,
               status_code: int = 200, headers: dict | None = None,
-              final_url: str | None = None, net: NetInputs | None = None) -> Report:
+              final_url: str | None = None, net: NetInputs | None = None,
+              performance_psi: dict | None = None) -> Report:
     """Run all modules against already-fetched HTML. Offline-safe (used by tests).
 
-    Network-derived material (robots.txt, sitemap, TLS, redirects) is passed in via `net`
-    so the modules stay pure — tests build a NetInputs from fixtures, no network needed.
+    Network-derived material (robots.txt, sitemap, TLS, redirects, PageSpeed) is passed in
+    so the modules stay pure — tests build inputs from fixtures, no network needed.
     """
     headers = {k.lower(): v for k, v in (headers or {}).items()}
     final_url = final_url or url
@@ -30,13 +32,20 @@ def scan_html(url: str, html: str, *, online: bool = False,
     findings += technical.analyze(soup, final_url, status_code, headers, net=net)
     findings += geo_readiness.analyze(soup, text)
 
+    overrides: dict[Pillar, int] = {}
+    if performance_psi is not None:
+        findings += performance.analyze(performance_psi)
+        perf_score = performance.pillar_score(performance_psi)
+        if perf_score is not None:
+            overrides[Pillar.PERFORMANCE] = perf_score
+
     meta = {
         "status_code": status_code,
         "final_url": final_url,
         "word_count": word_count(text),
         "online_checks": online,
     }
-    return build_report(url, findings, meta)
+    return build_report(url, findings, meta, pillar_overrides=overrides)
 
 
 def _render_delta(res: FetchResult) -> dict | None:
@@ -79,11 +88,13 @@ def _gather_network(res: FetchResult) -> NetInputs:
     )
 
 
-def scan(url: str, *, render: bool = False) -> Report:
+def scan(url: str, *, render: bool = False, performance: bool = False) -> Report:
     """Fetch a live URL and scan it.
 
-    With render=True, capture the post-JavaScript DOM (Playwright) and scan that — what a
-    JS-executing crawler sees — while still flagging how much content was JS-dependent.
+    render=True captures the post-JavaScript DOM (Playwright) and scans that — what a
+    JS-executing crawler sees — while flagging how much content was JS-dependent.
+    performance=True adds the Core Web Vitals / Lighthouse pillar via PageSpeed Insights
+    (slow; uses PAGESPEED_API_KEY from engine/.env when set, else runs key-less).
     """
     res = fetch(url, render=render)
     if res.error or not res.html:
@@ -92,9 +103,16 @@ def scan(url: str, *, render: bool = False) -> Report:
     # Scan the rendered DOM when available (closest to what crawlers/AI see); else raw HTML.
     html_to_scan = res.rendered_html or res.html
     meta_extra = {"rendered": res.rendered_html is not None}
+
+    psi = None
+    if performance:
+        psi = fetch_pagespeed(res.final_url, get_pagespeed_key())
+        meta_extra["performance_checked"] = psi is not None
+
     report = scan_html(
         url, html_to_scan, online=True, status_code=res.status_code,
         headers=res.headers, final_url=res.final_url, net=_gather_network(res),
+        performance_psi=psi,
     )
     report.meta.update(meta_extra)
     return report

@@ -24,18 +24,29 @@ def score_pillar(findings: list[Finding]) -> int:
     return max(0, min(100, score))
 
 
-def build_report(url: str, findings: list[Finding], meta: dict | None = None) -> Report:
+def build_report(url: str, findings: list[Finding], meta: dict | None = None,
+                 pillar_overrides: dict[Pillar, int] | None = None) -> Report:
+    """Score a list of findings into a Report.
+
+    `pillar_overrides` lets a pillar carry an authoritative score from its source instead of
+    the penalty model — used for Performance, whose score IS Google's Lighthouse 0–100 rather
+    than something we re-derive from findings.
+    """
     report = Report(url=url, findings=findings, meta=meta or {})
+    overrides = pillar_overrides or {}
 
     present: dict[Pillar, list[Finding]] = {}
     for f in findings:
         present.setdefault(f.pillar, []).append(f)
 
-    report.pillar_scores = {p.value: score_pillar(fs) for p, fs in present.items()}
+    def pillar_value(p: Pillar, fs: list[Finding]) -> int:
+        return overrides[p] if p in overrides else score_pillar(fs)
+
+    report.pillar_scores = {p.value: pillar_value(p, fs) for p, fs in present.items()}
 
     total_weight = sum(PILLAR_WEIGHTS[p] for p in present)
     if total_weight:
-        weighted = sum(score_pillar(fs) * PILLAR_WEIGHTS[p] for p, fs in present.items())
+        weighted = sum(report.pillar_scores[p.value] * PILLAR_WEIGHTS[p] for p in present)
         report.overall_score = round(weighted / total_weight)
 
     return report
