@@ -12,8 +12,9 @@ from enum import Enum
 from typing import Any
 
 # Bump when the report's check coverage or shape changes in a way consumers should notice.
-# v2: added geo.aeo / geo.faq / geo.trust (+ further coverage-map checks). Snapshot-tested.
-SCHEMA_VERSION = "2"
+# v2: added geo.aeo / geo.faq / geo.trust (+ further coverage-map checks).
+# v3: added the top-level `fixes` array (generated remediation artifacts). Snapshot-tested.
+SCHEMA_VERSION = "3"
 
 
 class Confidence(str, Enum):
@@ -97,6 +98,7 @@ class Report:
     pillar_scores: dict[str, int] = field(default_factory=dict)
     overall_score: int = 0
     meta: dict[str, Any] = field(default_factory=dict)  # status code, fetch notes, etc.
+    fixes: list[Any] = field(default_factory=list)  # generated remediation artifacts (Fix)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -107,4 +109,5 @@ class Report:
             "pillar_scores": self.pillar_scores,
             "meta": self.meta,
             "findings": [f.to_dict() for f in self.findings],
+            "fixes": [f.to_dict() for f in self.fixes],
         }

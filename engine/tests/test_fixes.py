@@ -1,0 +1,89 @@
+"""Fixture tests for deterministic fix generation. Offline."""
+
+from __future__ import annotations
+
+import json
+
+from damask_engine import scan_html
+from damask_engine.fixes import Fix, generate_fixes
+from damask_engine.util import make_soup
+
+
+def fixes_for(html: str, url: str = "https://example.com/page") -> dict[str, Fix]:
+    report = scan_html(url, html, online=False, final_url=url, fixes=True)
+    return {f.finding_id: f for f in report.fixes}
+
+
+def _valid_jsonld(fix: Fix) -> dict:
+    inner = fix.content.split(">", 1)[1].rsplit("<", 1)[0].strip()  # strip <script> wrapper
+    return json.loads(inner)
+
+
+# ------------------------------------------------------------------------ schema fix
+
+def test_schema_fix_generated_when_missing():
+    html = """<html><head><title>Acme Widgets | Acme</title>
+      <meta property="og:image" content="https://example.com/logo.png">
+      </head><body><h1>Best widgets</h1><p>We sell the finest widgets available anywhere.</p></body></html>"""
+    f = fixes_for(html)["schema.missing"]
+    assert f.kind == "json-ld"
+    graph = _valid_jsonld(f)["@graph"]
+    org = next(n for n in graph if n["@type"] == "Organization")
+    assert org["name"] == "Acme"  # derived from the title's brand segment
+    assert org["logo"] == "https://example.com/logo.png"
+
+
+def test_no_schema_fix_when_schema_present():
+    html = """<html><head><title>T</title>
+      <script type="application/ld+json">{"@type":"Organization","name":"X"}</script>
+      </head><body><h1>h</h1><p>Plenty of words here to satisfy the content checks fine.</p></body></html>"""
+    assert "schema.missing" not in fixes_for(html)
+
+
+# --------------------------------------------------------------------------- FAQ fix
+
+def test_faq_fix_from_qa_pairs():
+    html = """<html><head><title>T</title></head><body>
+      <h2>What is it?</h2><p>It is a clear and direct answer that is long enough to count.</p>
+      <h2>How much?</h2><p>It costs a fixed monthly fee with no hidden charges whatsoever.</p>
+    </body></html>"""
+    f = fixes_for(html)["geo.faq"]
+    entities = _valid_jsonld(f)["mainEntity"]
+    assert len(entities) == 2
+    assert entities[0]["@type"] == "Question"
+    assert entities[0]["acceptedAnswer"]["@type"] == "Answer"
+
+
+# -------------------------------------------------------------------------- llms.txt
+
+def test_llms_fix_when_absent():
+    # technical module emits tech.llms_txt(value=False) when llms_status is provided as 404
+    from damask_engine.modules.technical import NetInputs
+    report = scan_html("https://example.com/", "<html><body><p>hi there friends here</p></body></html>",
+                       online=False, final_url="https://example.com/",
+                       net=NetInputs(llms_status=404, llms_txt=""), fixes=True)
+    fx = {f.finding_id: f for f in report.fixes}["tech.llms_txt"]
+    assert fx.kind == "llms-txt"
+    assert fx.content.startswith("# ")
+    assert "/sitemap.xml" in fx.content
+
+
+# ---------------------------------------------------------------------- meta description
+
+def test_meta_fix_from_first_paragraph():
+    html = ("<html><head><title>T</title></head><body><h1>h</h1>"
+            "<p>This opening paragraph becomes the basis for a generated meta description tag.</p>"
+            "</body></html>")
+    f = fixes_for(html)["meta.description.missing"]
+    assert f.content.startswith('<meta name="description"')
+    assert "opening paragraph" in f.content
+
+
+def test_generate_fixes_is_pure_listable():
+    html = "<html><head><title>T</title></head><body><h1>h</h1></body></html>"
+    report = scan_html("https://example.com/", html, online=False, final_url="https://example.com/")
+    # without fixes=True, no fixes attached
+    assert report.fixes == []
+    # calling generate_fixes directly returns Fix objects
+    out = generate_fixes(make_soup(html), report, "https://example.com/")
+    assert all(isinstance(f, Fix) for f in out)

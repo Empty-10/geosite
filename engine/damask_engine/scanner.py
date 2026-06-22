@@ -6,6 +6,7 @@ from urllib.parse import urljoin, urlparse
 
 from .config import get_pagespeed_key
 from .fetch import FetchResult, fetch, fetch_pagespeed, fetch_resource, tls_info
+from .fixes import generate_fixes
 from .models import Pillar, Report
 from .modules import geo_readiness, onpage, performance, technical
 from .modules.technical import NetInputs, parse_robots
@@ -16,7 +17,7 @@ from .util import make_soup, visible_text, word_count
 def scan_html(url: str, html: str, *, online: bool = False,
               status_code: int = 200, headers: dict | None = None,
               final_url: str | None = None, net: NetInputs | None = None,
-              performance_psi: dict | None = None) -> Report:
+              performance_psi: dict | None = None, fixes: bool = False) -> Report:
     """Run all modules against already-fetched HTML. Offline-safe (used by tests).
 
     Network-derived material (robots.txt, sitemap, TLS, redirects, PageSpeed) is passed in
@@ -45,7 +46,10 @@ def scan_html(url: str, html: str, *, online: bool = False,
         "word_count": word_count(text),
         "online_checks": online,
     }
-    return build_report(url, findings, meta, pillar_overrides=overrides)
+    report = build_report(url, findings, meta, pillar_overrides=overrides)
+    if fixes:
+        report.fixes = generate_fixes(soup, report, final_url)
+    return report
 
 
 def _render_delta(res: FetchResult) -> dict | None:
@@ -91,13 +95,15 @@ def _gather_network(res: FetchResult) -> NetInputs:
     )
 
 
-def scan(url: str, *, render: bool = False, performance: bool = False) -> Report:
+def scan(url: str, *, render: bool = False, performance: bool = False,
+         fixes: bool = False) -> Report:
     """Fetch a live URL and scan it.
 
     render=True captures the post-JavaScript DOM (Playwright) and scans that — what a
     JS-executing crawler sees — while flagging how much content was JS-dependent.
     performance=True adds the Core Web Vitals / Lighthouse pillar via PageSpeed Insights
     (slow; uses PAGESPEED_API_KEY from engine/.env when set, else runs key-less).
+    fixes=True generates ready-to-paste remediation artifacts for the findings that fired.
     """
     res = fetch(url, render=render)
     if res.error or not res.html:
@@ -115,7 +121,7 @@ def scan(url: str, *, render: bool = False, performance: bool = False) -> Report
     report = scan_html(
         url, html_to_scan, online=True, status_code=res.status_code,
         headers=res.headers, final_url=res.final_url, net=_gather_network(res),
-        performance_psi=psi,
+        performance_psi=psi, fixes=fixes,
     )
     report.meta.update(meta_extra)
     return report

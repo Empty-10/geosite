@@ -39,6 +39,16 @@ def _print_human(report: Report) -> None:
     print("  labels: every check above is VERIFIED (deterministic). "
           "AI citation sampling (MEASURED) arrives in a later phase.\n")
 
+    if report.fixes:
+        print(f"  generated fixes ({len(report.fixes)}):")
+        for fx in report.fixes:
+            print(f"\n  ▸ {fx.title}  [{fx.kind}]  → {fx.finding_id}")
+            for line in fx.content.splitlines():
+                print(f"      {line}")
+            if fx.note:
+                print(f"      note: {fx.note}")
+        print()
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(prog="damask", description="GEO/SEO scan engine.")
@@ -50,9 +60,11 @@ def main() -> None:
     ap.add_argument("--performance", action="store_true",
                     help="add the Core Web Vitals / Lighthouse pillar via PageSpeed Insights "
                          "(slow; uses PAGESPEED_API_KEY from engine/.env when set)")
+    ap.add_argument("--fixes", action="store_true",
+                    help="generate ready-to-paste remediation artifacts for the findings")
     args = ap.parse_args()
 
-    report = scan(args.url, render=args.render, performance=args.performance)
+    report = scan(args.url, render=args.render, performance=args.performance, fixes=args.fixes)
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
