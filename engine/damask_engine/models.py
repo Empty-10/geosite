@@ -11,6 +11,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
+# Bump when the JSON report shape changes in a way consumers must notice. Snapshot-tested.
+SCHEMA_VERSION = "1"
+
 
 class Confidence(str, Enum):
     """How much to trust a finding. See CLAUDE.md → accuracy principle."""
@@ -96,6 +99,7 @@ class Report:
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "schema_version": SCHEMA_VERSION,
             "url": self.url,
             "fetched_at": self.fetched_at,
             "overall_score": self.overall_score,

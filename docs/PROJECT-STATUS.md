@@ -63,8 +63,11 @@ A pure, offline-testable scan engine. Give it a URL (or raw HTML) and it returns
 - `modules/` — pure functions returning `list[Finding]`, one per area:
   - `onpage.py` — title, meta, H1, headings, JSON-LD schema, canonical, robots meta, OG,
     image alt coverage.
-  - `technical.py` — HTTPS, status, redirects, HSTS, mixed content, viewport; robots.txt
-    + sitemap when online. (Shallowest module — first to deepen.)
+  - `technical.py` — HTTPS, status, redirect chain, HSTS, TLS-cert expiry, mixed content,
+    viewport, and parsed robots.txt (AI-crawler access, declared sitemaps) + sitemap.xml
+    (valid/index, URL count, `<lastmod>` freshness) when online. **Pure**: the scanner
+    fetches these at the boundary and hands the text in via `NetInputs`, so parsing is
+    offline- and fixture-tested (`parse_robots`, `parse_sitemap`).
   - `geo_readiness.py` — front-loaded answer, definitive-vs-hedged language, lists/tables,
     question-style headings, content depth. Deterministic (VERIFIED) — NOT citation
     sampling (that's a later MEASURED module).
@@ -117,9 +120,14 @@ uses Claude Design's runtime and won't run standalone).
    `Report.to_dict()` as the CLI, so the route handles the local and HTTP paths identically.
    Remaining for deploy: stand the service up on a container host and point
    `DAMASK_ENGINE_URL` at it.
-2. **Deepen `engine/modules/technical.py`** — real robots.txt + sitemap.xml fetch & parse,
-   redirect-chain capture, SSL/HSTS checks; add fixture tests. Version the JSON report
-   schema (`schema_version`) and snapshot-test it.
+2. ~~**Deepen `engine/modules/technical.py`**~~ ✅ **Done.** robots.txt + sitemap.xml are
+   fetched at the boundary (`fetch.py`) and parsed by pure `parse_robots` / `parse_sitemap`
+   (AI-crawler access, declared sitemaps; urlset/index validity, URL count, `<lastmod>`
+   freshness). Added redirect-chain capture (`FetchResult.redirect_chain`) and a TLS-cert
+   expiry check (`tls_info`, verified via certifi's CA bundle). The module is now pure (no
+   `requests` import) — network material flows in through `NetInputs`. JSON report carries
+   `schema_version` ("1"); fixture tests (`test_technical.py`) and a schema snapshot
+   (`test_schema.py`) cover it. 20 tests pass.
 3. **Playwright rendering in `fetch.py`** — capture raw HTML + rendered DOM; flag pages
    where they differ materially (JS-dependent content the engine would otherwise miss).
 4. **Report screen** (`web/app/report/...`) — the full scan-report view per design brief
