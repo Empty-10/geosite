@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { C, scoreColor } from "@/lib/tokens";
+import { C } from "@/lib/tokens";
+import { FindingsList } from "./report/FindingsList";
+import { MeasuredCard } from "./report/MeasuredCard";
+import { PillarCards } from "./report/PillarCards";
+import { ScoreRing } from "./report/ScoreRing";
+import { priorityFixes, rgba, type Report } from "./report/types";
 
 // Visual scan steps. The engine runs three deterministic modules (technical, on-page, GEO
 // readiness); the rest are surfaced here as roadmap so the full pillar set is visible.
@@ -16,67 +21,7 @@ const MODULE_NAMES = [
 ];
 const PERF_INDEX = 3;
 
-// Pillar cards map onto the engine's pillar_scores keys. Pillars absent from a scan
-// (Performance isn't in the first slice) render as a "not run yet" state, not a number.
-const PILLAR_CARDS: { label: string; key: string }[] = [
-  { label: "Technical", key: "technical" },
-  { label: "On-page", key: "onpage" },
-  { label: "GEO readiness", key: "geo" },
-  { label: "Performance", key: "performance" },
-];
-
-// severity → badge label + colour + sort rank (lower = more urgent).
-const SEV: Record<string, { label: string; color: string; rank: number }> = {
-  critical: { label: "Critical", color: C.fail, rank: 0 },
-  high: { label: "High", color: C.fail, rank: 1 },
-  medium: { label: "Medium", color: C.warn, rank: 2 },
-  low: { label: "Low", color: C.measured, rank: 3 },
-  info: { label: "Info", color: C.text3, rank: 4 },
-};
-
-// confidence → badge. The accuracy principle made visible: solid green = verified fact.
-const CONF: Record<string, { label: string; color: string }> = {
-  verified: { label: "Verified", color: C.accent },
-  measured: { label: "Measured", color: C.measured },
-  estimated: { label: "Estimated", color: C.warn },
-};
-
-const RING_R = 50;
-const RING_CIRC = 2 * Math.PI * RING_R;
 const MIN_SCAN_MS = 1900; // let the module ticks read even when the engine returns sooner
-
-type Finding = {
-  id: string;
-  pillar: string;
-  title: string;
-  status: string;
-  severity: string;
-  confidence: string;
-  value: unknown;
-  evidence: string | null;
-  recommendation: string | null;
-};
-
-type Report = {
-  url: string;
-  fetched_at: string;
-  overall_score: number;
-  pillar_scores: Record<string, number>;
-  meta: Record<string, unknown>;
-  findings: Finding[];
-};
-
-function rgba(hex: string, a: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
-}
-
-function sev(s: string) {
-  return SEV[s] ?? SEV.info;
-}
-function conf(c: string) {
-  return CONF[c] ?? CONF.verified;
-}
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -85,24 +30,20 @@ type Phase = "idle" | "scanning" | "done" | "error";
 export function HeroDemo() {
   const [url, setUrl] = useState("stripe.com");
   const [phase, setPhase] = useState<Phase>("idle");
-  const [score, setScore] = useState(0);
   const [moduleStatus, setModuleStatus] = useState<number[]>(() =>
     MODULE_NAMES.map((_, i) => (i === PERF_INDEX ? 3 : 0)),
   );
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [expanded, setExpanded] = useState<string | null>(null);
 
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const raf = useRef<number | null>(null);
   const runId = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
   function clearTimers() {
     timers.current.forEach((t) => clearTimeout(t));
     timers.current = [];
-    if (raf.current) cancelAnimationFrame(raf.current);
   }
   useEffect(() => {
     return () => {
@@ -110,17 +51,6 @@ export function HeroDemo() {
       abortRef.current?.abort();
     };
   }, []);
-
-  function countUp(target: number, dur: number) {
-    const start = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / dur);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setScore(Math.round(target * eased));
-      if (t < 1) raf.current = requestAnimationFrame(tick);
-    };
-    raf.current = requestAnimationFrame(tick);
-  }
 
   function startModuleAnimation() {
     setModuleStatus(MODULE_NAMES.map((_, i) => (i === PERF_INDEX ? 3 : 0)));
@@ -156,10 +86,8 @@ export function HeroDemo() {
     abortRef.current = ctrl;
 
     setPhase("scanning");
-    setScore(0);
     setReport(null);
     setError(null);
-    setExpanded(null);
     startModuleAnimation();
 
     const started = performance.now();
@@ -176,12 +104,9 @@ export function HeroDemo() {
       await delay(Math.max(0, MIN_SCAN_MS - (performance.now() - started)));
       if (runId.current !== myRun) return; // a newer scan superseded this one
 
-      const fixes = priorityFixes(data.findings ?? []);
       setReport(data);
       setElapsedMs(performance.now() - started);
-      setExpanded(fixes[0]?.id ?? null);
       setPhase("done");
-      countUp(typeof data.overall_score === "number" ? data.overall_score : 0, 650);
     } catch (e) {
       if (runId.current !== myRun || ctrl.signal.aborted) return;
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -193,7 +118,6 @@ export function HeroDemo() {
   const isScanning = phase === "scanning";
   const isDone = phase === "done";
   const isError = phase === "error";
-  const ringOffset = RING_CIRC * (1 - score / 100);
 
   const fixes = report ? priorityFixes(report.findings) : [];
   const modulesRun = MODULE_NAMES.length - 1; // Performance is not run in the first slice
@@ -363,10 +287,10 @@ export function HeroDemo() {
         {isScanning && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {MODULE_NAMES.map((name, i) => {
-              const st = moduleStatus[i];
-              const running = st === 1;
-              const done = st === 2;
-              const notRun = st === 3;
+              const stt = moduleStatus[i];
+              const running = stt === 1;
+              const done = stt === 2;
+              const notRun = stt === 3;
               return (
                 <div
                   key={name}
@@ -433,288 +357,24 @@ export function HeroDemo() {
             </div>
 
             <div style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 14 }}>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  padding: "18px 22px",
-                  border: "1px solid var(--border)",
-                  borderRadius: 12,
-                  background: "var(--ink)",
-                }}
-              >
-                <div style={{ position: "relative", width: 116, height: 116 }}>
-                  <svg width={116} height={116} viewBox="0 0 116 116" style={{ transform: "rotate(-90deg)" }}>
-                    <circle cx={58} cy={58} r={RING_R} fill="none" stroke={C.border} strokeWidth={9} />
-                    <circle
-                      cx={58}
-                      cy={58}
-                      r={RING_R}
-                      fill="none"
-                      stroke={scoreColor(score)}
-                      strokeWidth={9}
-                      strokeLinecap="round"
-                      strokeDasharray={RING_CIRC}
-                      strokeDashoffset={ringOffset}
-                    />
-                  </svg>
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <span style={{ fontSize: 34, fontWeight: 500, letterSpacing: "-0.02em", lineHeight: 1 }}>
-                      {score}
-                    </span>
-                    <span style={{ fontSize: 11, color: "var(--text-3)" }}>/ 100</span>
-                  </div>
-                </div>
-                <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>Overall GEO score</span>
-              </div>
-
-              <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {PILLAR_CARDS.map(({ label, key }) => {
-                  const value = report.pillar_scores[key];
-                  const ran = typeof value === "number";
-                  return (
-                    <div
-                      key={label}
-                      style={{
-                        padding: "12px 14px",
-                        border: "1px solid var(--border)",
-                        borderRadius: 11,
-                        background: "var(--ink)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 8,
-                        opacity: ran ? 1 : 0.6,
-                      }}
-                    >
-                      <span style={{ fontSize: 12, color: "var(--text-2)" }}>{label}</span>
-                      {ran ? (
-                        <>
-                          <span style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-0.01em" }}>{value}</span>
-                          <div style={{ height: 4, borderRadius: 99, background: "var(--border)", overflow: "hidden" }}>
-                            <div
-                              style={{ height: "100%", width: `${value}%`, background: scoreColor(value), borderRadius: 99 }}
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-3)" }}>Not run yet</span>
-                          <span style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
-                            later phase
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <ScoreRing score={report.overall_score} />
+              <PillarCards pillarScores={report.pillar_scores} />
             </div>
 
-            {/* Preview of the MEASURED citation module (later phase). Static sample data — not a
-                measurement of the scanned site. Kept visually so the verified/measured grammar reads. */}
-            <div
-              style={{
-                padding: "14px 16px",
-                border: "1px solid var(--border)",
-                borderRadius: 12,
-                background: "var(--ink)",
-                marginBottom: 16,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <span style={{ fontSize: 12.5, color: "var(--text-2)" }}>AI answer-engine visibility</span>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: 11,
-                    color: C.measured,
-                    border: `1px solid ${rgba(C.measured, 0.35)}`,
-                    background: rgba(C.measured, 0.1),
-                    padding: "3px 9px",
-                    borderRadius: 999,
-                  }}
-                >
-                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: C.measured }} />
-                  Measured · sample
-                </span>
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
-                <span style={{ fontSize: 26, fontWeight: 500 }}>23%</span>
-                <span style={{ fontSize: 13, color: "var(--text-3)" }}>citation share</span>
-              </div>
-              <div style={{ position: "relative", height: 8, borderRadius: 99, background: "var(--border)", marginBottom: 8 }}>
-                <div
-                  style={{
-                    position: "absolute",
-                    left: "17%",
-                    width: "12%",
-                    top: 0,
-                    bottom: 0,
-                    background: rgba(C.measured, 0.45),
-                    borderRadius: 99,
-                  }}
-                />
-                <div
-                  style={{ position: "absolute", left: "23%", top: -2, width: 2, height: 12, background: C.measured, borderRadius: 2 }}
-                />
-              </div>
-              <span style={{ fontSize: 11.5, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
-                example output · citation sampling arrives in a later phase
-              </span>
+            <div style={{ marginBottom: 16 }}>
+              <MeasuredCard />
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <span style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>Priority fixes</span>
-              <span style={{ fontSize: 12, color: "var(--text-3)" }}>
-                {Math.min(3, fixes.length)} of {fixes.length} shown
-              </span>
+              <a href={`/report?url=${encodeURIComponent(url)}`} style={{ fontSize: 12, color: C.accent }}>
+                Full report →
+              </a>
             </div>
-            {fixes.length === 0 ? (
-              <div
-                style={{
-                  padding: "16px 14px",
-                  border: "1px solid var(--border)",
-                  borderRadius: 11,
-                  background: "var(--ink)",
-                  fontSize: 13,
-                  color: "var(--text-2)",
-                }}
-              >
-                No failing or warning checks — this page passes the deterministic GEO-readiness audit.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {fixes.slice(0, 3).map((f) => {
-                  const open = expanded === f.id;
-                  const s = sev(f.severity);
-                  const cf = conf(f.confidence);
-                  return (
-                    <div
-                      key={f.id}
-                      style={{ border: "1px solid var(--border)", borderRadius: 11, background: "var(--ink)", overflow: "hidden" }}
-                    >
-                      <div
-                        onClick={() => setExpanded(open ? null : f.id)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 12,
-                          padding: "12px 14px",
-                          cursor: "pointer",
-                          borderLeft: `3px solid ${s.color}`,
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: s.color,
-                            border: `1px solid ${rgba(s.color, 0.35)}`,
-                            background: rgba(s.color, 0.1),
-                            padding: "2px 8px",
-                            borderRadius: 6,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {s.label}
-                        </span>
-                        <span style={{ flex: 1, fontSize: 13.5, color: "var(--text)" }}>{f.title}</span>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            fontSize: 11,
-                            color: "var(--text-2)",
-                            flexShrink: 0,
-                          }}
-                        >
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: cf.color }} />
-                          {cf.label}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: 13,
-                            color: "var(--text-3)",
-                            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-                            transition: "transform 0.15s ease",
-                          }}
-                        >
-                          ⌄
-                        </span>
-                      </div>
-                      {open && (
-                        <div style={{ padding: "0 14px 14px 17px", animation: "dmFade 0.15s ease both" }}>
-                          {f.evidence && (
-                            <>
-                              <div style={{ fontSize: 11, color: "var(--text-3)", margin: "4px 0 6px" }}>Evidence</div>
-                              <pre
-                                style={{
-                                  fontSize: 12,
-                                  color: "var(--text-2)",
-                                  fontFamily: "var(--mono)",
-                                  background: "var(--surface)",
-                                  border: "1px solid var(--border)",
-                                  borderRadius: 8,
-                                  padding: "10px 12px",
-                                  whiteSpace: "pre-wrap",
-                                  marginBottom: 12,
-                                }}
-                              >
-                                {f.evidence}
-                              </pre>
-                            </>
-                          )}
-                          {f.recommendation && (
-                            <>
-                              <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 6 }}>Recommendation</div>
-                              <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 12 }}>{f.recommendation}</p>
-                            </>
-                          )}
-                          <button
-                            style={{
-                              fontSize: 12.5,
-                              fontWeight: 500,
-                              color: C.accent,
-                              border: `1px solid ${rgba(C.accent, 0.4)}`,
-                              background: rgba(C.accent, 0.12),
-                              padding: "7px 13px",
-                              borderRadius: 8,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Generate fix
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <FindingsList findings={fixes.slice(0, 3)} />
           </div>
         )}
       </div>
     </div>
   );
-}
-
-/** Failing/warning findings, most urgent first — the actionable "priority fixes" list. */
-function priorityFixes(findings: Finding[]): Finding[] {
-  return findings
-    .filter((f) => f.status === "fail" || f.status === "warn")
-    .sort((a, b) => sev(a.severity).rank - sev(b.severity).rank);
 }

@@ -17,7 +17,8 @@ A snapshot of what exists, how it works, and what to build next. Pair this with
 | Marketing/landing site | ✅ Built (Next.js 16), live scan demo **wired to real engine** | `web/` |
 | Design system + prototype | ✅ Locked | `docs/claude-design-brief.md`, `design/` |
 | `/api/scan` (engine ↔ web) | ✅ Built — route shells out to the engine, HeroDemo consumes it | `web/app/api/scan/` |
-| Report screen, dashboard | ❌ Not built | — |
+| Report screen | ✅ Built — `/report?url=`, reuses shared report components | `web/app/report/`, `web/components/report/` |
+| Dashboard | ❌ Not built | — |
 | Real GEO citation sampling, attribution, accounts/billing | ❌ Later phases | — |
 
 ---
@@ -143,8 +144,13 @@ uses Claude Design's runtime and won't run standalone).
    without it, scans degrade to raw HTML. The web `/api/scan` route does **not** pass
    `--render` (keeps the demo fast — no browser per request); opt in later if needed.
    Verified live: todomvc CSR React app flagged (13→118 words); static pages pass.
-4. **Report screen** (`web/app/report/...`) — the full scan-report view per design brief
-   §7.3, reusing HeroDemo's score ring / pillar cards / findings components.
+4. ~~**Report screen**~~ ✅ **Done.** `web/app/report/page.tsx` + `components/report/`
+   (`ReportView`, `ScoreRing`, `PillarCards`, `MeasuredCard`, `FindingsList`,
+   `ConfidenceLegend`, shared `types.ts`). `/report?url=<url>` scans via `/api/scan` and
+   renders the §7.3 screen: header (URL, scan time, re-scan, export-via-print), confidence
+   legend, score ring + pillar cards + measured sample card, priority fixes, and per-pillar
+   tabs (Technical / On-page / GEO). HeroDemo was refactored onto the same shared components
+   (no duplication) and now links to the full report. Verified end-to-end in a real browser.
 5. **PageSpeed performance module** — needs a Google API key in env (`.env`, gitignored).
 
 After that: GEO citation sampling (MEASURED), then the closed-loop features (attribution,
