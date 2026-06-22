@@ -82,23 +82,32 @@ pillars we have (on-page, technical, GEO-readiness) and renormalize weights.
 ## Repo layout
 
 ```
-engine/                 Python scan engine (THE FIRST BUILD — start here)
+engine/                 Python scan engine — BUILT, runnable, pytest green
   damask_engine/
-    cli.py              `python -m damask_engine <url>` → prints a scored report
+    cli.py              `python -m damask_engine <url>` → scored report (--json for JSON)
     scanner.py          orchestrates modules; scan(url) and scan_html(url, html)
-    fetch.py            HTTP fetch (Playwright render comes later)
-    models.py           Finding / Report / enums (ConfidenceLabel, Severity, Pillar)
-    scoring.py          pillar + overall scoring
+    fetch.py            HTTP fetch (Playwright render still to come)
+    models.py           Finding / Report / enums (Confidence, Severity, Status, Pillar)
+    scoring.py          pillar + overall scoring (weights renormalized to pillars present)
+    util.py             HTML parsing helpers
     modules/            onpage.py, technical.py, geo_readiness.py
   tests/                offline tests (parse fixed HTML, no network)
   pyproject.toml
-web/                    Next.js app (scaffold later via create-next-app — see web/README)
-docs/                   architecture doc + competitive notes
+web/                    Next.js 16 landing app — BUILT (real port of the design prototype)
+  app/                  layout.tsx, page.tsx, globals.css, icon.svg, opengraph-image.tsx
+  components/           Nav, Hero, HeroDemo (live scan demo), Confidence, Features,
+                        Pricing, AgencyCta, Footer, Logo
+  lib/tokens.ts         design tokens (palette + scoreColor) for JS/inline use
+  public/robots.txt
+design/                 landing-prototype.html (Claude Design output; reference only)
+docs/                   architecture doc, claude-design-brief.md, PROJECT-STATUS.md
 ```
 
 ## Conventions
 
-- Python 3.11+, type hints everywhere, dataclasses for models, `ruff` + `black` style.
+- Python 3.10+, type hints everywhere, dataclasses for models, `ruff` + `black` style.
+- Web: Next.js 16 (App Router) + React 19 + TypeScript. Dark-mode-first; design tokens
+  live in `web/app/globals.css` (CSS vars) and `web/lib/tokens.ts` (JS). No Tailwind.
 - Modules are pure: a module takes parsed input and returns `list[Finding]`. No module
   reaches into another. New checks = new functions returning Findings, nothing else.
 - Every `Finding` MUST set a `confidence` label and, where possible, `evidence`
@@ -120,25 +129,34 @@ pytest                                                 # offline tests
 
 ## Roadmap (build order)
 
-- **Phase 0 — foundations.** Engine skeleton, models, scoring, on-page/technical/
-  GEO-readiness modules, CLI, tests. ← *this scaffold; flesh it out next.*
+- **Phase 0 — foundations. ✅ DONE.** Engine skeleton, models, scoring, on-page/technical/
+  GEO-readiness modules, CLI, tests (pytest green).
 - **Phase 1 — engine depth.** Add Playwright rendering, richer technical (sitemap/robots
   parsing, SSL), PageSpeed API performance module, JSON report schema v1.
-- **Phase 2 — internal report.** Web shell, run a scan, render a branded report, PDF export.
+- **Phase 2 — internal report. 🟡 STARTED.** Next.js landing app built (marketing + live
+  scan demo, currently mocked). Still to do: real `/api/scan` route, report screen,
+  dashboard, branded/PDF export.
 - **Phase 3 — GEO engine.** Multi-engine citation sampling (MEASURED), visibility/SoV,
   entity authority, confidence bands. This is the differentiator's first half.
 - **Phase 4 — closed loop.** AI referral attribution (GA4 + logs), crawler-log analytics,
   fix generation. This is what makes us not-a-monitor.
 - **Phase 5 — SaaS.** Accounts, multi-tenant, billing, scheduling, alerts, white-label.
 
-## Immediate next tasks (for Claude Code to pick up)
+## Immediate next tasks (pick up here)
 
-1. `cd engine && pip install -e . && pytest` — confirm the scaffold runs green.
-2. Flesh out `modules/technical.py`: real robots.txt + sitemap.xml fetch & parse,
-   redirect-chain capture, SSL/HSTS check. Add tests with fixtures.
-3. Add a `--json` report schema (versioned) and snapshot-test it.
-4. Add Playwright rendering in `fetch.py` (raw HTML + rendered DOM; flag JS-dependent
-   pages where they differ materially).
-5. Then start the PageSpeed performance module (needs a Google API key in env).
+The highest-value next step is connecting the two halves that already exist — the live
+scan demo on the landing page is mocked; make it call the real engine.
 
+1. **`/api/scan` route** in `web/` — accept a URL, run the engine, return its JSON report.
+   Two options: (a) a Next route handler that shells out to `python -m damask_engine <url>
+   --json`, or (b) expose the engine as a small FastAPI service and have the route fetch it.
+   Wire `HeroDemo.tsx` to call it instead of the mocked data.
+2. **Engine depth** — flesh out `modules/technical.py` (real robots.txt + sitemap parse,
+   redirect chain, SSL/HSTS) with fixture tests; version the JSON report schema.
+3. **Playwright rendering** in `fetch.py` (raw HTML + rendered DOM; flag JS-dependent pages).
+4. **Report screen** in `web/` — the full scan-report view (see `docs/claude-design-brief.md`
+   §7.3), reusing the HeroDemo components.
+5. **PageSpeed performance module** (needs a Google API key in env).
+
+See `docs/PROJECT-STATUS.md` for the full current-state breakdown.
 Keep the accuracy principle and the GEO-first wedge in mind for every addition.

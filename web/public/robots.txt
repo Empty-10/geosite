@@ -1,0 +1,7 @@
+# damask marketing site
+User-agent: *
+Allow: /
+
+# We practice what we preach — AI answer engines are welcome here.
+# (Update the host once the real domain is locked.)
+# Sitemap: https://your-domain.ai/sitemap.xml
