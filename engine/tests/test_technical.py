@@ -154,5 +154,35 @@ def test_offline_scan_skips_network_checks():
     """With no NetInputs, none of the network-derived findings appear (offline default)."""
     r = scan_html("https://example.com/", HTML, online=False)
     ids = {f.id for f in r.findings}
-    assert not any(i.startswith(("tech.robots", "tech.sitemap", "tech.redirect", "tech.tls", "tech.render")) for i in ids)
+    assert not any(i.startswith(("tech.robots", "tech.sitemap", "tech.redirect", "tech.tls",
+                                 "tech.render", "tech.llms")) for i in ids)
     assert "tech.https" in ids  # in-page technical checks still run
+    assert "tech.resource_hints" in ids  # delivery check is DOM-based, runs offline
+
+
+# ------------------------------------------------------------- delivery + llms.txt
+
+def test_resource_hints_pass_with_hints():
+    html = ("<head><link rel='preconnect' href='https://cdn.example'>"
+            "<script src='a.js' defer></script></head><body><h1>x</h1></body>")
+    f = _run_full(html)["tech.resource_hints"]
+    assert f.status == Status.PASS
+    assert f.value["resource_hints"] == 1 and f.value["blocking_scripts"] == 0
+
+
+def test_resource_hints_warn_on_blocking_script():
+    html = "<head><script src='a.js'></script></head><body><h1>x</h1></body>"
+    f = _run_full(html)["tech.resource_hints"]
+    assert f.status == Status.WARN and f.value["blocking_scripts"] == 1
+
+
+def test_llms_present_and_absent():
+    present = _run(NetInputs(llms_status=200, llms_txt="# llms\nUser-agent: *\n"))
+    assert present["tech.llms_txt"].status == Status.PASS and present["tech.llms_txt"].value is True
+    absent = _run(NetInputs(llms_status=404, llms_txt=""))
+    assert absent["tech.llms_txt"].status == Status.INFO  # low-impact: absence doesn't penalize
+
+
+def _run_full(html: str):
+    """Run the technical module against given HTML (resource hints read the DOM head)."""
+    return {f.id: f for f in analyze(make_soup(html), "https://example.com/", 200, {})}

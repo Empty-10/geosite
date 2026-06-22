@@ -11,8 +11,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-# Bump when the JSON report shape changes in a way consumers must notice. Snapshot-tested.
-SCHEMA_VERSION = "1"
+# Bump when the report's check coverage or shape changes in a way consumers should notice.
+# v2: added geo.aeo / geo.faq / geo.trust (+ further coverage-map checks). Snapshot-tested.
+SCHEMA_VERSION = "2"
 
 
 class Confidence(str, Enum):

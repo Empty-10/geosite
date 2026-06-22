@@ -46,6 +46,8 @@ class NetInputs:
     tls: dict | None = None
     # {"raw_words": int, "rendered_words": int} when a render was attempted, else None.
     render_delta: dict | None = None
+    llms_status: int | None = None
+    llms_txt: str | None = None
 
 
 # --------------------------------------------------------------------------- parsers (pure)
@@ -235,7 +237,51 @@ def analyze(
     if net.render_delta is not None:
         out.append(_render_check(net.render_delta))
 
+    # --- resource hints & script loading (delivery signals from the HTML head) ---
+    out.append(_delivery_checks(soup))
+
+    # --- llms.txt (fetched at the boundary; flagged low-impact) ---
+    if net.llms_status is not None:
+        out.append(_llms_check(net.llms_status, net.llms_txt or ""))
+
     return out
+
+
+def _delivery_checks(soup: BeautifulSoup) -> Finding:
+    rels: list[str] = []
+    for link in soup.find_all("link", rel=True):
+        rel = link.get("rel")
+        rels += [r.lower() for r in (rel if isinstance(rel, list) else [rel])]
+    hints = sum(1 for r in rels if r in
+                ("preload", "preconnect", "dns-prefetch", "prefetch", "modulepreload"))
+
+    scripts = soup.find_all("script", src=True)
+    blocking = [s for s in scripts
+                if s.get("async") is None and s.get("defer") is None
+                and (s.get("type") or "").lower() != "module"]
+    ok = hints > 0 or not blocking
+    return Finding(
+        "tech.resource_hints", P, "Resource hints & script loading",
+        Status.PASS if ok else Status.WARN, Severity.LOW, C,
+        value={"resource_hints": hints, "blocking_scripts": len(blocking), "scripts": len(scripts)},
+        evidence=f"{hints} resource hint(s); {len(blocking)} render-blocking script(s)",
+        recommendation=None if ok else
+        "Add resource hints (preload/preconnect/dns-prefetch) and mark non-critical scripts "
+        "async/defer so they don't block first render.",
+    )
+
+
+def _llms_check(status: int, text: str) -> Finding:
+    present = status == 200 and bool(text.strip())
+    # Low-impact on purpose: real AI crawlers rarely fetch llms.txt — don't over-score it.
+    return Finding(
+        "tech.llms_txt", P, "llms.txt", Status.PASS if present else Status.INFO,
+        Severity.INFO, C, value=present,
+        evidence=f"{len(text)} bytes" if present else "not found",
+        recommendation=None if present else
+        "Optional: publish an llms.txt declaring guidance for AI crawlers. Low impact today "
+        "(few engines fetch it), but cheap to add.",
+    )
 
 
 def _render_check(delta: dict) -> Finding:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
@@ -11,8 +12,14 @@ from ..models import Confidence, Finding, Pillar, Severity, Status
 P = Pillar.ONPAGE
 C = Confidence.VERIFIED
 
+# Anchor text that tells engines nothing about the destination.
+GENERIC_ANCHORS = {
+    "click here", "here", "read more", "more", "learn more", "more info", "details",
+    "this", "this page", "link", "read", "continue", "see more", "website", "go",
+}
 
-def analyze(soup: BeautifulSoup, text: str) -> list[Finding]:
+
+def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
     out: list[Finding] = []
 
     # --- title ---
@@ -113,7 +120,149 @@ def analyze(soup: BeautifulSoup, text: str) -> list[Finding]:
                            recommendation=None if pct >= 90 else
                            f"{len(imgs) - with_alt} image(s) missing alt text."))
 
+    # --- image dimensions & lazy-load (extends alt; CLS + delivery) ---
+    if imgs:
+        with_dims = sum(1 for i in imgs if i.get("width") and i.get("height"))
+        with_lazy = sum(1 for i in imgs if (i.get("loading") or "").lower() == "lazy")
+        dpct = round(100 * with_dims / len(imgs))
+        out.append(Finding(
+            "onpage.images.dims", P, "Image dimensions & lazy-load",
+            Status.PASS if dpct >= 80 else Status.WARN, Severity.LOW, C,
+            value={"with_dims": with_dims, "with_lazy": with_lazy, "total": len(imgs), "pct_dims": dpct},
+            recommendation=None if dpct >= 80 else
+            f"{len(imgs) - with_dims} image(s) lack explicit width/height (causes layout shift) — "
+            "add them, and loading=\"lazy\" for below-the-fold images.",
+        ))
+
+    # --- link analysis: internal/external + anchor text quality ---
+    host = urlparse(url).netloc.lower().split(":")[0] if url else ""
+    internal, external, generic, ext_domains = _link_stats(soup, host)
+    total_links = internal + external
+    if total_links:
+        bad = len(generic)
+        ok = bad < 3 and bad / total_links <= 0.25
+        out.append(Finding(
+            "onpage.links", P, "Link anchor text", Status.PASS if ok else Status.WARN,
+            Severity.MEDIUM, C, value={"internal": internal, "external": external, "generic": bad},
+            evidence="; ".join(generic[:3]) or None,
+            recommendation=None if ok else
+            "Replace generic anchor text ('click here', 'read more', bare URLs) with descriptive "
+            "phrases — anchors tell engines what the linked page is about.",
+        ))
+        out.append(Finding(
+            "onpage.outbound", P, "Outbound source links",
+            Status.PASS if external >= 1 else Status.INFO, Severity.LOW, C,
+            value={"external": external},
+            evidence=", ".join(sorted(set(ext_domains))[:5]) or None,
+            recommendation=None if external >= 1 else
+            "Link out to authoritative sources where relevant — citing sources is a trust signal.",
+        ))
+
+    # --- in-page jump/anchor links (table-of-contents, deep-linkable sections) ---
+    jumps = [a["href"][1:] for a in soup.find_all("a", href=True)
+             if a["href"].startswith("#") and len(a["href"]) > 1]
+    if jumps:
+        resolved = sum(1 for t in jumps if soup.find(id=t))
+        out.append(Finding(
+            "onpage.jump_links", P, "In-page jump links",
+            Status.PASS if resolved >= 1 else Status.INFO, Severity.LOW, C,
+            value={"jump_links": len(jumps), "resolved": resolved},
+            evidence=f"{resolved} of {len(jumps)} anchor link(s) resolve to an id",
+            recommendation=None if resolved >= 1 else
+            "Anchor links don't resolve to an id on the page — fix the targets so sections "
+            "are deep-linkable.",
+        ))
+
+    # --- accessibility basics (coverage-map row 16 → On-page pillar) ---
+    html_tag = soup.find("html")
+    has_lang = bool(html_tag and html_tag.get("lang"))
+    out.append(Finding(
+        "onpage.lang", P, "Page language", Status.PASS if has_lang else Status.WARN,
+        Severity.LOW, C, value=html_tag.get("lang") if has_lang else None,
+        recommendation=None if has_lang else
+        "Set <html lang=\"…\"> so search engines and assistive tech know the page language.",
+    ))
+
+    controls = [c for c in soup.find_all(["input", "select", "textarea"])
+                if (c.get("type") or "text").lower() not in
+                ("hidden", "submit", "button", "reset", "image")]
+    if controls:
+        unlabeled = [c for c in controls if not _is_labeled(soup, c)]
+        out.append(Finding(
+            "onpage.form_labels", P, "Form control labels",
+            Status.PASS if not unlabeled else Status.WARN, Severity.LOW, C,
+            value={"controls": len(controls), "unlabeled": len(unlabeled)},
+            recommendation=None if not unlabeled else
+            f"{len(unlabeled)} form control(s) lack a label — add <label for>, aria-label, or "
+            "wrap the control in a <label>.",
+        ))
+
+    # --- URL structure quality ---
+    if url:
+        out.append(_url_quality(url))
+
     return out
+
+
+def _is_labeled(soup: BeautifulSoup, control) -> bool:
+    if control.get("aria-label") or control.get("aria-labelledby") or control.get("title"):
+        return True
+    cid = control.get("id")
+    if cid and soup.find("label", attrs={"for": cid}):
+        return True
+    return control.find_parent("label") is not None
+
+
+def _link_stats(soup: BeautifulSoup, host: str) -> tuple[int, int, list[str], list[str]]:
+    """Count internal/external links, collect generic-anchor texts and external domains."""
+    internal = external = 0
+    generic: list[str] = []
+    ext_domains: list[str] = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        if not href or href.startswith(("#", "mailto:", "tel:", "javascript:")):
+            continue
+        p = urlparse(href)
+        if p.scheme in ("http", "https") and p.netloc:
+            if host and p.netloc.lower().split(":")[0] == host:
+                internal += 1
+            else:
+                external += 1
+                ext_domains.append(p.netloc)
+        else:
+            internal += 1  # relative link
+        text = a.get_text(" ", strip=True)
+        norm = text.lower().strip(" .›»→-")
+        bare_url = norm.startswith(("http://", "https://", "www."))
+        empty = not text and not (a.get("aria-label") or a.get("title"))
+        if norm in GENERIC_ANCHORS or bare_url or empty:
+            generic.append(text or "(no text)")
+    return internal, external, generic, ext_domains
+
+
+def _url_quality(url: str) -> Finding:
+    p = urlparse(url)
+    path = p.path or "/"
+    issues = []
+    if any(c.isupper() for c in path):
+        issues.append("uppercase letters")
+    if "_" in path:
+        issues.append("underscores (use hyphens)")
+    segments = [s for s in path.split("/") if s]
+    if len(segments) > 4:
+        issues.append(f"deep path ({len(segments)} levels)")
+    if p.query:
+        issues.append("query string")
+    if len(url) > 100:
+        issues.append("very long")
+    ok = len(issues) <= 1
+    return Finding(
+        "onpage.url", P, "URL structure", Status.PASS if ok else Status.WARN, Severity.LOW, C,
+        value={"issues": issues}, evidence=url if not ok else None,
+        recommendation=None if ok else
+        "Prefer short, lowercase, hyphenated URLs with shallow depth and no query junk — "
+        "issues: " + ", ".join(issues) + ".",
+    )
 
 
 def _jsonld_types(soup: BeautifulSoup) -> set[str]:

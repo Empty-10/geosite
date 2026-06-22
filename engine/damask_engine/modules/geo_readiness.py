@@ -8,7 +8,9 @@ Signals are grounded in 2026 GEO research (see docs / chat history).
 
 from __future__ import annotations
 
-from bs4 import BeautifulSoup
+import json
+
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 from ..models import Confidence, Finding, Pillar, Severity, Status
 
@@ -21,6 +23,12 @@ HEDGE_WORDS = {
     "usually", "often", "arguably", "seemingly", "presumably", "likely", "probably",
     "somewhat", "relatively", "fairly", "tends", "tend",
 }
+
+# AEO answer-block gating, scored over the first rendered visible words (see coverage-map).
+AEO_WINDOW = 350         # only look this far down the visible text
+AEO_GOOD_MAX = 220       # an answer starting deeper than this is too low
+MIN_ANSWER_WORDS = 12    # a "self-contained answer" paragraph is at least this long
+_SKIP_TEXT = {"script", "style", "noscript", "template"}
 
 
 def analyze(soup: BeautifulSoup, text: str) -> list[Finding]:
@@ -93,4 +101,180 @@ def analyze(soup: BeautifulSoup, text: str) -> list[Finding]:
         out.append(Finding("geo.depth", P, "Content depth", Status.PASS, Severity.INFO, C,
                            value=total))
 
+    # --- new deterministic checks (coverage-map "Checks to add") ---
+    out.append(_aeo(soup))
+    out.append(_faq(soup))
+    out.append(_trust(soup))
+
     return out
+
+
+# --------------------------------------------------------------------------- JSON-LD helpers
+
+
+def _jsonld_objects(soup: BeautifulSoup) -> list[dict]:
+    """All JSON-LD nodes on the page, flattening top-level lists and `@graph` containers."""
+    out: list[dict] = []
+    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        raw = script.string or script.get_text() or ""
+        try:
+            data = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        stack = list(data) if isinstance(data, list) else [data]
+        while stack:
+            node = stack.pop()
+            if isinstance(node, list):
+                stack.extend(node)
+            elif isinstance(node, dict):
+                graph = node.get("@graph")
+                if isinstance(graph, list):
+                    stack.extend(graph)
+                out.append(node)
+    return out
+
+
+def _types_of(node: dict) -> set[str]:
+    t = node.get("@type")
+    if isinstance(t, list):
+        return {str(x).lower() for x in t}
+    return {str(t).lower()} if t else set()
+
+
+# ------------------------------------------------------------------------------- AEO + FAQ
+
+
+def _is_answer_paragraph(text: str) -> bool:
+    return len(text.split()) >= MIN_ANSWER_WORDS and any(p in text for p in ".!?")
+
+
+def _first_answer_offset(soup: BeautifulSoup) -> tuple[int | None, str]:
+    """Visible-word offset of the first self-contained answer <p>, or (None, "") if none.
+
+    Walks the body in document order, accumulating visible words; when it reaches a <p>
+    that reads as a full answer, returns how many visible words preceded it.
+    """
+    body = soup.body or soup
+    offset = 0
+    for el in body.descendants:
+        if isinstance(el, Tag):
+            if el.name == "p":
+                ptext = el.get_text(" ", strip=True)
+                if _is_answer_paragraph(ptext):
+                    return offset, ptext
+        elif isinstance(el, NavigableString):
+            if any(isinstance(p, Tag) and p.name in _SKIP_TEXT for p in el.parents):
+                continue
+            offset += len(str(el).split())
+    return None, ""
+
+
+def _aeo(soup: BeautifulSoup) -> Finding:
+    offset, snippet = _first_answer_offset(soup)
+    snip = (snippet[:120] + "…") if len(snippet) > 120 else snippet
+
+    if offset is None or offset >= AEO_WINDOW:
+        return Finding(
+            "geo.aeo", P, "Up-front answer block", Status.FAIL, Severity.HIGH, C,
+            value={"answer_word_offset": offset},
+            evidence=f"No self-contained answer paragraph in the first {AEO_WINDOW} visible words.",
+            recommendation="Lead with a direct, self-contained answer (a full sentence or two) "
+            "high on the page — AI answer engines extract from the top.",
+        )
+    if offset > AEO_GOOD_MAX:
+        return Finding(
+            "geo.aeo", P, "Up-front answer block", Status.WARN, Severity.HIGH, C,
+            value={"answer_word_offset": offset},
+            evidence=f"first answer ~{offset} words in: “{snip}”",
+            recommendation=f"The up-front answer starts ~{offset} words down; move it into the "
+            "first ~150 words so it's the first thing engines read.",
+        )
+    return Finding(
+        "geo.aeo", P, "Up-front answer block", Status.PASS, Severity.INFO, C,
+        value={"answer_word_offset": offset}, evidence=f"answer ~{offset} words in: “{snip}”",
+    )
+
+
+def _faq(soup: BeautifulSoup) -> Finding:
+    objs = _jsonld_objects(soup)
+    has_schema = any("faqpage" in _types_of(o) for o in objs)
+
+    pairs, examples = 0, []
+    for h in soup.find_all(["h2", "h3", "h4"]):
+        q = h.get_text(strip=True)
+        if "?" not in q:
+            continue
+        nxt, steps = h.find_next_sibling(), 0
+        while nxt is not None and steps < 3:
+            if getattr(nxt, "name", None) in ("h1", "h2", "h3", "h4"):
+                break
+            if len(nxt.get_text(" ", strip=True).split()) >= 8:  # an actual answer follows
+                pairs += 1
+                if len(examples) < 3:
+                    examples.append(q)
+                break
+            nxt, steps = nxt.find_next_sibling(), steps + 1
+
+    ok = has_schema or pairs >= 2
+    detail = ", ".join(filter(None, [
+        "FAQPage schema" if has_schema else None,
+        f"{pairs} Q&A pair(s)" if pairs else None,
+    ])) or "no FAQ structure found"
+    return Finding(
+        "geo.faq", P, "FAQ section", Status.PASS if ok else Status.WARN, Severity.MEDIUM, C,
+        value={"faqpage_schema": has_schema, "qa_pairs": pairs}, evidence=detail,
+        recommendation=None if ok else
+        "Add an FAQ: question-form H2/H3s each answered directly (ideally with FAQPage "
+        "JSON-LD). AI engines lift Q&A pairs almost verbatim.",
+    )
+
+
+# ----------------------------------------------------------------------------- trust/E-E-A-T
+
+
+def _trust(soup: BeautifulSoup) -> Finding:
+    def has_class(substr: str) -> bool:
+        return bool(soup.find(class_=lambda c: c and substr in " ".join(c).lower()
+                              if isinstance(c, list) else c and substr in c.lower()))
+
+    author = bool(
+        soup.find("meta", attrs={"name": "author"})
+        or soup.find(attrs={"rel": "author"})
+        or soup.find(attrs={"itemprop": "author"})
+        or has_class("author") or has_class("byline")
+    )
+    date = bool(
+        soup.find("time")
+        or soup.find("meta", attrs={"property": "article:published_time"})
+        or soup.find("meta", attrs={"property": "article:modified_time"})
+        or soup.find(attrs={"itemprop": lambda v: v in ("datePublished", "dateModified")})
+    )
+    anchors = soup.find_all("a")
+    hrefs = " ".join((a.get("href") or "").lower() for a in anchors)
+    labels = " ".join(a.get_text(" ", strip=True).lower() for a in anchors)
+    about_contact = (("/about" in hrefs or "about" in labels)
+                     and ("/contact" in hrefs or "contact" in labels))
+    entity_sameas = any(
+        (_types_of(o) & {"organization", "person"}) and o.get("sameAs")
+        for o in _jsonld_objects(soup)
+    )
+
+    signals = {
+        "author byline": author,
+        "published/updated date": date,
+        "about & contact links": about_contact,
+        "entity schema with sameAs": entity_sameas,
+    }
+    present = [k for k, v in signals.items() if v]
+    missing = [k for k, v in signals.items() if not v]
+    ok = len(present) >= 3
+    return Finding(
+        "geo.trust", P, "Trust & E-E-A-T signals", Status.PASS if ok else Status.WARN,
+        Severity.MEDIUM, C, value={"present": present, "count": len(present)},
+        evidence=("present: " + ", ".join(present) if present else "none found")
+        + ("; missing: " + ", ".join(missing) if missing else ""),
+        recommendation=None if ok else
+        "Add author/E-E-A-T signals: a visible author byline, a published/updated date, "
+        "About + Contact links, and Organization/Person JSON-LD with sameAs — strong "
+        "citation-trust factors.",
+    )

@@ -33,7 +33,7 @@ def test_report_schema_snapshot():
     d = scan_html("https://example.com/schema", HTML, online=False).to_dict()
 
     assert set(d) == REPORT_KEYS
-    assert d["schema_version"] == SCHEMA_VERSION == "1"
+    assert d["schema_version"] == SCHEMA_VERSION == "2"
     assert isinstance(d["fetched_at"], str) and d["fetched_at"]
     assert isinstance(d["overall_score"], int)
     assert isinstance(d["pillar_scores"], dict)

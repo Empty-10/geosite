@@ -28,7 +28,7 @@ def scan_html(url: str, html: str, *, online: bool = False,
     text = visible_text(soup)
 
     findings = []
-    findings += onpage.analyze(soup, text)
+    findings += onpage.analyze(soup, text, final_url)
     findings += technical.analyze(soup, final_url, status_code, headers, net=net)
     findings += geo_readiness.analyze(soup, text)
 
@@ -73,6 +73,7 @@ def _gather_network(res: FetchResult) -> NetInputs:
         if declared:
             sitemap_url = declared[0]
     sitemap_status, sitemap_xml = fetch_resource(sitemap_url)
+    llms_status, llms_txt = fetch_resource(urljoin(base, "/llms.txt"))
 
     tls = tls_info(parsed.hostname) if parsed.scheme == "https" and parsed.hostname else None
 
@@ -85,6 +86,8 @@ def _gather_network(res: FetchResult) -> NetInputs:
         sitemap_xml=sitemap_xml,
         tls=tls,
         render_delta=_render_delta(res),
+        llms_status=llms_status,
+        llms_txt=llms_txt,
     )
 
 
