@@ -15,6 +15,15 @@ export type Finding = {
   recommendation: string | null;
 };
 
+export type Fix = {
+  finding_id: string;
+  title: string;
+  kind: string;
+  language: string;
+  content: string;
+  note: string | null;
+};
+
 export type Report = {
   schema_version?: string;
   url: string;
@@ -23,7 +32,15 @@ export type Report = {
   pillar_scores: Record<string, number>;
   meta: Record<string, unknown>;
   findings: Finding[];
+  fixes?: Fix[];
 };
+
+/** Index a report's fixes by the finding they remediate. */
+export function fixesByFinding(report: Report): Record<string, Fix> {
+  const out: Record<string, Fix> = {};
+  for (const f of report.fixes ?? []) out[f.finding_id] = f;
+  return out;
+}
 
 // severity → badge label + colour + sort rank (lower = more urgent).
 export const SEV: Record<string, { label: string; color: string; rank: number }> = {

@@ -9,7 +9,7 @@ import { FindingsList } from "./FindingsList";
 import { MeasuredCard } from "./MeasuredCard";
 import { PillarCards } from "./PillarCards";
 import { ScoreRing } from "./ScoreRing";
-import { PILLAR_SECTIONS, priorityFixes, rgba, type Report } from "./types";
+import { fixesByFinding, PILLAR_SECTIONS, priorityFixes, rgba, type Report } from "./types";
 
 type State =
   | { phase: "empty" }
@@ -205,6 +205,7 @@ function Placeholder({ children }: { children: React.ReactNode }) {
 
 function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n: number) => void }) {
   const fixes = priorityFixes(report.findings);
+  const fixMap = fixesByFinding(report);
   const finalUrl = (report.meta?.final_url as string) || report.url;
   const when = new Date(report.fetched_at);
   const section = PILLAR_SECTIONS[tab];
@@ -237,7 +238,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
 
       <SectionTitle>Priority fixes</SectionTitle>
       <div style={{ marginBottom: 28 }}>
-        <FindingsList findings={fixes} />
+        <FindingsList findings={fixes} fixes={fixMap} />
       </div>
 
       {/* per-pillar tabs */}
@@ -271,7 +272,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
         })}
       </div>
       {/* key remounts the list per tab so its expanded-row state resets */}
-      <FindingsList key={section.key} findings={sectionFindings} openFirst={false} />
+      <FindingsList key={section.key} findings={sectionFindings} fixes={fixMap} openFirst={false} />
     </div>
   );
 }

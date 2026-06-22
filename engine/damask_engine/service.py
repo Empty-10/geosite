@@ -37,4 +37,4 @@ def health() -> dict:
 @app.post("/scan")
 def scan_endpoint(req: ScanRequest) -> dict:
     """Run a full scan and return the report dict. Failures surface in meta.error."""
-    return scan(req.url).to_dict()
+    return scan(req.url, fixes=True).to_dict()

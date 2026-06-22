@@ -6,7 +6,7 @@ import { FindingsList } from "./report/FindingsList";
 import { MeasuredCard } from "./report/MeasuredCard";
 import { PillarCards } from "./report/PillarCards";
 import { ScoreRing } from "./report/ScoreRing";
-import { priorityFixes, rgba, type Report } from "./report/types";
+import { fixesByFinding, priorityFixes, rgba, type Report } from "./report/types";
 
 // Visual scan steps. The engine runs three deterministic modules (technical, on-page, GEO
 // readiness); the rest are surfaced here as roadmap so the full pillar set is visible.
@@ -371,7 +371,7 @@ export function HeroDemo() {
                 Full report →
               </a>
             </div>
-            <FindingsList findings={fixes.slice(0, 3)} />
+            <FindingsList findings={fixes.slice(0, 3)} fixes={report ? fixesByFinding(report) : {}} />
           </div>
         )}
       </div>

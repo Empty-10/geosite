@@ -92,7 +92,7 @@ function runEngineLocal(target: string): Promise<EngineResult> {
       }
     };
 
-    const proc = spawn(PYTHON, ["-m", "damask_engine", target, "--json"], { cwd: ENGINE_DIR });
+    const proc = spawn(PYTHON, ["-m", "damask_engine", target, "--json", "--fixes"], { cwd: ENGINE_DIR });
     let out = "";
     let err = "";
 

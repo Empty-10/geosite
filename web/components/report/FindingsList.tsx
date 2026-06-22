@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { C } from "@/lib/tokens";
-import { conf, rgba, sev, type Finding } from "./types";
+import { FixBlock } from "./FixBlock";
+import { conf, rgba, sev, type Finding, type Fix } from "./types";
 
 const STATUS: Record<string, { label: string; color: string }> = {
   fail: { label: "Fail", color: C.fail },
@@ -20,7 +21,11 @@ function statusOf(s: string) {
  * (no modals, per the design brief). Used for the priority-fix list and per-pillar checks.
  * Parents that swap the `findings` set (e.g. pillar tabs) should pass a `key` to remount.
  */
-export function FindingsList({ findings, openFirst = true }: { findings: Finding[]; openFirst?: boolean }) {
+export function FindingsList({ findings, fixes = {}, openFirst = true }: {
+  findings: Finding[];
+  fixes?: Record<string, Fix>;
+  openFirst?: boolean;
+}) {
   const [expanded, setExpanded] = useState<string | null>(openFirst ? findings[0]?.id ?? null : null);
 
   if (findings.length === 0) {
@@ -152,22 +157,7 @@ export function FindingsList({ findings, openFirst = true }: { findings: Finding
                     This check passed — nothing to fix.
                   </p>
                 )}
-                {issue && (
-                  <button
-                    style={{
-                      fontSize: 12.5,
-                      fontWeight: 500,
-                      color: C.accent,
-                      border: `1px solid ${rgba(C.accent, 0.4)}`,
-                      background: rgba(C.accent, 0.12),
-                      padding: "7px 13px",
-                      borderRadius: 8,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Generate fix
-                  </button>
-                )}
+                {issue && fixes[f.id] && <FixBlock fix={fixes[f.id]} />}
               </div>
             )}
           </div>
