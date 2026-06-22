@@ -79,6 +79,29 @@ def test_meta_fix_from_first_paragraph():
     assert "opening paragraph" in f.content
 
 
+def test_title_fix_from_h1():
+    html = "<html><head></head><body><h1>Best widgets in town</h1><p>plenty of words here friends</p></body></html>"
+    f = fixes_for(html)["title.missing"]
+    assert f.content == "<title>Best widgets in town</title>"
+
+
+def test_canonical_and_viewport_fixes_when_missing():
+    html = "<html><head><title>T</title></head><body><h1>h</h1><p>words words words words words words words</p></body></html>"
+    fx = fixes_for(html, "https://example.com/page")
+    assert fx["canonical"].content == '<link rel="canonical" href="https://example.com/page">'
+    assert 'width=device-width' in fx["tech.viewport"].content
+
+
+def test_robots_fix_when_missing():
+    from damask_engine.modules.technical import NetInputs
+    report = scan_html("https://example.com/", "<html><body><h1>h</h1><p>some words here for body</p></body></html>",
+                       online=False, final_url="https://example.com/",
+                       net=NetInputs(robots_status=404, robots_txt=""), fixes=True)
+    fx = {f.finding_id: f for f in report.fixes}["tech.robots.missing"]
+    assert fx.kind == "robots"
+    assert "GPTBot" in fx.content and "Sitemap: https://example.com/sitemap.xml" in fx.content
+
+
 def test_generate_fixes_is_pure_listable():
     html = "<html><head><title>T</title></head><body><h1>h</h1></body></html>"
     report = scan_html("https://example.com/", html, online=False, final_url="https://example.com/")

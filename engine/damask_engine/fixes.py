@@ -37,17 +37,27 @@ def generate_fixes(soup: BeautifulSoup, report: Report, url: str) -> list[Fix]:
     ids = {f.id for f in report.findings if f.status in ("fail", "warn")}
     fixes: list[Fix] = []
 
+    if "title.missing" in ids:
+        fixes.append(_fix_title(soup, url))
+    if "meta.description.missing" in ids:
+        meta = _fix_meta(soup)
+        if meta is not None:
+            fixes.append(meta)
+    if "canonical" in ids:
+        fixes.append(_fix_canonical(url))
+    if "tech.viewport" in ids:
+        fixes.append(_fix_viewport())
     if "schema.missing" in ids:
         fixes.append(_fix_schema(soup, url))
     faq = _fix_faq(soup)
     if faq is not None:
         fixes.append(faq)
+    if "tech.robots.missing" in ids:
+        fixes.append(_fix_robots(url, "tech.robots.missing"))
+    elif "tech.robots.ai" in ids:
+        fixes.append(_fix_robots(url, "tech.robots.ai"))
     if "tech.llms_txt" in {f.id for f in report.findings if f.value is False}:
         fixes.append(_fix_llms(soup, url))
-    if "meta.description.missing" in ids:
-        meta = _fix_meta(soup)
-        if meta is not None:
-            fixes.append(meta)
 
     return fixes
 
@@ -195,6 +205,47 @@ def _fix_llms(soup: BeautifulSoup, url: str) -> Fix:
         language="markdown", content=content,
         note=f"Save as {root}/llms.txt. Low impact today (few engines fetch it) but cheap; "
         "list your most important pages under Key pages.",
+    )
+
+
+def _fix_title(soup: BeautifulSoup, url: str) -> Fix:
+    h1 = soup.find("h1")
+    text = _truncate((h1.get_text(strip=True) if h1 else "") or _site_name(soup, url), 60)
+    return Fix(
+        finding_id="title.missing", title="Add a page title", kind="meta", language="html",
+        content=f"<title>{text}</title>",
+        note="Paste into <head>. Lead with the page's main topic; aim for ~50–60 characters.",
+    )
+
+
+def _fix_canonical(url: str) -> Fix:
+    return Fix(
+        finding_id="canonical", title="Add a canonical tag", kind="meta", language="html",
+        content=f'<link rel="canonical" href="{url}">',
+        note="Paste into <head> so engines consolidate ranking signals on the preferred URL.",
+    )
+
+
+def _fix_viewport() -> Fix:
+    return Fix(
+        finding_id="tech.viewport", title="Add a mobile viewport tag", kind="meta", language="html",
+        content='<meta name="viewport" content="width=device-width, initial-scale=1">',
+        note="Paste into <head> for correct responsive rendering on mobile.",
+    )
+
+
+def _fix_robots(url: str, finding_id: str) -> Fix:
+    parsed = urlparse(url)
+    root = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else url
+    lines = ["# robots.txt — allow search + AI answer engines", "", "User-agent: *", "Allow: /", ""]
+    for crawler in ("GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended", "OAI-SearchBot"):
+        lines += [f"User-agent: {crawler}", "Allow: /"]
+    lines += ["", f"Sitemap: {root}/sitemap.xml"]
+    return Fix(
+        finding_id=finding_id, title="Allow AI crawlers in robots.txt", kind="robots",
+        language="text", content="\n".join(lines),
+        note=f"Save as {root}/robots.txt. Explicitly allows GPTBot/ClaudeBot/PerplexityBot/"
+        "Google-Extended so AI engines can read — and cite — your pages.",
     )
 
 

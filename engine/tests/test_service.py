@@ -32,7 +32,7 @@ def test_scan_returns_report_dict():
     assert body["overall_score"] == 42
     assert body["pillar_scores"] == {"onpage": 42}
     assert body["url"] == "https://x.test"
-    m.assert_called_once_with("x.test")
+    m.assert_called_once_with("x.test", fixes=True)
 
 
 def test_scan_surfaces_engine_error_as_200():
