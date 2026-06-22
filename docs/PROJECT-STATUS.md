@@ -111,8 +111,12 @@ uses Claude Design's runtime and won't run standalone).
    out at 25s. Requires `engine/.venv` with the engine installed (`pip install -e .`).
    Notes carried forward: Performance pillar renders "not run yet" (later phase); the
    citation-share block is a labelled *sample* preview, not a MEASURED claim.
-   _Next refinement when ready: build the FastAPI engine service for the `DAMASK_ENGINE_URL`
-   path so the deployed site can scan without a local Python process._
+   The FastAPI engine service backing the `DAMASK_ENGINE_URL` path now exists too:
+   `engine/damask_engine/service.py` (`pip install -e ".[service]"`, then
+   `uvicorn damask_engine.service:app --port 8000`). `POST /scan {url}` returns the same
+   `Report.to_dict()` as the CLI, so the route handles the local and HTTP paths identically.
+   Remaining for deploy: stand the service up on a container host and point
+   `DAMASK_ENGINE_URL` at it.
 2. **Deepen `engine/modules/technical.py`** — real robots.txt + sitemap.xml fetch & parse,
    redirect-chain capture, SSL/HSTS checks; add fixture tests. Version the JSON report
    schema (`schema_version`) and snapshot-test it.
@@ -131,9 +135,10 @@ crawler logs, fix generation), then accounts/billing. Full arc in `CLAUDE.md` �
 
 - `web/app/layout.tsx` → `metadataBase` is `https://damask.example`. Set the real domain.
 - `damask` is a placeholder name; the `.ai` domain isn't locked yet.
-- The `/api/scan` route shells out to a local Python process — works in local dev and on a
-  container host, **not** on Vercel serverless. Set `DAMASK_ENGINE_URL` to a deployed engine
-  service before/at production deploy (the FastAPI service to back it isn't built yet).
+- The `/api/scan` route shells out to a local Python process by default — works in local dev
+  and on a container host, **not** on Vercel serverless. For production set `DAMASK_ENGINE_URL`
+  to the deployed FastAPI engine service (`engine/damask_engine/service.py`); that service
+  still needs to be containerized and hosted.
 - Deploy note: the app lives in `web/`, not the repo root — set the host's **root
   directory to `web/`** (e.g. on Vercel).
 - Secrets (Google API key, future AI-engine keys) go in `.env` files — never commit them.

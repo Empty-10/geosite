@@ -53,7 +53,7 @@ engine with a 25s timeout. Engine invocation is env-configurable:
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `DAMASK_ENGINE_URL` | _(unset)_ | If set, POST the scan to this engine HTTP service instead of shelling out. The production path (Vercel has no Python runtime). |
+| `DAMASK_ENGINE_URL` | _(unset)_ | If set, POST the scan to this engine HTTP service (e.g. `http://localhost:8000`) instead of shelling out. The production path — see the FastAPI service in `engine/` (`uvicorn damask_engine.service:app`). Vercel has no Python runtime, so deployed builds must use this. |
 | `DAMASK_ENGINE_DIR` | `../engine` | Engine working directory. |
 | `DAMASK_PYTHON` | `<engine>/.venv/bin/python` | Python interpreter that has the engine installed. |
 

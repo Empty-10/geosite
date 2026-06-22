@@ -143,7 +143,7 @@ async function runEngineHttp(base: string, target: string): Promise<EngineResult
     });
     const data = (await res.json()) as { meta?: { error?: string } };
     if (!res.ok) return { ok: false, status: 502, error: `Engine service error (${res.status}).` };
-    if (data?.meta?.error) return { ok: false, status: 502, error: String(data.meta.error) };
+    if (data?.meta?.error) return { ok: false, status: 502, error: friendlyFetchError(String(data.meta.error)) };
     return { ok: true, data };
   } catch (e) {
     return { ok: false, status: 504, error: e instanceof Error ? e.message : "Engine service unreachable." };
