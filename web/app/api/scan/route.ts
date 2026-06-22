@@ -106,11 +106,19 @@ function runEngineLocal(target: string): Promise<EngineResult> {
 
     proc.on("error", (e: NodeJS.ErrnoException) => {
       clearTimeout(timer);
-      const hint =
-        e.code === "ENOENT"
-          ? ` (no interpreter at ${PYTHON} — run \`pip install -e .\` in engine/ or set DAMASK_PYTHON)`
-          : "";
-      done({ ok: false, status: 500, error: `Engine could not start${hint}.` });
+      if (e.code === "ENOENT") {
+        // No local Python interpreter — typical on serverless (Vercel). The engine is meant
+        // to run as a separate service; point this app at it with DAMASK_ENGINE_URL.
+        done({
+          ok: false,
+          status: 503,
+          error:
+            "Live scanning isn't available on this deployment yet — the scan engine runs as a " +
+            "separate service. Set DAMASK_ENGINE_URL to its URL (see web/README.md).",
+        });
+        return;
+      }
+      done({ ok: false, status: 500, error: "Engine could not start." });
     });
 
     proc.on("close", () => {
