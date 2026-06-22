@@ -12,6 +12,14 @@ npm install
 npm run dev      # http://localhost:3000
 ```
 
+The live-scan demo (`/api/scan`) shells out to the local Python engine, so set the engine
+up once first (the route looks for `../engine/.venv/bin/python` by default):
+
+```bash
+cd ../engine
+python -m venv .venv && ./.venv/bin/pip install -e .
+```
+
 Build for production:
 
 ```bash
@@ -31,9 +39,23 @@ lib/
   tokens.ts         JS copies of the palette + scoreColor() for the live demo
 ```
 
-`HeroDemo.tsx` is the interactive live-scan demo (a client component). The scan numbers
-are currently mocked; wiring it to the real Python engine (or a `/api/scan` route that
-calls it) is the next step. See the root `CLAUDE.md` roadmap.
+`HeroDemo.tsx` is the interactive live-scan demo (a client component). It POSTs the URL to
+`app/api/scan/route.ts`, which runs the **real** engine and returns its JSON `Report`; the
+score ring, pillar cards, and priority-fix list are all driven by that response. Pillars
+the engine doesn't run yet (Performance) render as "not run yet"; the citation-share block
+is a clearly-labelled *sample* preview (MEASURED sampling is a later phase — never faked).
+
+### `/api/scan`
+
+`POST { "url": "example.com" }` → the engine's JSON report, or `{ "error": "..." }`.
+It normalizes the URL, rejects loopback/private hosts (basic SSRF guard), and runs the
+engine with a 25s timeout. Engine invocation is env-configurable:
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `DAMASK_ENGINE_URL` | _(unset)_ | If set, POST the scan to this engine HTTP service instead of shelling out. The production path (Vercel has no Python runtime). |
+| `DAMASK_ENGINE_DIR` | `../engine` | Engine working directory. |
+| `DAMASK_PYTHON` | `<engine>/.venv/bin/python` | Python interpreter that has the engine installed. |
 
 ## Design source of truth
 
