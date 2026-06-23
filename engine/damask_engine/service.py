@@ -28,6 +28,7 @@ import uuid
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+from . import store
 from .cloudflare_logs import fetch_cloudflare_logs
 from .crawl import crawl
 from .crawler_logs import analyze_logs
@@ -68,8 +69,34 @@ def health() -> dict:
 
 @app.post("/scan")
 def scan_endpoint(req: ScanRequest) -> dict:
-    """Run a full scan and return the report dict. Failures surface in meta.error."""
-    return scan(req.url, fixes=True).to_dict()
+    """Run a full scan and return the report dict. Failures surface in meta.error.
+
+    When persistence is enabled (DAMASK_DB_PATH), the scan is saved and the response carries
+    meta.scan_id plus meta.diff (vs the previous scan of the same URL) for change tracking.
+    """
+    report = scan(req.url, fixes=True).to_dict()
+    if not report.get("meta", {}).get("error") and store.is_enabled():
+        scan_id = store.save(report)
+        report.setdefault("meta", {})["scan_id"] = scan_id
+        prev = store.previous(report.get("url", ""), kind="page", before_id=scan_id)
+        if prev:
+            report["meta"]["diff"] = store.diff_reports(prev, report)
+    return report
+
+
+@app.get("/history")
+def history_endpoint(url: str, kind: str = "page", limit: int = 20) -> dict:
+    """List recent saved scans for a URL (newest first). Empty when persistence is off."""
+    return {"url": url, "kind": kind, "scans": store.history(url, kind=kind, limit=max(1, min(limit, 100)))}
+
+
+@app.get("/scans/{scan_id}")
+def get_scan_endpoint(scan_id: int) -> dict:
+    """Fetch a stored report by id."""
+    report = store.get(scan_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="scan not found")
+    return report
 
 
 @app.post("/logs")

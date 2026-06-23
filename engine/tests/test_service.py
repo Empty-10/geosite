@@ -135,3 +135,31 @@ def test_cloudflare_logs_endpoint(monkeypatch):
 
 def test_cloudflare_logs_missing_domain_is_422():
     assert client.post("/cloudflare-logs", json={}).status_code == 422
+
+
+def test_scan_persists_and_diffs(monkeypatch, tmp_path):
+    from damask_engine.models import Finding, Pillar, Severity, Status
+
+    monkeypatch.setenv("DAMASK_DB_PATH", str(tmp_path / "s.db"))
+    r1 = Report(url="https://x.test", overall_score=70, pillar_scores={"technical": 70},
+                findings=[Finding("t.a", Pillar.TECHNICAL, "A", Status.FAIL, Severity.HIGH)])
+    r2 = Report(url="https://x.test", overall_score=85, pillar_scores={"technical": 85},
+                findings=[Finding("t.a", Pillar.TECHNICAL, "A", Status.PASS, Severity.HIGH)])
+
+    with patch("damask_engine.service.scan", side_effect=[r1, r2]):
+        first = client.post("/scan", json={"url": "x.test"}).json()
+        second = client.post("/scan", json={"url": "x.test"}).json()
+
+    assert first["meta"]["scan_id"]
+    assert "diff" not in first["meta"]  # nothing to compare against yet
+    assert second["meta"]["diff"]["score_delta"] == 15
+    assert any(x["id"] == "t.a" for x in second["meta"]["diff"]["resolved"])
+
+    hist = client.get("/history", params={"url": "https://x.test"}).json()
+    assert len(hist["scans"]) == 2
+    assert hist["scans"][0]["score"] == 85  # newest first
+
+
+def test_get_scan_404_when_missing(monkeypatch, tmp_path):
+    monkeypatch.setenv("DAMASK_DB_PATH", str(tmp_path / "s.db"))
+    assert client.get("/scans/999").status_code == 404
