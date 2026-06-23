@@ -129,33 +129,12 @@ def test_tls_expiry_states():
     assert _run(NetInputs(tls={"days_remaining": -1, "not_after": "x"}))["tech.tls"].status == Status.FAIL
 
 
-# ------------------------------------------------------------------ JS-render gap
-
-def test_render_flags_js_dependent_content():
-    ids = _run(NetInputs(render_delta={"raw_words": 20, "rendered_words": 300}))
-    f = ids["tech.render.js_dependent"]
-    assert f.status == Status.WARN
-    assert f.value == {"raw_words": 20, "rendered_words": 300}
-
-
-def test_render_ok_when_content_in_raw_html():
-    ids = _run(NetInputs(render_delta={"raw_words": 200, "rendered_words": 210}))
-    assert ids["tech.render.ok"].status == Status.PASS
-    assert "tech.render.js_dependent" not in ids
-
-
-def test_render_small_absolute_delta_is_ok():
-    # 10 -> 25 words: ratio is high but the absolute gap is below the threshold, so not flagged.
-    ids = _run(NetInputs(render_delta={"raw_words": 10, "rendered_words": 25}))
-    assert ids["tech.render.ok"].status == Status.PASS
-
-
 def test_offline_scan_skips_network_checks():
     """With no NetInputs, none of the network-derived findings appear (offline default)."""
     r = scan_html("https://example.com/", HTML, online=False)
     ids = {f.id for f in r.findings}
     assert not any(i.startswith(("tech.robots", "tech.sitemap", "tech.redirect", "tech.tls",
-                                 "tech.render", "tech.llms")) for i in ids)
+                                 "tech.llms")) for i in ids)
     assert "tech.https" in ids  # in-page technical checks still run
     assert "tech.resource_hints" in ids  # delivery check is DOM-based, runs offline
 

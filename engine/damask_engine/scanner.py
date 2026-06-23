@@ -31,7 +31,7 @@ def scan_html(url: str, html: str, *, online: bool = False,
     findings = []
     findings += onpage.analyze(soup, text, final_url)
     findings += technical.analyze(soup, final_url, status_code, headers, net=net)
-    findings += geo_readiness.analyze(soup, text)
+    findings += geo_readiness.analyze(soup, text, render_delta=net.render_delta if net else None)
 
     overrides: dict[Pillar, int] = {}
     if performance_psi is not None:
@@ -53,12 +53,26 @@ def scan_html(url: str, html: str, *, online: bool = False,
 
 
 def _render_delta(res: FetchResult) -> dict | None:
-    """Visible-word counts for raw HTML vs rendered DOM, for the JS-dependency check."""
+    """Raw-vs-rendered signals for the JS-dependency check (geo.js_rendered).
+
+    Also flags the worst cases — the H1 or JSON-LD schema existing only in the rendered DOM
+    (i.e. injected by JavaScript and absent from the raw HTML an AI crawler first sees).
+    """
     if res.rendered_html is None:
         return None
-    raw_words = word_count(visible_text(make_soup(res.html)))
-    rendered_words = word_count(visible_text(make_soup(res.rendered_html)))
-    return {"raw_words": raw_words, "rendered_words": rendered_words}
+    raw = make_soup(res.html)
+    rendered = make_soup(res.rendered_html)
+
+    def has(soup, *args, **kwargs) -> bool:
+        return soup.find(*args, **kwargs) is not None
+
+    jsonld = {"type": "application/ld+json"}
+    return {
+        "raw_words": word_count(visible_text(raw)),
+        "rendered_words": word_count(visible_text(rendered)),
+        "h1_js_only": has(rendered, "h1") and not has(raw, "h1"),
+        "schema_js_only": has(rendered, "script", attrs=jsonld) and not has(raw, "script", attrs=jsonld),
+    }
 
 
 def _gather_network(res: FetchResult) -> NetInputs:

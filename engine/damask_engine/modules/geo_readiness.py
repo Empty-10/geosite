@@ -30,8 +30,13 @@ AEO_GOOD_MAX = 220       # an answer starting deeper than this is too low
 MIN_ANSWER_WORDS = 12    # a "self-contained answer" paragraph is at least this long
 _SKIP_TEXT = {"script", "style", "noscript", "template"}
 
+# JS-dependent content: share of words that only appear after JavaScript runs (needs --render).
+JS_RENDER_WARN = 0.15    # ≥15% render-only → warn
+JS_RENDER_FAIL = 0.50    # >50% render-only → fail
+JS_RAW_MIN_WORDS = 50    # raw HTML this thin ≈ an empty shell without JS
 
-def analyze(soup: BeautifulSoup, text: str) -> list[Finding]:
+
+def analyze(soup: BeautifulSoup, text: str, render_delta: dict | None = None) -> list[Finding]:
     out: list[Finding] = []
     words = text.split()
     total = len(words)
@@ -106,7 +111,52 @@ def analyze(soup: BeautifulSoup, text: str) -> list[Finding]:
     out.append(_faq(soup))
     out.append(_trust(soup))
 
+    # --- JavaScript-dependent content (only when a render was captured via --render) ---
+    if render_delta is not None:
+        out.append(_js_render_check(render_delta))
+
     return out
+
+
+def _js_render_check(delta: dict) -> Finding:
+    raw = int(delta.get("raw_words", 0))
+    rendered = int(delta.get("rendered_words", 0))
+    render_only = max(0.0, (rendered - raw) / max(rendered, 1))
+    pct = round(render_only * 100)
+    value = {"raw_words": raw, "rendered_words": rendered, "render_only_pct": pct}
+
+    # Call out the worst cases: H1 / structured data present only after JS.
+    js_only = []
+    if delta.get("schema_js_only"):
+        js_only.append("structured data (JSON-LD)")
+    if delta.get("h1_js_only"):
+        js_only.append("the H1")
+    verb = "appear" if len(js_only) > 1 else "appears"
+    callout = f" Note: {' and '.join(js_only)} {verb} only after rendering." if js_only else ""
+    evidence = (f"raw HTML: {raw} words; rendered DOM: {rendered} words "
+                f"({pct}% only after JS).{callout}")
+
+    if render_only > JS_RENDER_FAIL or (raw < JS_RAW_MIN_WORDS and render_only >= JS_RENDER_WARN):
+        return Finding(
+            "geo.js_rendered", P, "JavaScript-dependent content", Status.FAIL, Severity.HIGH, C,
+            value=value, evidence=evidence,
+            recommendation="Most of your content is rendered by JavaScript, so AI crawlers that "
+            "don't execute JS won't see it. Serve the key content in the initial HTML — "
+            "server-side render, static-generate, or prerender the page.",
+        )
+    if render_only >= JS_RENDER_WARN:
+        return Finding(
+            "geo.js_rendered", P, "JavaScript-dependent content", Status.WARN, Severity.MEDIUM, C,
+            value=value, evidence=evidence,
+            recommendation="A meaningful share of content only appears after JavaScript runs. AI "
+            "crawlers that don't run JS may miss it — server-render or prerender the important "
+            "parts so they're in the initial HTML.",
+        )
+    return Finding(
+        "geo.js_rendered", P, "JavaScript-dependent content", Status.PASS, Severity.INFO, C,
+        value=value,
+        evidence=f"raw HTML: {raw} words; rendered DOM: {rendered} words ({pct}% only after JS).",
+    )
 
 
 # --------------------------------------------------------------------------- JSON-LD helpers

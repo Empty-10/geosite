@@ -25,9 +25,6 @@ AI_CRAWLERS = ["GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended", "OAI-S
 
 SITEMAP_STALE_DAYS = 180
 CERT_EXPIRY_WARN_DAYS = 14
-# A page is "JS-dependent" when rendering reveals materially more text than the raw HTML.
-JS_CONTENT_RATIO = 1.5
-JS_CONTENT_MIN_DELTA = 50
 
 
 @dataclass
@@ -227,9 +224,8 @@ def analyze(
     if net.sitemap_status is not None:
         out.extend(_sitemap_checks(net.sitemap_status, net.sitemap_xml or ""))
 
-    # --- JS-rendering gap (raw HTML vs rendered DOM) ---
-    if net.render_delta is not None:
-        out.append(_render_check(net.render_delta))
+    # NOTE: the JS-dependent-content check (render_delta) lives in geo_readiness.py
+    # (geo.js_rendered) — it's a GEO/crawlability concern, scored on the GEO pillar.
 
     # --- resource hints & script loading (delivery signals from the HTML head) ---
     out.append(_delivery_checks(soup))
@@ -275,26 +271,6 @@ def _llms_check(status: int, text: str) -> Finding:
         recommendation=None if present else
         "Optional: publish an llms.txt declaring guidance for AI crawlers. Low impact today "
         "(few engines fetch it), but cheap to add.",
-    )
-
-
-def _render_check(delta: dict) -> Finding:
-    raw = delta.get("raw_words", 0)
-    rendered = delta.get("rendered_words", 0)
-    js_dependent = rendered >= raw * JS_CONTENT_RATIO and (rendered - raw) >= JS_CONTENT_MIN_DELTA
-    if js_dependent:
-        return Finding(
-            "tech.render.js_dependent", P, "JavaScript-dependent content", Status.WARN,
-            Severity.HIGH, C, value={"raw_words": raw, "rendered_words": rendered},
-            evidence=f"raw HTML: {raw} words; rendered DOM: {rendered} words",
-            recommendation="Most content appears only after JavaScript runs. AI crawlers and "
-            "some search bots don't execute JS — server-render or pre-render the key content "
-            "so it's in the raw HTML.",
-        )
-    return Finding(
-        "tech.render.ok", P, "Content in raw HTML", Status.PASS, Severity.INFO, C,
-        value={"raw_words": raw, "rendered_words": rendered},
-        evidence=f"raw HTML: {raw} words; rendered DOM: {rendered} words",
     )
 
 

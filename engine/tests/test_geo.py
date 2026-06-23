@@ -103,3 +103,41 @@ def test_trust_warn_when_signals_sparse():
     f = run("<body><p>Just some text with no author, date, links or entity schema at all.</p></body>")["geo.trust"]
     assert f.status == Status.WARN
     assert f.value["count"] < 3
+
+
+# ------------------------------------------------------------------ JS-dependent content
+
+def js(raw: int, rendered: int, **extra):
+    soup = make_soup("<body><p>x</p></body>")
+    delta = {"raw_words": raw, "rendered_words": rendered, **extra}
+    return {f.id: f for f in analyze(soup, "x", render_delta=delta)}["geo.js_rendered"]
+
+
+def test_js_rendered_pass_when_mostly_in_raw():
+    f = js(200, 210)  # render_only ~5%
+    assert f.status == Status.PASS and f.value["render_only_pct"] == 5
+
+
+def test_js_rendered_warn_meaningful_share():
+    f = js(200, 280)  # render_only ~29%
+    assert f.status == Status.WARN and f.value["render_only_pct"] == 29
+
+
+def test_js_rendered_fail_majority_js():
+    f = js(18, 410)  # render_only ~96%
+    assert f.status == Status.FAIL
+
+
+def test_js_rendered_fail_thin_raw_shell():
+    f = js(30, 60)  # raw < 50 and render_only = 50% → fail (near-empty without JS)
+    assert f.status == Status.FAIL
+
+
+def test_js_rendered_calls_out_js_only_schema_and_h1():
+    f = js(18, 410, schema_js_only=True, h1_js_only=True)
+    assert "structured data (JSON-LD)" in f.evidence and "the H1" in f.evidence
+
+
+def test_js_rendered_not_run_without_render_delta():
+    ids = {f.id for f in analyze(make_soup("<body><p>x</p></body>"), "x")}
+    assert "geo.js_rendered" not in ids
