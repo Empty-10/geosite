@@ -29,6 +29,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from .crawl import crawl
+from .crawler_logs import analyze_logs
 from .scanner import scan
 
 app = FastAPI(title="damask engine", version="1", description="GEO/SEO scan engine.")
@@ -49,6 +50,11 @@ class CrawlRequest(BaseModel):
     max_pages: int = 25
 
 
+class LogsRequest(BaseModel):
+    text: str
+    source: str = "uploaded log"
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -58,6 +64,12 @@ def health() -> dict:
 def scan_endpoint(req: ScanRequest) -> dict:
     """Run a full scan and return the report dict. Failures surface in meta.error."""
     return scan(req.url, fixes=True).to_dict()
+
+
+@app.post("/logs")
+def logs_endpoint(req: LogsRequest) -> dict:
+    """Analyze access-log text for AI-crawler activity. Fast/synchronous; bounded internally."""
+    return analyze_logs(req.text, source=req.source).to_dict()
 
 
 def _run_crawl(job_id: str, url: str, max_pages: int) -> None:

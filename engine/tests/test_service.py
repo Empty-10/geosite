@@ -100,3 +100,19 @@ def test_crawl_error_surfaces_as_error_status():
 
 def test_crawl_unknown_job_is_404():
     assert client.get("/crawl/does-not-exist").status_code == 404
+
+
+def test_logs_endpoint_analyzes_text():
+    line = ('66.249.66.1 - - [10/Oct/2025:13:55:36 +0000] "GET /a HTTP/1.1" 404 5 "-" '
+            '"Mozilla/5.0 (compatible; ClaudeBot/1.0; +claudebot@anthropic.com)"')
+    r = client.post("/logs", json={"text": line, "source": "test.log"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["scan_type"] == "logs"
+    assert body["source"] == "test.log"
+    assert body["bots"][0]["name"] == "ClaudeBot"
+    assert any(f["id"] == "logs.bot_errors" for f in body["findings"])
+
+
+def test_logs_missing_text_is_422():
+    assert client.post("/logs", json={}).status_code == 422
