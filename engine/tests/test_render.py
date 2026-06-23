@@ -27,7 +27,7 @@ def test_thin_static_page_without_spa_markers_is_not_a_shell():
 
 
 def test_cloudflare_render_returns_none_without_creds(monkeypatch):
-    monkeypatch.delenv("CF_ACCOUNT_ID", raising=False)
-    monkeypatch.delenv("CF_API_TOKEN", raising=False)
-    # No creds → returns None before any network call (graceful fallback to raw HTML).
+    # Force the no-creds branch (engine/.env may hold real creds locally) → returns None
+    # before any network call, so the caller falls back to raw HTML.
+    monkeypatch.setattr("damask_engine.fetch.get_cloudflare", lambda: None)
     assert render_dom_cloudflare("https://example.com") is None

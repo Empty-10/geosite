@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 
-from .models import Report, Status
+from .models import Report, SiteReport, Status
 from .scanner import scan
 
 _MARK = {Status.PASS: "[pass]", Status.WARN: "[warn]", Status.FAIL: "[FAIL]", Status.INFO: "[info]"}
@@ -50,6 +50,37 @@ def _print_human(report: Report) -> None:
         print()
 
 
+def _print_site(site: SiteReport) -> None:
+    if site.meta.get("error"):
+        print(f"Could not crawl {site.url}: {site.meta['error']}")
+        return
+
+    m = site.meta
+    print(f"\n  damask site scan — {site.url}")
+    print(f"  site score: {site.overall_score}/100   "
+          f"pages: {m.get('pages_crawled', '?')}   "
+          f"broken: {m.get('broken', 0)}   "
+          f"sitemap urls: {m.get('sitemap_urls', 0)}\n")
+
+    print("  PAGES")
+    for p in sorted(site.pages, key=lambda x: x.overall_score):
+        path = p.url.split("//", 1)[-1].split("/", 1)
+        path = "/" + path[1] if len(path) > 1 else "/"
+        title = (p.title[:42] + "…") if len(p.title) > 43 else p.title
+        print(f"    [{p.overall_score:>3}] {path:<32} {title}")
+    print()
+
+    if site.site_findings:
+        print("  SITE-WIDE")
+        for f in site.site_findings:
+            print(f"    {_MARK[f.status]} {f.title}" + (f" — {f.evidence}" if f.evidence else ""))
+            if f.recommendation:
+                print(f"           ↳ {f.recommendation}")
+        print()
+
+    print("  labels: every check above is VERIFIED (deterministic).\n")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(prog="damask", description="GEO/SEO scan engine.")
     ap.add_argument("url", help="URL to scan, e.g. https://example.com")
@@ -62,7 +93,20 @@ def main() -> None:
                          "(slow; uses PAGESPEED_API_KEY from engine/.env when set)")
     ap.add_argument("--fixes", action="store_true",
                     help="generate ready-to-paste remediation artifacts for the findings")
+    ap.add_argument("--crawl", action="store_true",
+                    help="crawl the whole site (bounded, polite) and report site-wide issues")
+    ap.add_argument("--max-pages", type=int, default=25,
+                    help="max pages to crawl with --crawl (default 25)")
     args = ap.parse_args()
+
+    if args.crawl:
+        from .crawl import crawl
+        site = crawl(args.url, max_pages=args.max_pages)
+        if args.json:
+            print(json.dumps(site.to_dict(), indent=2))
+        else:
+            _print_site(site)
+        sys.exit(0 if not site.meta.get("error") else 1)
 
     report = scan(args.url, render=args.render, performance=args.performance, fixes=args.fixes)
 

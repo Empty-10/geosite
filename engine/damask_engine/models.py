@@ -111,3 +111,48 @@ class Report:
             "findings": [f.to_dict() for f in self.findings],
             "fixes": [f.to_dict() for f in self.fixes],
         }
+
+
+@dataclass
+class PageSummary:
+    """One page within a site crawl — a compact slice of its full Report.
+
+    The full per-page findings aren't kept (drilling in = re-scanning that URL); a SiteReport
+    holds these summaries plus the cross-page `site_findings` a single-page scan can't produce.
+    """
+
+    url: str
+    status_code: int
+    overall_score: int
+    pillar_scores: dict[str, int] = field(default_factory=dict)
+    title: str = ""
+    meta_description: str = ""
+    word_count: int = 0
+    issues: int = 0  # number of failing/warning findings on the page
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class SiteReport:
+    """Aggregate of a multi-page crawl: per-page summaries + site-wide findings + a site score."""
+
+    url: str
+    fetched_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    pages: list[PageSummary] = field(default_factory=list)
+    site_findings: list[Finding] = field(default_factory=list)
+    overall_score: int = 0
+    meta: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "scan_type": "site",
+            "url": self.url,
+            "fetched_at": self.fetched_at,
+            "overall_score": self.overall_score,
+            "meta": self.meta,
+            "pages": [p.to_dict() for p in self.pages],
+            "site_findings": [f.to_dict() for f in self.site_findings],
+        }
