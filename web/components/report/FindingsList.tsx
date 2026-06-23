@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { C } from "@/lib/tokens";
+import { AiDraftBlock } from "./AiDraftBlock";
 import { FixBlock } from "./FixBlock";
-import { conf, rgba, sev, type Finding, type Fix } from "./types";
+import { conf, GENERATIVE_FINDINGS, rgba, sev, type Finding, type Fix } from "./types";
 
 const STATUS: Record<string, { label: string; color: string }> = {
   fail: { label: "Fail", color: C.fail },
@@ -21,9 +22,10 @@ function statusOf(s: string) {
  * (no modals, per the design brief). Used for the priority-fix list and per-pillar checks.
  * Parents that swap the `findings` set (e.g. pillar tabs) should pass a `key` to remount.
  */
-export function FindingsList({ findings, fixes = {}, openFirst = true }: {
+export function FindingsList({ findings, fixes = {}, url, openFirst = true }: {
   findings: Finding[];
   fixes?: Record<string, Fix>;
+  url?: string; // when set, generative findings get an on-demand "Draft with AI" button
   openFirst?: boolean;
 }) {
   const [expanded, setExpanded] = useState<string | null>(openFirst ? findings[0]?.id ?? null : null);
@@ -158,6 +160,9 @@ export function FindingsList({ findings, fixes = {}, openFirst = true }: {
                   </p>
                 )}
                 {issue && fixes[f.id] && <FixBlock fix={fixes[f.id]} />}
+                {issue && !fixes[f.id] && url && GENERATIVE_FINDINGS.has(f.id) && (
+                  <AiDraftBlock url={url} findingId={f.id} />
+                )}
               </div>
             )}
           </div>

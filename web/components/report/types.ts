@@ -22,7 +22,18 @@ export type Fix = {
   language: string;
   content: string;
   note: string | null;
+  // "deterministic" (engine-generated, ready to apply) vs "ai_drafted" (Claude — review first).
+  source?: "deterministic" | "ai_drafted";
 };
+
+// Findings whose remediation is judgment-dependent → eligible for on-demand AI drafting
+// via POST /api/fix. Everything else has a deterministic fix (or none).
+export const GENERATIVE_FINDINGS = new Set([
+  "geo.aeo",
+  "geo.frontload",
+  "geo.definitive",
+  "geo.thin_content",
+]);
 
 export type Report = {
   schema_version?: string;

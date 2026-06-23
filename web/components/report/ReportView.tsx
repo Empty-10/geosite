@@ -238,7 +238,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
 
       <SectionTitle>Priority fixes</SectionTitle>
       <div style={{ marginBottom: 28 }}>
-        <FindingsList findings={fixes} fixes={fixMap} />
+        <FindingsList findings={fixes} fixes={fixMap} url={finalUrl} />
       </div>
 
       {/* per-pillar tabs */}
@@ -272,7 +272,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
         })}
       </div>
       {/* key remounts the list per tab so its expanded-row state resets */}
-      <FindingsList key={section.key} findings={sectionFindings} fixes={fixMap} openFirst={false} />
+      <FindingsList key={section.key} findings={sectionFindings} fixes={fixMap} url={finalUrl} openFirst={false} />
     </div>
   );
 }
