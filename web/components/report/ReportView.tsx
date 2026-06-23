@@ -216,9 +216,17 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
     <div style={{ animation: "dmFade 0.3s ease both" }}>
       {/* report header */}
       <div style={{ marginBottom: 18 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em", marginBottom: 6, wordBreak: "break-all" }}>
-          {finalUrl}
-        </h1>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+          <h1 style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em", marginBottom: 6, wordBreak: "break-all" }}>
+            {finalUrl}
+          </h1>
+          <a
+            href={`/site?url=${encodeURIComponent(finalUrl)}`}
+            style={{ fontSize: 12.5, color: C.accent, whiteSpace: "nowrap", marginLeft: "auto" }}
+          >
+            Crawl whole site →
+          </a>
+        </div>
         <div style={{ fontSize: 12.5, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
           scanned {when.toLocaleString()} · {report.findings.length} checks · schema v{report.schema_version ?? "?"}
           <RenderTag meta={report.meta} />

@@ -13,6 +13,7 @@ import time
 import xml.etree.ElementTree as ET
 from collections import Counter, deque
 from statistics import mean
+from typing import Callable
 from urllib.parse import urljoin, urlparse
 
 from .fetch import fetch, fetch_resource
@@ -33,10 +34,12 @@ _THIN_SHARE_WARN = 0.30   # warn (vs info) when more than this fraction of pages
 _MAX_SITEMAP_CHILDREN = 10  # cap on child sitemaps fetched from a sitemap index
 
 
-def crawl(url: str, *, max_pages: int = 25, max_depth: int = 3, delay: float = 0.3) -> SiteReport:
+def crawl(url: str, *, max_pages: int = 25, max_depth: int = 3, delay: float = 0.3,
+          on_progress: Callable[[int, str], None] | None = None) -> SiteReport:
     """Crawl a site breadth-first from `url` and return an aggregated SiteReport.
 
     max_pages / max_depth bound the work; delay (seconds) keeps us polite between requests.
+    on_progress(pages_done, current_url) is called after each scanned page (for live status).
     """
     seen: set[str] = set()
     frontier: deque[tuple[str, int]] = deque([(url, 0)])
@@ -82,6 +85,8 @@ def crawl(url: str, *, max_pages: int = 25, max_depth: int = 3, delay: float = 0
             word_count=word_count(visible_text(soup)),
             issues=sum(1 for f in report.findings if f.status in (Status.FAIL, Status.WARN)),
         ))
+        if on_progress:
+            on_progress(len(pages), res.final_url)
 
         if depth < max_depth and host:
             for link in _internal_links(soup, res.final_url, host):
