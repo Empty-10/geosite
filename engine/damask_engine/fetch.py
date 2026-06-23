@@ -15,10 +15,14 @@ from datetime import datetime, timezone
 import certifi
 import requests
 
+from .config import get_cloudflare
+
 USER_AGENT = "damaskbot/0.1 (+https://example.com/bot; GEO/SEO scanner)"
 TIMEOUT = 20
 RESOURCE_TIMEOUT = 10
 RENDER_TIMEOUT_MS = 15000
+CF_RENDER_ENDPOINT = "https://api.cloudflare.com/client/v4/accounts/{account}/browser-rendering/content"
+CF_RENDER_TIMEOUT = 30
 
 
 @dataclass
@@ -70,6 +74,32 @@ def fetch(url: str, *, render: bool = False) -> FetchResult:
     if render and result.html:
         result.rendered_html = render_dom(result.final_url)
     return result
+
+
+def render_dom_cloudflare(url: str) -> str | None:
+    """Return the post-JavaScript DOM via Cloudflare Browser Rendering, or None.
+
+    A cheap, infra-free alternative to local Chromium: when CF_ACCOUNT_ID + CF_API_TOKEN are
+    set (env), Cloudflare runs the headless browser and returns rendered HTML. None when the
+    creds are absent or the call fails — the caller falls back to the raw HTML.
+    """
+    creds = get_cloudflare()
+    if not creds:
+        return None
+    account, token = creds
+    try:
+        r = requests.post(
+            CF_RENDER_ENDPOINT.format(account=account),
+            headers={"Authorization": f"Bearer {token}", "content-type": "application/json"},
+            json={"url": url},
+            timeout=CF_RENDER_TIMEOUT,
+        )
+        if r.status_code != 200:
+            return None
+        html = r.json().get("result")
+        return html if isinstance(html, str) and html.strip() else None
+    except (requests.RequestException, ValueError):
+        return None
 
 
 def render_dom(url: str) -> str | None:

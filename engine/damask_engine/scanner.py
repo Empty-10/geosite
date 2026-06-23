@@ -5,7 +5,7 @@ from __future__ import annotations
 from urllib.parse import urljoin, urlparse
 
 from .config import get_pagespeed_key
-from .fetch import FetchResult, fetch, fetch_pagespeed, fetch_resource, tls_info
+from .fetch import FetchResult, fetch, fetch_pagespeed, fetch_resource, render_dom_cloudflare, tls_info
 from .fixes import generate_fixes
 from .models import Pillar, Report
 from .modules import geo_readiness, onpage, performance, technical
@@ -50,6 +50,20 @@ def scan_html(url: str, html: str, *, online: bool = False,
     if fixes:
         report.fixes = generate_fixes(soup, report, final_url)
     return report
+
+
+# Mount points that signal a client-rendered single-page app shell.
+_SPA_MARKERS = ('id="root"', "id='root'", 'id="app"', "id='app'", 'id="__next"',
+                'id="___gatsby"', 'id="__nuxt"', "data-reactroot", "ng-app", "ng-version")
+
+
+def _looks_like_js_shell(html: str) -> bool:
+    """Raw HTML with almost no visible text (or a known SPA mount) — likely client-rendered."""
+    words = word_count(visible_text(make_soup(html)))
+    if words >= 60:
+        return False
+    low = html.lower()
+    return words < 15 or any(m in low for m in _SPA_MARKERS)
 
 
 def _render_delta(res: FetchResult) -> dict | None:
@@ -123,9 +137,20 @@ def scan(url: str, *, render: bool = False, performance: bool = False,
     if res.error or not res.html:
         return Report(url=url, meta={"error": res.error or "empty response",
                                      "status_code": res.status_code})
+
+    # Smart auto-render: when the raw HTML looks like a client-rendered shell (almost no text,
+    # or a known SPA mount point) and Cloudflare Browser Rendering is configured, render it so
+    # we scan what a JS-executing crawler sees. SSR sites (WordPress, etc.) never trigger this.
+    render_source = "playwright" if res.rendered_html else None
+    if res.rendered_html is None and _looks_like_js_shell(res.html):
+        cf_html = render_dom_cloudflare(res.final_url)
+        if cf_html:
+            res.rendered_html = cf_html
+            render_source = "cloudflare"
+
     # Scan the rendered DOM when available (closest to what crawlers/AI see); else raw HTML.
     html_to_scan = res.rendered_html or res.html
-    meta_extra = {"rendered": res.rendered_html is not None}
+    meta_extra = {"rendered": res.rendered_html is not None, "render_source": render_source}
 
     psi = None
     if performance:

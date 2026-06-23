@@ -34,3 +34,11 @@ def get_pagespeed_key() -> str | None:
     """Return the PageSpeed Insights API key, or None if unset (the API works key-less too)."""
     _load_env_once()
     return os.environ.get("PAGESPEED_API_KEY", "").strip() or None
+
+
+def get_cloudflare() -> tuple[str, str] | None:
+    """Cloudflare (account_id, api_token) for Browser Rendering, or None if either is unset."""
+    _load_env_once()
+    account = os.environ.get("CF_ACCOUNT_ID", "").strip()
+    token = os.environ.get("CF_API_TOKEN", "").strip()
+    return (account, token) if account and token else None
