@@ -51,9 +51,9 @@ export function MeasuredCard() {
         />
         <div style={{ position: "absolute", left: "23%", top: -2, width: 2, height: 12, background: C.measured, borderRadius: 2 }} />
       </div>
-      <span style={{ fontSize: 11.5, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
-        example output · citation sampling arrives in a later phase
-      </span>
+      <a href="/visibility" style={{ fontSize: 11.5, color: C.measured, fontFamily: "var(--mono)" }}>
+        example output · measure your AI visibility →
+      </a>
     </div>
   );
 }
