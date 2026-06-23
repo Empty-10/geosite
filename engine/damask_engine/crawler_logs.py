@@ -13,10 +13,14 @@ A Cloudflare/Vercel log connector can feed the same analyzer later.
 from __future__ import annotations
 
 import re
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, namedtuple
 from datetime import datetime
 
 from .models import BotActivity, Confidence, Finding, LogReport, Pillar, Severity, Status
+
+# One request (or a pre-aggregated group of `count` identical requests) to feed the aggregator.
+# Both the access-log parser and the Cloudflare connector emit these, so they share one analyzer.
+Record = namedtuple("Record", "ua path status count ts nbytes")
 
 C = Confidence.VERIFIED
 
@@ -78,12 +82,34 @@ def identify_bot(ua: str) -> tuple[str, str, str] | None:
 
 
 def analyze_logs(text: str, *, source: str = "uploaded log", max_lines: int = _MAX_LINES) -> LogReport:
-    """Parse access-log text and aggregate AI-crawler activity into a LogReport."""
-    lines_total = lines_parsed = lines_truncated = 0
-    earliest: datetime | None = None
-    latest: datetime | None = None
+    """Parse access-log text (Combined Log Format) and aggregate AI-crawler activity."""
+    counts = {"lines_total": 0, "lines_parsed": 0, "lines_truncated": 0}
 
-    # Per-bot accumulators.
+    def records():
+        for raw in text.splitlines():
+            if not raw.strip():
+                continue
+            counts["lines_total"] += 1
+            if counts["lines_total"] > max_lines:
+                counts["lines_truncated"] += 1
+                continue
+            m = _LINE.match(raw)
+            if not m:
+                continue
+            counts["lines_parsed"] += 1
+            nbytes = int(m["bytes"]) if m["bytes"].isdigit() else 0
+            yield Record(m["ua"], m["path"], int(m["status"]), 1, _parse_time(m["time"]), nbytes)
+
+    report = aggregate_records(records(), source=source)
+    report.meta.update(counts)  # generator is fully consumed by now, so counts are final
+    return report
+
+
+def aggregate_records(records, *, source: str, extra_meta: dict | None = None) -> LogReport:
+    """Aggregate Record stream → per-bot activity + findings → LogReport.
+
+    Shared by the access-log parser and the Cloudflare connector so both produce identical reports.
+    """
     hits: dict[str, int] = defaultdict(int)
     info: dict[str, tuple[str, str]] = {}        # name -> (operator, category)
     paths: dict[str, Counter] = defaultdict(Counter)
@@ -91,43 +117,30 @@ def analyze_logs(text: str, *, source: str = "uploaded log", max_lines: int = _M
     errors: dict[str, int] = defaultdict(int)
     nbytes: dict[str, int] = defaultdict(int)
     last_seen: dict[str, str] = {}
-    error_examples: list[tuple[str, str, int]] = []  # (bot, path, status)
+    error_examples: list[tuple[str, str, int]] = []
+    earliest: datetime | None = None
+    latest: datetime | None = None
 
-    for raw in text.splitlines():
-        if not raw.strip():
-            continue
-        lines_total += 1
-        if lines_total > max_lines:
-            lines_truncated += 1
-            continue
-        m = _LINE.match(raw)
-        if not m:
-            continue
-        bot = identify_bot(m["ua"])
+    for r in records:
+        bot = identify_bot(r.ua)
         if bot is None:
-            lines_parsed += 1
             continue
         name, operator, category = bot
         info[name] = (operator, category)
-        status = int(m["status"])
-        path = m["path"]
-        hits[name] += 1
-        paths[name][path] += 1
-        statuses[name][str(status)] += 1
-        nbytes[name] += int(m["bytes"]) if m["bytes"].isdigit() else 0
-        if status >= 400:
-            errors[name] += 1
+        hits[name] += r.count
+        paths[name][r.path] += r.count
+        statuses[name][str(r.status)] += r.count
+        nbytes[name] += r.nbytes
+        if r.status >= 400:
+            errors[name] += r.count
             if len(error_examples) < _ERR_EXAMPLES:
-                error_examples.append((name, path, status))
-
-        ts = _parse_time(m["time"])
-        if ts is not None:
-            earliest = ts if earliest is None or ts < earliest else earliest
-            latest = ts if latest is None or ts > latest else latest
-            iso = ts.isoformat()
+                error_examples.append((name, r.path, r.status))
+        if r.ts is not None:
+            earliest = r.ts if earliest is None or r.ts < earliest else earliest
+            latest = r.ts if latest is None or r.ts > latest else latest
+            iso = r.ts.isoformat()
             if name not in last_seen or iso > last_seen[name]:
                 last_seen[name] = iso
-        lines_parsed += 1
 
     bots = [
         BotActivity(
@@ -139,17 +152,14 @@ def analyze_logs(text: str, *, source: str = "uploaded log", max_lines: int = _M
         )
         for name in sorted(hits, key=lambda n: hits[n], reverse=True)
     ]
-
     meta = {
-        "lines_total": lines_total,
-        "lines_parsed": lines_parsed,
-        "lines_truncated": lines_truncated,
         "ai_requests": sum(hits.values()),
         "date_range": [earliest.isoformat() if earliest else None,
                        latest.isoformat() if latest else None],
     }
-    findings = _findings(bots, error_examples)
-    return LogReport(source=source, bots=bots, findings=findings, meta=meta)
+    if extra_meta:
+        meta.update(extra_meta)
+    return LogReport(source=source, bots=bots, findings=_findings(bots, error_examples), meta=meta)
 
 
 def _parse_time(s: str) -> datetime | None:

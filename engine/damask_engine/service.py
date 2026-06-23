@@ -28,6 +28,7 @@ import uuid
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+from .cloudflare_logs import fetch_cloudflare_logs
 from .crawl import crawl
 from .crawler_logs import analyze_logs
 from .scanner import scan
@@ -55,6 +56,11 @@ class LogsRequest(BaseModel):
     source: str = "uploaded log"
 
 
+class CloudflareLogsRequest(BaseModel):
+    domain: str
+    days: int = 7
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -70,6 +76,13 @@ def scan_endpoint(req: ScanRequest) -> dict:
 def logs_endpoint(req: LogsRequest) -> dict:
     """Analyze access-log text for AI-crawler activity. Fast/synchronous; bounded internally."""
     return analyze_logs(req.text, source=req.source).to_dict()
+
+
+@app.post("/cloudflare-logs")
+def cloudflare_logs_endpoint(req: CloudflareLogsRequest) -> dict:
+    """Pull AI-crawler activity for a domain from Cloudflare analytics. Errors surface in meta.error."""
+    days = max(1, min(req.days, 30))
+    return fetch_cloudflare_logs(req.domain, days=days).to_dict()
 
 
 def _run_crawl(job_id: str, url: str, max_pages: int) -> None:

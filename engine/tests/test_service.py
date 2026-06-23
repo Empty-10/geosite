@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from damask_engine.models import PageSummary, Report, SiteReport
+from damask_engine.models import LogReport, PageSummary, Report, SiteReport
 from damask_engine.service import app
 
 client = TestClient(app)
@@ -116,3 +116,22 @@ def test_logs_endpoint_analyzes_text():
 
 def test_logs_missing_text_is_422():
     assert client.post("/logs", json={}).status_code == 422
+
+
+def test_cloudflare_logs_endpoint(monkeypatch):
+    fake = LogReport(source="Cloudflare · acme.com", meta={"connector": "cloudflare"})
+    captured = {}
+
+    def fake_fetch(domain, *, days):
+        captured.update(domain=domain, days=days)
+        return fake
+
+    with patch("damask_engine.service.fetch_cloudflare_logs", side_effect=fake_fetch):
+        r = client.post("/cloudflare-logs", json={"domain": "acme.com", "days": 99})
+    assert r.status_code == 200
+    assert r.json()["scan_type"] == "logs"
+    assert captured == {"domain": "acme.com", "days": 30}  # clamped to 30
+
+
+def test_cloudflare_logs_missing_domain_is_422():
+    assert client.post("/cloudflare-logs", json={}).status_code == 422
