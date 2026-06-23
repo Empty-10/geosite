@@ -81,9 +81,35 @@ def _print_site(site: SiteReport) -> None:
     print("  labels: every check above is VERIFIED (deterministic).\n")
 
 
+def _print_logs(report) -> None:
+    m = report.meta
+    dr = m.get("date_range") or [None, None]
+    print(f"\n  damask crawler-log analysis — {report.source}")
+    print(f"  {m.get('ai_requests', 0)} AI-crawler requests of {m.get('lines_parsed', 0)} "
+          f"parsed lines   range: {dr[0] or '?'} → {dr[1] or '?'}\n")
+
+    if report.bots:
+        print("  AI CRAWLERS")
+        for b in report.bots:
+            errs = f"  {b.errors} errors" if b.errors else ""
+            print(f"    {b.name:<20} [{b.category}]  {b.operator:<14} "
+                  f"{b.hits} hits · {b.paths} paths{errs}")
+        print()
+
+    if report.findings:
+        print("  FINDINGS")
+        for f in report.findings:
+            print(f"    {_MARK[f.status]} {f.title}" + (f" — {f.evidence}" if f.evidence else ""))
+            if f.recommendation:
+                print(f"           ↳ {f.recommendation}")
+        print()
+
+    print("  labels: every number above is VERIFIED (read straight from the log).\n")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(prog="damask", description="GEO/SEO scan engine.")
-    ap.add_argument("url", help="URL to scan, e.g. https://example.com")
+    ap.add_argument("url", nargs="?", help="URL to scan, e.g. https://example.com")
     ap.add_argument("--json", action="store_true", help="output machine-readable JSON")
     ap.add_argument("--render", action="store_true",
                     help="render JavaScript with Playwright and scan the resulting DOM "
@@ -97,7 +123,23 @@ def main() -> None:
                     help="crawl the whole site (bounded, polite) and report site-wide issues")
     ap.add_argument("--max-pages", type=int, default=25,
                     help="max pages to crawl with --crawl (default 25)")
+    ap.add_argument("--logs", metavar="FILE",
+                    help="analyze an access log (Combined Log Format) for AI-crawler activity "
+                         "instead of scanning a URL")
     args = ap.parse_args()
+
+    if args.logs:
+        from .crawler_logs import analyze_logs
+        with open(args.logs, encoding="utf-8", errors="replace") as fh:
+            report = analyze_logs(fh.read(), source=args.logs)
+        if args.json:
+            print(json.dumps(report.to_dict(), indent=2))
+        else:
+            _print_logs(report)
+        sys.exit(0)
+
+    if not args.url:
+        ap.error("a URL is required unless --logs FILE is given")
 
     if args.crawl:
         from .crawl import crawl
