@@ -37,6 +37,23 @@ def test_aeo_fail_when_no_answer_paragraph():
     assert f.value["answer_word_offset"] is None
 
 
+def test_aeo_pass_with_div_based_answer():
+    # framework markup: the answer lives in a text <div>/<span>, not a <p>
+    html = ("<body><div class='hero'><span>Pour-over coffee uses a 1 to 16 ratio "
+            "brewed over about three minutes.</span></div></body>")
+    f = run(html)["geo.aeo"]
+    assert f.status == Status.PASS  # previously false-FAILed because it wasn't a <p>
+
+
+def test_aeo_skips_layout_wrapper_divs():
+    # an outer wrapper <div> (has nested blocks) is NOT treated as the answer; the inner
+    # <p> is, and the heading words before it still count toward the offset
+    html = ("<body><div class='wrap'><h2>Topic</h2>"
+            "<p>A clear and complete answer sentence that is definitely long enough to count here.</p>"
+            "</div></body>")
+    assert run(html)["geo.aeo"].status == Status.PASS
+
+
 # ----------------------------------------------------------------------------- FAQ section
 
 FAQ_SCHEMA = """<script type="application/ld+json">
@@ -57,11 +74,11 @@ def test_faq_pass_via_two_qa_pairs():
     assert f.value["qa_pairs"] == 2
 
 
-def test_faq_warn_when_single_question_or_none():
-    # one Q&A pair is not enough, and no FAQPage schema
+def test_faq_info_not_penalised_when_absent():
+    # one Q&A pair / no FAQPage schema → informational, NOT a penalty (not every page is an FAQ)
     html = "<body><h2>What is it?</h2><p>It is a clear and direct answer that is long enough.</p></body>"
     f = run(html)["geo.faq"]
-    assert f.status == Status.WARN
+    assert f.status == Status.INFO
     assert f.value["qa_pairs"] == 1
 
 

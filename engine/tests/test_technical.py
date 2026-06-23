@@ -186,3 +186,22 @@ def test_llms_present_and_absent():
 def _run_full(html: str):
     """Run the technical module against given HTML (resource hints read the DOM head)."""
     return {f.id: f for f in analyze(make_soup(html), "https://example.com/", 200, {})}
+
+
+# --------------------------------------------------------------------- mixed content
+
+def test_mixed_content_flags_http_subresources_only():
+    # http image = mixed content; http <a> link and http canonical are NOT
+    html = ("<head><link rel='canonical' href='http://example.com/x'></head>"
+            "<body><a href='http://other.com'>a link</a>"
+            "<img src='http://cdn.com/logo.png'></body>")
+    ids = _run_full(html)
+    assert ids["tech.mixed_content"].status == Status.FAIL
+    assert ids["tech.mixed_content"].value == 1  # only the <img>, not the link or canonical
+
+
+def test_no_mixed_content_for_plain_http_links():
+    # an https page that merely LINKS to http sites is not mixed content
+    html = "<body><a href='http://news.example'>read more</a><img src='/local.png'></body>"
+    ids = _run_full(html)
+    assert ids["tech.mixed_content.ok"].status == Status.PASS

@@ -144,24 +144,44 @@ def _types_of(node: dict) -> set[str]:
 # ------------------------------------------------------------------------------- AEO + FAQ
 
 
+# Elements that inherently hold their own text — direct answer-block candidates.
+_TEXT_BLOCKS = {"p", "li", "blockquote", "dd"}
+# Block-level tags; a <div>/<section> containing any of these is a layout wrapper, not a
+# text leaf, so we don't treat it as a paragraph (its inner blocks are checked instead).
+_BLOCK_TAGS = ["p", "div", "section", "article", "ul", "ol", "table", "header", "footer",
+               "nav", "aside", "main", "figure", "form", "h1", "h2", "h3", "h4", "h5", "h6"]
+
+
+def _is_answer_block(el: Tag) -> bool:
+    """A self-contained text block: a <p>/<li>/blockquote/dd, or a <div>/<section> with no
+    nested block elements (a "text div"). The latter covers React/Tailwind-style markup that
+    wraps body copy in <div>/<span> instead of <p>."""
+    if el.name in _TEXT_BLOCKS:
+        return True
+    if el.name in ("div", "section"):
+        return el.find(_BLOCK_TAGS) is None
+    return False
+
+
 def _is_answer_paragraph(text: str) -> bool:
     return len(text.split()) >= MIN_ANSWER_WORDS and any(p in text for p in ".!?")
 
 
 def _first_answer_offset(soup: BeautifulSoup) -> tuple[int | None, str]:
-    """Visible-word offset of the first self-contained answer <p>, or (None, "") if none.
+    """Visible-word offset of the first self-contained answer block, or (None, "") if none.
 
-    Walks the body in document order, accumulating visible words; when it reaches a <p>
-    that reads as a full answer, returns how many visible words preceded it.
+    Walks the body in document order, accumulating visible words; when it reaches a text
+    block (<p>, list item, or a text-only <div>) that reads as a full answer, returns how
+    many visible words preceded it.
     """
     body = soup.body or soup
     offset = 0
     for el in body.descendants:
         if isinstance(el, Tag):
-            if el.name == "p":
-                ptext = el.get_text(" ", strip=True)
-                if _is_answer_paragraph(ptext):
-                    return offset, ptext
+            if _is_answer_block(el):
+                text = el.get_text(" ", strip=True)
+                if _is_answer_paragraph(text):
+                    return offset, text
         elif isinstance(el, NavigableString):
             if any(isinstance(p, Tag) and p.name in _SKIP_TEXT for p in el.parents):
                 continue
@@ -220,12 +240,13 @@ def _faq(soup: BeautifulSoup) -> Finding:
         "FAQPage schema" if has_schema else None,
         f"{pairs} Q&A pair(s)" if pairs else None,
     ])) or "no FAQ structure found"
+    # Informational (not a penalty) when absent — not every page should be an FAQ.
     return Finding(
-        "geo.faq", P, "FAQ section", Status.PASS if ok else Status.WARN, Severity.MEDIUM, C,
+        "geo.faq", P, "FAQ section", Status.PASS if ok else Status.INFO, Severity.LOW, C,
         value={"faqpage_schema": has_schema, "qa_pairs": pairs}, evidence=detail,
         recommendation=None if ok else
-        "Add an FAQ: question-form H2/H3s each answered directly (ideally with FAQPage "
-        "JSON-LD). AI engines lift Q&A pairs almost verbatim.",
+        "Optional: an FAQ (question-form H2/H3s each answered directly, ideally with FAQPage "
+        "JSON-LD) gives AI engines Q&A pairs they lift almost verbatim.",
     )
 
 

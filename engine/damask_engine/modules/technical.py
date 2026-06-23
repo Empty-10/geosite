@@ -198,21 +198,15 @@ def analyze(
     if net.tls:
         out.append(_tls_check(net.tls))
 
-    # --- mixed content ---
+    # --- mixed content (http sub-resources on an https page) ---
     if is_https:
-        insecure = [
-            t.get(attr)
-            for t, attr in (
-                [(x, "src") for x in soup.find_all(src=True)]
-                + [(x, "href") for x in soup.find_all(href=True)]
-            )
-            if str(t.get(attr, "")).startswith("http://")
-        ]
+        insecure = _mixed_content(soup)
         if insecure:
             out.append(Finding("tech.mixed_content", P, "Mixed content", Status.FAIL,
                                Severity.MEDIUM, C, value=len(insecure),
-                               evidence=str(insecure[0]),
-                               recommendation="Load all sub-resources over HTTPS."))
+                               evidence=insecure[0],
+                               recommendation="Load all sub-resources (images, scripts, "
+                               "stylesheets, iframes) over HTTPS."))
         else:
             out.append(Finding("tech.mixed_content.ok", P, "Mixed content", Status.PASS,
                                Severity.INFO, C, value=0))
@@ -302,6 +296,31 @@ def _render_check(delta: dict) -> Finding:
         value={"raw_words": raw, "rendered_words": rendered},
         evidence=f"raw HTML: {raw} words; rendered DOM: {rendered} words",
     )
+
+
+def _mixed_content(soup: BeautifulSoup) -> list[str]:
+    """http:// sub-resources on an https page — the real definition of mixed content.
+
+    Only resource-loading attributes count: `src` (img/script/iframe/audio/video/source/…),
+    `<link rel="stylesheet" href>`, and `<object data>`. Navigational `<a href>` and
+    `link rel=canonical/alternate` are NOT mixed content and are deliberately excluded.
+    """
+    insecure: list[str] = []
+    for el in soup.find_all(src=True):
+        src = str(el.get("src", ""))
+        if src.startswith("http://"):
+            insecure.append(src)
+    for el in soup.find_all("link", href=True):
+        rel = el.get("rel") or []
+        rels = [r.lower() for r in (rel if isinstance(rel, list) else [str(rel)])]
+        href = str(el.get("href", ""))
+        if "stylesheet" in rels and href.startswith("http://"):
+            insecure.append(href)
+    for el in soup.find_all("object", attrs={"data": True}):
+        data = str(el.get("data", ""))
+        if data.startswith("http://"):
+            insecure.append(data)
+    return insecure
 
 
 def _redirect_checks(chain: list[tuple[int, str]]) -> list[Finding]:
