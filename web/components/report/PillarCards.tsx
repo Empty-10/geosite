@@ -5,7 +5,7 @@ import { PILLAR_CARDS } from "./types";
 export function PillarCards({ pillarScores }: { pillarScores: Record<string, number> }) {
   return (
     <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-      {PILLAR_CARDS.map(({ label, key }) => {
+      {PILLAR_CARDS.map(({ label, key }, i) => {
         const value = pillarScores[key];
         const ran = typeof value === "number";
         return (
@@ -20,6 +20,9 @@ export function PillarCards({ pillarScores }: { pillarScores: Record<string, num
               flexDirection: "column",
               gap: 8,
               opacity: ran ? 1 : 0.6,
+              // staggered rise-in as the result reveals
+              animation: "dmRise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both",
+              animationDelay: `${i * 80}ms`,
             }}
           >
             <span style={{ fontSize: 12, color: "var(--text-2)" }}>{label}</span>

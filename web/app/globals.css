@@ -48,6 +48,16 @@ input { font-family: inherit; }
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
+/* Cards rise + settle as the scan result reveals (staggered via animation-delay). */
+@keyframes dmRise {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Respect users who prefer reduced motion: cut the entrance/scan animations. */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; }
+}
 
 /* Hero backdrop: faint grid fading into a soft vignette. */
 .hero-bg {
