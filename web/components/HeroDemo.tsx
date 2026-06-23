@@ -5,6 +5,7 @@ import { C } from "@/lib/tokens";
 import { FindingsList } from "./report/FindingsList";
 import { MeasuredCard } from "./report/MeasuredCard";
 import { PillarCards } from "./report/PillarCards";
+import { RenderTag } from "./report/RenderTag";
 import { ScoreRing } from "./report/ScoreRing";
 import { fixesByFinding, priorityFixes, rgba, type Report } from "./report/types";
 
@@ -354,6 +355,7 @@ export function HeroDemo() {
             >
               <span style={{ color: "var(--accent)" }}>●</span> {modulesRun} modules complete · scanned in{" "}
               {(elapsedMs / 1000).toFixed(1)}s
+              <RenderTag meta={report.meta} />
             </div>
 
             <div style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 14 }}>

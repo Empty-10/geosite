@@ -9,6 +9,7 @@ import { FindingsList } from "./FindingsList";
 import { MeasuredCard } from "./MeasuredCard";
 import { PillarCards } from "./PillarCards";
 import { ScoreRing } from "./ScoreRing";
+import { RenderTag } from "./RenderTag";
 import { fixesByFinding, PILLAR_SECTIONS, priorityFixes, rgba, type Report } from "./types";
 
 type State =
@@ -220,6 +221,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
         </h1>
         <div style={{ fontSize: 12.5, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
           scanned {when.toLocaleString()} · {report.findings.length} checks · schema v{report.schema_version ?? "?"}
+          <RenderTag meta={report.meta} />
         </div>
       </div>
 
