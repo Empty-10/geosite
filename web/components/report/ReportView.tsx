@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { C } from "@/lib/tokens";
-import { Logo } from "../Logo";
+import { ToolNav } from "./ToolNav";
 import { ConfidenceLegend } from "./ConfidenceLegend";
 import { FindingsList } from "./FindingsList";
 import { MeasuredCard } from "./MeasuredCard";
@@ -63,25 +63,7 @@ export function ReportView() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--ink)" }}>
-      {/* top bar */}
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "16px 24px",
-          borderBottom: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: 10, color: "var(--text)" }}>
-          <Logo size={20} />
-          <span style={{ fontSize: 15, fontWeight: 500, letterSpacing: "-0.01em" }}>damask</span>
-        </a>
-        <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
-          scan report
-        </span>
-      </header>
+      <ToolNav active="report" />
 
       <main style={{ maxWidth: 880, margin: "0 auto", padding: "24px 20px 80px" }}>
         {/* URL bar — always present, for entering or re-scanning */}

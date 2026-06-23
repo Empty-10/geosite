@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { C } from "@/lib/tokens";
-import { Logo } from "../Logo";
+import { ToolNav } from "./ToolNav";
 import { FindingsList } from "./FindingsList";
 import { rgba } from "./types";
 import { CATEGORY, type BotActivity, type LogReport } from "./logTypes";
@@ -54,24 +54,7 @@ export function LogReportView() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--ink)" }}>
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "16px 24px",
-          borderBottom: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: 10, color: "var(--text)" }}>
-          <Logo size={20} />
-          <span style={{ fontSize: 15, fontWeight: 500, letterSpacing: "-0.01em" }}>damask</span>
-        </a>
-        <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
-          AI crawler logs
-        </span>
-      </header>
+      <ToolNav active="crawlers" />
 
       <main style={{ maxWidth: 920, margin: "0 auto", padding: "24px 20px 80px" }}>
         <h1 style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em", marginBottom: 6 }}>

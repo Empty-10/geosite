@@ -34,8 +34,9 @@ export function Nav() {
         <a style={linkStyle}>Docs</a>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <a style={linkStyle}>Sign in</a>
-        <button
+        <a style={linkStyle} href="/crawlers">Crawler logs</a>
+        <a
+          href="/report"
           style={{
             fontSize: 14,
             fontWeight: 500,
@@ -45,10 +46,12 @@ export function Nav() {
             padding: "9px 16px",
             borderRadius: 8,
             cursor: "pointer",
+            textDecoration: "none",
+            display: "inline-block",
           }}
         >
           Start free scan
-        </button>
+        </a>
       </div>
     </nav>
   );

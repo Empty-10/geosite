@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { C, scoreColor } from "@/lib/tokens";
-import { Logo } from "../Logo";
+import { ToolNav } from "./ToolNav";
 import { FindingsList } from "./FindingsList";
 import { ScoreRing } from "./ScoreRing";
 import { rgba } from "./types";
@@ -117,24 +117,7 @@ export function SiteReportView() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--ink)" }}>
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "16px 24px",
-          borderBottom: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: 10, color: "var(--text)" }}>
-          <Logo size={20} />
-          <span style={{ fontSize: 15, fontWeight: 500, letterSpacing: "-0.01em" }}>damask</span>
-        </a>
-        <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
-          site crawl
-        </span>
-      </header>
+      <ToolNav active="site" />
 
       <main style={{ maxWidth: 920, margin: "0 auto", padding: "24px 20px 80px" }}>
         <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>
