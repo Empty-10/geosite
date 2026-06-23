@@ -16,8 +16,12 @@ import path from "node:path";
 // Needs child_process + filesystem paths — Node runtime, never edge. Never cache a scan.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Allow the function to run long enough to cover a cold-starting engine service (Vercel
+// Hobby caps at 60s). Without this, the platform kills the request at the default ~10s.
+export const maxDuration = 60;
 
-const SCAN_TIMEOUT_MS = 25_000;
+const SCAN_TIMEOUT_MS = 25_000; // local shell-out path
+const ENGINE_HTTP_TIMEOUT_MS = 55_000; // HTTP path — tolerate free-tier cold starts
 
 const ENGINE_DIR =
   process.env.DAMASK_ENGINE_DIR || path.resolve(process.cwd(), "..", "engine");
@@ -147,7 +151,7 @@ async function runEngineHttp(base: string, target: string): Promise<EngineResult
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ url: target }),
-      signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
+      signal: AbortSignal.timeout(ENGINE_HTTP_TIMEOUT_MS),
     });
     const data = (await res.json()) as { meta?: { error?: string } };
     if (!res.ok) return { ok: false, status: 502, error: `Engine service error (${res.status}).` };
