@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { C } from "@/lib/tokens";
 import { ToolNav } from "./ToolNav";
 import { ConfidenceLegend } from "./ConfidenceLegend";
+import { DiffBanner } from "./DiffBanner";
 import { FindingsList } from "./FindingsList";
 import { MeasuredCard } from "./MeasuredCard";
 import { PillarCards } from "./PillarCards";
@@ -214,6 +215,8 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
           <RenderTag meta={report.meta} />
         </div>
       </div>
+
+      <DiffBanner meta={report.meta} />
 
       <div style={{ marginBottom: 18 }}>
         <ConfidenceLegend />
