@@ -22,6 +22,7 @@ function cat(c: string) {
 
 export function LogReportView() {
   const [text, setText] = useState("");
+  const [domain, setDomain] = useState("");
   const [state, setState] = useState<State>({ phase: "empty" });
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -39,6 +40,25 @@ export function LogReportView() {
       setState({ phase: "done", report: data });
     } catch (e) {
       setState({ phase: "error", message: e instanceof Error ? e.message : "Something went wrong." });
+    }
+  };
+
+  const connectCloudflare = async (d: string) => {
+    if (!d.trim()) return;
+    setState({ phase: "analyzing" });
+    try {
+      const res = await fetch("/api/cloudflare-logs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ domain: d }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `Couldn't connect (${res.status}).`);
+      // Cloudflare-side problems (bad scope, wrong zone) surface as 200 + meta.error.
+      if (data?.meta?.error) throw new Error(data.meta.error);
+      setState({ phase: "done", report: data });
+    } catch (e) {
+      setState({ phase: "error", message: e instanceof Error ? e.message : "Couldn't connect to Cloudflare." });
     }
   };
 
@@ -133,6 +153,77 @@ export function LogReportView() {
             }}
           />
           <span style={{ fontSize: 12, color: "var(--text-3)" }}>Combined Log Format · nothing is stored</span>
+        </div>
+
+        {/* Cloudflare connector — no upload, pulls analytics for a domain you proxy via Cloudflare. */}
+        <div
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: 12,
+            background: "var(--surface)",
+            padding: "16px 16px 14px",
+            marginBottom: 24,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 13.5, color: "var(--text)", fontWeight: 500 }}>Or connect Cloudflare</span>
+            <span style={{ fontSize: 11, color: "var(--text-3)" }}>— no upload, pulls the last 7 days</span>
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div
+              style={{
+                flex: 1,
+                minWidth: 220,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "0 12px",
+                height: 42,
+                border: "1px solid var(--border)",
+                borderRadius: 9,
+                background: "var(--ink)",
+              }}
+            >
+              <span style={{ fontSize: 13, color: "var(--text-3)", fontFamily: "var(--mono)" }}>domain</span>
+              <input
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && connectCloudflare(domain)}
+                placeholder="acme.com"
+                style={{
+                  flex: 1,
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                  color: "var(--text)",
+                  fontSize: 14,
+                  fontFamily: "var(--mono)",
+                }}
+              />
+            </div>
+            <button
+              onClick={() => connectCloudflare(domain)}
+              disabled={state.phase === "analyzing" || !domain.trim()}
+              style={{
+                fontSize: 14,
+                fontWeight: 500,
+                border: "1px solid var(--border-strong)",
+                padding: "0 18px",
+                height: 42,
+                borderRadius: 9,
+                cursor: state.phase === "analyzing" || !domain.trim() ? "default" : "pointer",
+                background: "transparent",
+                color: "var(--text)",
+              }}
+            >
+              Connect Cloudflare
+            </button>
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--text-3)", marginTop: 10, lineHeight: 1.5 }}>
+            Needs the domain on your Cloudflare account and the API token granted{" "}
+            <span style={{ color: "var(--text-2)" }}>Zone → Read</span> +{" "}
+            <span style={{ color: "var(--text-2)" }}>Analytics → Read</span>.
+          </div>
         </div>
 
         {state.phase === "error" && (
