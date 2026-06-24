@@ -7,6 +7,7 @@ import { MeasuredCard } from "./report/MeasuredCard";
 import { PillarCards } from "./report/PillarCards";
 import { RenderTag } from "./report/RenderTag";
 import { ScoreRing } from "./report/ScoreRing";
+import { usePerformance } from "./report/usePerformance";
 import { fixesByFinding, priorityFixes, rgba, type Report } from "./report/types";
 
 // Visual scan steps. The engine runs three deterministic modules (technical, on-page, GEO
@@ -120,8 +121,13 @@ export function HeroDemo() {
   const isDone = phase === "done";
   const isError = phase === "error";
 
+  // On-demand Performance — same runnable card as the report screen.
+  const perfUrl = (report?.meta?.final_url as string) || url;
+  const perfPre = typeof report?.pillar_scores?.performance === "number" ? report.pillar_scores.performance : undefined;
+  const { controller: perfController, pillarOverride } = usePerformance(perfUrl, perfPre);
+
   const fixes = report ? priorityFixes(report.findings) : [];
-  const modulesRun = MODULE_NAMES.length - 1; // Performance is not run in the first slice
+  const modulesRun = MODULE_NAMES.length - 1; // Performance runs on demand, not in the default scan
   const buttonLabel = isScanning ? "Scanning…" : isDone ? "Re-scan" : isError ? "Retry" : "Scan";
 
   return (
@@ -332,7 +338,7 @@ export function HeroDemo() {
                     {name}
                   </span>
                   <span style={{ fontSize: 12, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
-                    {done ? "done" : running ? "scanning…" : notRun ? "not in this scan" : "queued"}
+                    {done ? "done" : running ? "scanning…" : notRun ? "on demand" : "queued"}
                   </span>
                 </div>
               );
@@ -360,7 +366,7 @@ export function HeroDemo() {
 
             <div style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 14 }}>
               <ScoreRing score={report.overall_score} />
-              <PillarCards pillarScores={report.pillar_scores} />
+              <PillarCards pillarScores={{ ...report.pillar_scores, ...pillarOverride }} perf={perfController} />
             </div>
 
             <div style={{ marginBottom: 16 }}>
