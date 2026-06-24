@@ -1,134 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { C } from "@/lib/tokens";
-import { FindingsList } from "./report/FindingsList";
-import { MeasuredCard } from "./report/MeasuredCard";
-import { PillarCards } from "./report/PillarCards";
-import { RenderTag } from "./report/RenderTag";
-import { ScoreRing } from "./report/ScoreRing";
-import { usePerformance } from "./report/usePerformance";
-import { fixesByFinding, priorityFixes, rgba, type Report } from "./report/types";
 
-// Visual scan steps. The engine runs three deterministic modules (technical, on-page, GEO
-// readiness); the rest are surfaced here as roadmap so the full pillar set is visible.
-// PERF_INDEX is shown as "not in this scan" — Performance is a later phase, never faked.
-const MODULE_NAMES = [
-  "Technical crawl",
-  "On-page structure",
-  "GEO readiness",
-  "Performance",
-  "Schema & metadata",
-  "AI crawler access",
-];
-const PERF_INDEX = 3;
-
-const MIN_SCAN_MS = 1900; // let the module ticks read even when the engine returns sooner
-
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-type Phase = "idle" | "scanning" | "done" | "error";
-
+// Landing-page scan entry. Enter a URL → Scan → routes to the /report scan page, which shows the
+// animated "scanning…" state then the score + full breakdown. (One scan, one place.)
 export function HeroDemo() {
   const [url, setUrl] = useState("stripe.com");
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [moduleStatus, setModuleStatus] = useState<number[]>(() =>
-    MODULE_NAMES.map((_, i) => (i === PERF_INDEX ? 3 : 0)),
-  );
-  const [report, setReport] = useState<Report | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [elapsedMs, setElapsedMs] = useState(0);
+  const router = useRouter();
 
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const runId = useRef(0);
-  const abortRef = useRef<AbortController | null>(null);
-
-  function clearTimers() {
-    timers.current.forEach((t) => clearTimeout(t));
-    timers.current = [];
-  }
-  useEffect(() => {
-    return () => {
-      clearTimers();
-      abortRef.current?.abort();
-    };
-  }, []);
-
-  function startModuleAnimation() {
-    setModuleStatus(MODULE_NAMES.map((_, i) => (i === PERF_INDEX ? 3 : 0)));
-    MODULE_NAMES.forEach((_, i) => {
-      if (i === PERF_INDEX) return; // stays "not run"
-      timers.current.push(
-        setTimeout(() => {
-          setModuleStatus((ms) => {
-            const next = [...ms];
-            next[i] = 1;
-            return next;
-          });
-        }, 120 + i * 300),
-      );
-      timers.current.push(
-        setTimeout(() => {
-          setModuleStatus((ms) => {
-            const next = [...ms];
-            next[i] = 2;
-            return next;
-          });
-        }, 120 + i * 300 + 260),
-      );
-    });
-  }
-
-  async function onScan() {
-    if (phase === "scanning") return;
-    clearTimers();
-    abortRef.current?.abort();
-    const myRun = ++runId.current;
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-
-    setPhase("scanning");
-    setReport(null);
-    setError(null);
-    startModuleAnimation();
-
-    const started = performance.now();
-    try {
-      const res = await fetch("/api/scan", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url }),
-        signal: ctrl.signal,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || `Scan failed (${res.status}).`);
-
-      await delay(Math.max(0, MIN_SCAN_MS - (performance.now() - started)));
-      if (runId.current !== myRun) return; // a newer scan superseded this one
-
-      setReport(data);
-      setElapsedMs(performance.now() - started);
-      setPhase("done");
-    } catch (e) {
-      if (runId.current !== myRun || ctrl.signal.aborted) return;
-      setError(e instanceof Error ? e.message : "Something went wrong.");
-      setPhase("error");
-    }
-  }
-
-  const isIdle = phase === "idle";
-  const isScanning = phase === "scanning";
-  const isDone = phase === "done";
-  const isError = phase === "error";
-
-  // On-demand Performance — same runnable card as the report screen.
-  const perfUrl = (report?.meta?.final_url as string) || url;
-  const perfPre = typeof report?.pillar_scores?.performance === "number" ? report.pillar_scores.performance : undefined;
-  const { controller: perfController, pillarOverride } = usePerformance(perfUrl, perfPre);
-
-  const fixes = report ? priorityFixes(report.findings) : [];
-  const modulesRun = MODULE_NAMES.length - 1; // Performance runs on demand, not in the default scan
-  const buttonLabel = isScanning ? "Scanning…" : isDone ? "Re-scan" : isError ? "Retry" : "Scan";
+  const scan = () => {
+    const v = url.trim();
+    if (!v) return;
+    const withScheme = /^https?:\/\//i.test(v) ? v : `https://${v}`;
+    router.push(`/report?url=${encodeURIComponent(withScheme)}`);
+  };
 
   return (
     <div
@@ -153,9 +40,7 @@ export function HeroDemo() {
         {[0, 1, 2].map((i) => (
           <div key={i} style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--border-strong)" }} />
         ))}
-        <span style={{ marginLeft: 8, fontSize: 12, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
-          live scan
-        </span>
+        <span style={{ marginLeft: 8, fontSize: 12, color: "var(--text-3)", fontFamily: "var(--mono)" }}>live scan</span>
       </div>
 
       <div style={{ padding: 20 }}>
@@ -168,18 +53,16 @@ export function HeroDemo() {
               gap: 10,
               padding: "0 14px",
               height: 46,
-              border: `1px solid ${isScanning ? C.borderStrong : C.border}`,
+              border: `1px solid ${C.border}`,
               borderRadius: 10,
               background: "var(--ink)",
             }}
           >
             <span style={{ fontSize: 14, color: "var(--text-3)", fontFamily: "var(--mono)" }}>https://</span>
             <input
-              value={url}
+              value={url.replace(/^https?:\/\//i, "")}
               onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onScan();
-              }}
+              onKeyDown={(e) => e.key === "Enter" && scan()}
               placeholder="your-site.com"
               style={{
                 flex: 1,
@@ -193,7 +76,7 @@ export function HeroDemo() {
             />
           </div>
           <button
-            onClick={onScan}
+            onClick={scan}
             style={{
               fontSize: 14,
               fontWeight: 500,
@@ -201,187 +84,57 @@ export function HeroDemo() {
               padding: "0 20px",
               height: 46,
               borderRadius: 10,
-              cursor: isScanning ? "default" : "pointer",
+              cursor: "pointer",
               flexShrink: 0,
-              background: isScanning ? C.raised : C.accent,
-              color: isScanning ? C.text3 : C.ink,
+              background: C.accent,
+              color: C.ink,
             }}
           >
-            {buttonLabel}
+            Scan
           </button>
         </div>
 
-        {isIdle && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            height: 300,
+            border: "1px dashed var(--border)",
+            borderRadius: 12,
+            textAlign: "center",
+            padding: 24,
+          }}
+        >
           <div
             style={{
+              width: 40,
+              height: 40,
+              border: "1.5px solid var(--border-strong)",
+              borderRadius: "50%",
               display: "flex",
-              flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              gap: 10,
-              height: 300,
-              border: "1px dashed var(--border)",
-              borderRadius: 12,
-              textAlign: "center",
-              padding: 24,
             }}
           >
             <div
               style={{
-                width: 40,
-                height: 40,
-                border: "1.5px solid var(--border-strong)",
+                width: 14,
+                height: 14,
+                border: "1.5px solid var(--text-3)",
                 borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                borderTopColor: "transparent",
+                transform: "rotate(45deg)",
               }}
-            >
-              <div
-                style={{
-                  width: 14,
-                  height: 14,
-                  border: "1.5px solid var(--text-3)",
-                  borderRadius: "50%",
-                  borderTopColor: "transparent",
-                  transform: "rotate(45deg)",
-                }}
-              />
-            </div>
-            <span style={{ fontSize: 14, color: "var(--text-2)" }}>Enter a URL and run a scan</span>
-            <span style={{ fontSize: 12.5, color: "var(--text-3)", maxWidth: 280 }}>
-              Deterministic technical engine · live, verified results
-            </span>
+            />
           </div>
-        )}
-
-        {isError && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              height: 300,
-              border: `1px solid ${rgba(C.fail, 0.4)}`,
-              borderRadius: 12,
-              textAlign: "center",
-              padding: 24,
-              background: rgba(C.fail, 0.06),
-            }}
-          >
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                border: `1.5px solid ${rgba(C.fail, 0.6)}`,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: C.fail,
-                fontSize: 20,
-              }}
-            >
-              !
-            </div>
-            <span style={{ fontSize: 14, color: "var(--text)" }}>Couldn&apos;t complete the scan</span>
-            <span style={{ fontSize: 12.5, color: "var(--text-3)", maxWidth: 320 }}>{error}</span>
-          </div>
-        )}
-
-        {isScanning && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {MODULE_NAMES.map((name, i) => {
-              const stt = moduleStatus[i];
-              const running = stt === 1;
-              const done = stt === 2;
-              const notRun = stt === 3;
-              return (
-                <div
-                  key={name}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "11px 14px",
-                    border: "1px solid var(--border)",
-                    borderRadius: 10,
-                    background: "var(--raised)",
-                    opacity: notRun ? 0.55 : 1,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: "50%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 11,
-                      flexShrink: 0,
-                      background: done ? rgba(C.accent, 0.14) : C.raised,
-                      border: `1.5px solid ${done ? C.accent : running ? C.measured : C.borderStrong}`,
-                      color: done ? C.accent : C.text3,
-                      animation: running
-                        ? "dmPulse 1s ease infinite"
-                        : done
-                          ? "dmTick 0.3s ease both"
-                          : undefined,
-                    }}
-                  >
-                    {done ? "✓" : notRun ? "–" : ""}
-                  </div>
-                  <span style={{ flex: 1, fontSize: 14, color: done ? C.text2 : running ? C.text : C.text3 }}>
-                    {name}
-                  </span>
-                  <span style={{ fontSize: 12, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
-                    {done ? "done" : running ? "scanning…" : notRun ? "on demand" : "queued"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {isDone && report && (
-          <div style={{ animation: "dmFade 0.4s ease both" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 12,
-                color: "var(--text-3)",
-                marginBottom: 16,
-                fontFamily: "var(--mono)",
-              }}
-            >
-              <span style={{ color: "var(--accent)" }}>●</span> {modulesRun} modules complete · scanned in{" "}
-              {(elapsedMs / 1000).toFixed(1)}s
-              <RenderTag meta={report.meta} />
-            </div>
-
-            <div style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 14 }}>
-              <ScoreRing score={report.overall_score} />
-              <PillarCards pillarScores={{ ...report.pillar_scores, ...pillarOverride }} perf={perfController} />
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <MeasuredCard />
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-              <span style={{ fontSize: 13, color: "var(--text)", fontWeight: 500 }}>Priority fixes</span>
-              <a href={`/report?url=${encodeURIComponent(url)}`} style={{ fontSize: 12, color: C.accent }}>
-                Full report →
-              </a>
-            </div>
-            <FindingsList findings={fixes.slice(0, 3)} fixes={report ? fixesByFinding(report) : {}} />
-          </div>
-        )}
+          <span style={{ fontSize: 14, color: "var(--text-2)" }}>Enter a URL and run a deterministic GEO/SEO scan</span>
+          <span style={{ fontSize: 12.5, color: "var(--text-3)", maxWidth: 300 }}>
+            Verified results in seconds — score, 20-row scorecard, and every fix.
+          </span>
+        </div>
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import { DiffBanner } from "./DiffBanner";
 import { FindingsList } from "./FindingsList";
 import { MeasuredCard } from "./MeasuredCard";
 import { PerformancePanel } from "./PerformancePanel";
+import { ScanProgress } from "./ScanProgress";
 import { PillarCards } from "./PillarCards";
 import { ScorecardPanel } from "./ScorecardPanel";
 import { ScoreRing } from "./ScoreRing";
@@ -145,7 +146,7 @@ export function ReportView() {
           <Placeholder>Enter a URL above to run a deterministic GEO-readiness scan.</Placeholder>
         )}
 
-        {state.phase === "loading" && <Placeholder>Scanning {state.url} …</Placeholder>}
+        {state.phase === "loading" && <ScanProgress url={state.url} />}
 
         {state.phase === "error" && (
           <div
