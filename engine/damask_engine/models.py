@@ -16,7 +16,9 @@ from typing import Any
 # v3: added the top-level `fixes` array (generated remediation artifacts). Snapshot-tested.
 # v4: 20-row scorecard parity checks — geo.summary_bullets / geo.intro_quality / geo.chunking,
 #     onpage.link_attrs, schema.validation.
-SCHEMA_VERSION = "4"
+# v5: response-header cluster (tech.x_robots_tag / tech.compression / tech.security_headers,
+#     live fetch only) + geo.data_density (quotable-data density).
+SCHEMA_VERSION = "5"
 
 
 class Confidence(str, Enum):

@@ -9,6 +9,7 @@ Signals are grounded in 2026 GEO research (see docs / chat history).
 from __future__ import annotations
 
 import json
+import re
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 
@@ -45,6 +46,18 @@ PROMO_MARKERS = (
 )
 CHUNK_MIN_WORDS = 15     # a substantive paragraph
 CHUNK_WALL_WORDS = 150   # a "wall of text" that's hard to extract a clean chunk from
+
+# Concrete-data patterns. Pages dense with figures/stats get cited far more by AI engines.
+_DATA_PATTERNS = {
+    "percent": re.compile(r"\d+(?:\.\d+)?\s?%"),
+    "currency": re.compile(r"[$£€]\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:usd|gbp|eur|dollars|pounds|euros)\b", re.I),
+    "year": re.compile(r"\b(?:19|20)\d{2}\b"),
+    "measure": re.compile(r"\b\d+(?:\.\d+)?\s?(?:ms|kg|km|cm|mm|mph|km/h|gb|mb|tb|kb|kw|hrs?|hours?|mins?|minutes?|days?|weeks?|months?|years?|°[cf]?|x|×)\b", re.I),
+    "big_number": re.compile(r"\b\d{1,3}(?:,\d{3})+\b"),
+}
+DATA_RICH_POINTS = 5     # this many concrete data points → rich
+DATA_RICH_PER_100 = 1.5  # …or this density per 100 words
+DATA_SUBSTANTIAL_WORDS = 300  # a content page this long with almost no data is weak for citation
 
 
 def analyze(soup: BeautifulSoup, text: str, render_delta: dict | None = None) -> list[Finding]:
@@ -122,6 +135,7 @@ def analyze(soup: BeautifulSoup, text: str, render_delta: dict | None = None) ->
     out.append(_summary_bullets(soup))   # Row 8 — bullets near the top (nav-aware)
     out.append(_intro_quality(soup, text))  # Row 6 — promotional/unclear intro gate
     out.append(_chunking(soup))          # Row 10 — extractable paragraph chunks
+    out.append(_data_density(text))      # quotable stats / concrete-figure density
     out.append(_faq(soup))
     out.append(_trust(soup))
 
@@ -394,6 +408,36 @@ def _chunking(soup: BeautifulSoup) -> Finding:
         evidence=f"{len(substantive)} substantive paragraph(s), {len(walls)} wall(s) (>{CHUNK_WALL_WORDS} words)",
         recommendation="Break content into discrete, self-contained paragraphs (~20–80 words each) "
         "with subheadings — AI engines extract clean chunks, not walls of text.",
+    )
+
+
+def _data_density(text: str) -> Finding:
+    """Concrete-data density — figures, %, currency, years, measurements. AI answer engines
+    cite pages with hard data far more than vague prose."""
+    words = max(len(text.split()), 1)
+    counts = {name: len(pat.findall(text)) for name, pat in _DATA_PATTERNS.items()}
+    total = sum(counts.values())
+    per100 = round(total / (words / 100), 2)
+    value = {**counts, "data_points": total, "per_100_words": per100}
+
+    if total >= DATA_RICH_POINTS or per100 >= DATA_RICH_PER_100:
+        return Finding(
+            "geo.data_density", P, "Quotable data", Status.PASS, Severity.INFO, C, value=value,
+            evidence=f"{total} concrete data point(s) ({per100} per 100 words)",
+        )
+    if words >= DATA_SUBSTANTIAL_WORDS and total < 2:
+        return Finding(
+            "geo.data_density", P, "Quotable data", Status.WARN, Severity.MEDIUM, C, value=value,
+            evidence=f"only {total} concrete figure(s) across ~{words} words",
+            recommendation="The page makes claims with almost no concrete figures. Add statistics, "
+            "numbers, dates and measurements — AI engines disproportionately cite pages with hard, "
+            "verifiable data.",
+        )
+    return Finding(
+        "geo.data_density", P, "Quotable data", Status.INFO, Severity.INFO, C, value=value,
+        evidence=f"{total} concrete data point(s) ({per100} per 100 words)",
+        recommendation="More concrete figures (stats, numbers, dates) would make the page more "
+        "citable — AI engines favour data-rich content.",
     )
 
 

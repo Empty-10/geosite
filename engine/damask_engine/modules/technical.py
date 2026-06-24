@@ -230,6 +230,10 @@ def analyze(
     # --- resource hints & script loading (delivery signals from the HTML head) ---
     out.append(_delivery_checks(soup))
 
+    # --- response-header signals (indexability / delivery / security) — live fetch only ---
+    if headers:
+        out.extend(_header_checks(headers))
+
     # --- llms.txt (fetched at the boundary; flagged low-impact) ---
     if net.llms_status is not None:
         out.append(_llms_check(net.llms_status, net.llms_txt or ""))
@@ -259,6 +263,61 @@ def _delivery_checks(soup: BeautifulSoup) -> Finding:
         "Add resource hints (preload/preconnect/dns-prefetch) and mark non-critical scripts "
         "async/defer so they don't block first render.",
     )
+
+
+_SECURITY_HEADERS = {
+    "content-security-policy": "CSP",
+    "x-content-type-options": "X-Content-Type-Options",
+    "x-frame-options": "X-Frame-Options",
+    "referrer-policy": "Referrer-Policy",
+    "permissions-policy": "Permissions-Policy",
+}
+
+
+def _header_checks(headers: dict[str, str]) -> list[Finding]:
+    """Indexability/delivery/security signals from the HTTP response headers (live fetch only)."""
+    out: list[Finding] = []
+
+    # X-Robots-Tag — a header-level noindex/none is easy to miss and silently de-indexes a page.
+    xrt = str(headers.get("x-robots-tag", "")).lower()
+    if xrt:
+        if "noindex" in xrt or "none" in xrt:
+            out.append(Finding(
+                "tech.x_robots_tag", P, "X-Robots-Tag", Status.FAIL, Severity.HIGH, C,
+                value=xrt, evidence=f"X-Robots-Tag: {xrt}",
+                recommendation="The X-Robots-Tag HTTP header blocks this page from indexing "
+                "(noindex) — remove it if the page should rank; header-level noindex is easy to miss.",
+            ))
+        else:
+            out.append(Finding("tech.x_robots_tag", P, "X-Robots-Tag", Status.INFO, Severity.INFO,
+                               C, value=xrt, evidence=f"X-Robots-Tag: {xrt}"))
+
+    # Compression
+    enc = str(headers.get("content-encoding", "")).lower()
+    compressed = any(e in enc for e in ("gzip", "br", "deflate", "zstd"))
+    out.append(Finding(
+        "tech.compression", P, "Compression", Status.PASS if compressed else Status.WARN,
+        Severity.LOW, C, value=enc or None,
+        evidence=f"Content-Encoding: {enc}" if enc else "no Content-Encoding header",
+        recommendation=None if compressed else
+        "Enable gzip or Brotli compression (Content-Encoding) to cut transfer size and speed "
+        "up first render.",
+    ))
+
+    # Security headers
+    present = [label for h, label in _SECURITY_HEADERS.items() if h in headers]
+    missing = [label for h, label in _SECURITY_HEADERS.items() if h not in headers]
+    ok = len(present) >= 3
+    out.append(Finding(
+        "tech.security_headers", P, "Security headers", Status.PASS if ok else Status.WARN,
+        Severity.LOW, C, value={"present": present, "count": len(present)},
+        evidence=("present: " + ", ".join(present) if present else "none")
+        + ("; missing: " + ", ".join(missing) if missing else ""),
+        recommendation=None if ok else
+        "Add standard security headers (" + ", ".join(missing) + ") — best-practice hardening "
+        "that audits and some ranking signals reward.",
+    ))
+    return out
 
 
 def _llms_check(status: int, text: str) -> Finding:

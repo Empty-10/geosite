@@ -189,3 +189,24 @@ def test_chunking_warns_on_wall_of_text():
     html = "<body><p>" + "word " * 400 + "</p></body>"
     f = run(html)["geo.chunking"]
     assert f.status == Status.WARN and f.value["walls"] == 1
+
+
+# ---------------------------------------------------------------- data density (quotable stats)
+
+def test_data_density_pass_when_rich():
+    html = ("<body><p>Revenue grew 42% to $1,200,000 in 2024, up from 2,500 units, with "
+            "load times of 250 ms across 30 days of testing.</p></body>")
+    assert run(html)["geo.data_density"].status == Status.PASS
+
+
+def test_data_density_warn_on_long_vague_page():
+    # ~360 words of prose with no concrete figures → weak for citation
+    html = "<body><p>" + ("quality service matters and we care deeply about our customers " * 40) + "</p></body>"
+    f = run(html)["geo.data_density"]
+    assert f.status == Status.WARN and f.value["data_points"] < 2
+
+
+def test_data_density_counts_categories():
+    html = "<body><p>In 2024 sales rose 12% to €5,000 over 10 km.</p></body>"
+    v = run(html)["geo.data_density"].value
+    assert v["year"] >= 1 and v["percent"] >= 1 and v["currency"] >= 1 and v["measure"] >= 1

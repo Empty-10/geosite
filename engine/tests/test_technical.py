@@ -184,3 +184,39 @@ def test_no_mixed_content_for_plain_http_links():
     html = "<body><a href='http://news.example'>read more</a><img src='/local.png'></body>"
     ids = _run_full(html)
     assert ids["tech.mixed_content.ok"].status == Status.PASS
+
+
+# ------------------------------------------------------------------- response-header cluster
+
+def _hrun(headers: dict):
+    return {f.id: f for f in analyze(make_soup(HTML), "https://example.com/", 200, headers)}
+
+
+def test_header_checks_skipped_without_headers():
+    ids = {f.id for f in analyze(make_soup(HTML), "https://example.com/", 200, {})}
+    assert "tech.compression" not in ids and "tech.security_headers" not in ids
+
+
+def test_x_robots_tag_noindex_fails():
+    f = _hrun({"x-robots-tag": "noindex, nofollow"})["tech.x_robots_tag"]
+    assert f.status == Status.FAIL
+
+
+def test_x_robots_tag_absent_emits_no_finding():
+    assert "tech.x_robots_tag" not in _hrun({"content-encoding": "gzip"})
+
+
+def test_compression_pass_and_warn():
+    assert _hrun({"content-encoding": "br"})["tech.compression"].status == Status.PASS
+    assert _hrun({"cache-control": "max-age=0"})["tech.compression"].status == Status.WARN
+
+
+def test_security_headers_pass_with_three():
+    headers = {"content-security-policy": "default-src 'self'", "x-frame-options": "DENY",
+               "x-content-type-options": "nosniff"}
+    assert _hrun(headers)["tech.security_headers"].status == Status.PASS
+
+
+def test_security_headers_warn_when_sparse():
+    f = _hrun({"x-frame-options": "DENY"})["tech.security_headers"]
+    assert f.status == Status.WARN and f.value["count"] == 1
