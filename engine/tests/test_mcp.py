@@ -1,0 +1,52 @@
+"""Tests for the MCP server tool payloads. Skipped unless the [mcp] extra is installed.
+`scan` is monkeypatched to an offline scan_html so no network runs."""
+
+from __future__ import annotations
+
+import pytest
+
+pytest.importorskip("mcp")
+
+from damask_engine import scan_html  # noqa: E402
+from damask_engine.models import Report  # noqa: E402
+import damask_engine.mcp_server as srv  # noqa: E402
+
+HTML = """<!doctype html><html lang="en"><head>
+<title>How to brew pour-over coffee: a complete guide for beginners</title>
+<meta name="description" content="A clear, complete guide to brewing pour-over coffee at home,
+with ratios, timings and the gear you need — about 120 to 160 characters of useful summary.">
+</head><body><h1>Pour-over coffee</h1>
+<p>Pour-over coffee uses a 1 to 16 ratio of grounds to water brewed over three minutes.</p>
+</body></html>"""
+
+
+def test_audit_payload_shape(monkeypatch):
+    monkeypatch.setattr(srv, "scan", lambda url, fixes=False: scan_html(url, HTML, online=False))
+    out = srv.audit_url("https://example.com/coffee")
+    assert isinstance(out["ai_retrievability"], (int, float))
+    assert len(out["rows"]) == 20
+    assert out["confidence"] == "verified"
+    assert "overlay" in out and "categories" in out
+    assert isinstance(out["top_issues"], list)
+
+
+def test_audit_payload_surfaces_error(monkeypatch):
+    bad = Report(url="https://x.test", meta={"error": "could not resolve host"})
+    monkeypatch.setattr(srv, "scan", lambda url, fixes=False: bad)
+    out = srv.audit_url("https://x.test")
+    assert out["error"] == "could not resolve host"
+
+
+def test_scan_url_returns_full_report(monkeypatch):
+    monkeypatch.setattr(srv, "scan", lambda url, fixes=False: scan_html(url, HTML, online=False))
+    out = srv.scan_url("https://example.com/coffee")
+    assert out["schema_version"] and out["findings"] and out["scorecard"]
+
+
+def test_tools_are_registered():
+    # The two tools must be discoverable by an MCP client.
+    import anyio
+
+    tools = anyio.run(srv.mcp.list_tools)
+    names = {t.name for t in tools}
+    assert {"audit_url", "scan_url"} <= names
