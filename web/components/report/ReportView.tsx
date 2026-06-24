@@ -8,6 +8,7 @@ import { ConfidenceLegend } from "./ConfidenceLegend";
 import { DiffBanner } from "./DiffBanner";
 import { FindingsList } from "./FindingsList";
 import { MeasuredCard } from "./MeasuredCard";
+import { PerformancePanel } from "./PerformancePanel";
 import { PillarCards } from "./PillarCards";
 import { ScorecardPanel } from "./ScorecardPanel";
 import { ScoreRing } from "./ScoreRing";
@@ -205,11 +206,11 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
   const allFindings = perfFindings.length ? [...report.findings, ...perfFindings] : report.findings;
   const fixes = priorityFixes(allFindings);
 
-  // Add a Performance tab once it has findings to show.
-  const sections = perfFindings.length ? [...PILLAR_SECTIONS, { label: "Performance", key: "performance" }] : PILLAR_SECTIONS;
+  // Performance detail gets its own "Google Lighthouse" panel (below), not a pillar tab.
+  const sections = PILLAR_SECTIONS;
   const activeTab = Math.min(tab, sections.length - 1);
   const section = sections[activeTab];
-  const sectionFindings = allFindings.filter((f) => f.pillar === section.key);
+  const sectionFindings = report.findings.filter((f) => f.pillar === section.key);
 
   return (
     <div style={{ animation: "dmFade 0.3s ease both" }}>
@@ -248,6 +249,8 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
       {perf.phase === "error" && perf.error && (
         <div style={{ fontSize: 12, color: C.fail, marginBottom: 14 }}>{perf.error}</div>
       )}
+
+      {perfFindings.length > 0 && <PerformancePanel findings={perfFindings} />}
 
       <div style={{ marginBottom: 24 }}>
         <MeasuredCard />
