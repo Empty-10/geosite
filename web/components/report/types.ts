@@ -2,6 +2,7 @@
 // HeroDemo and the full /report screen so the two never drift.
 
 import { C } from "@/lib/tokens";
+import type { Scorecard } from "./scorecardTypes";
 
 export type Finding = {
   id: string;
@@ -44,6 +45,7 @@ export type Report = {
   meta: Record<string, unknown>;
   findings: Finding[];
   fixes?: Fix[];
+  scorecard?: Scorecard | null;
 };
 
 /** Index a report's fixes by the finding they remediate. */

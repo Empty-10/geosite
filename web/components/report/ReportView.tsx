@@ -9,6 +9,7 @@ import { DiffBanner } from "./DiffBanner";
 import { FindingsList } from "./FindingsList";
 import { MeasuredCard } from "./MeasuredCard";
 import { PillarCards, type PerfController } from "./PillarCards";
+import { ScorecardPanel } from "./ScorecardPanel";
 import { ScoreRing } from "./ScoreRing";
 import { RenderTag } from "./RenderTag";
 import { fixesByFinding, PILLAR_SECTIONS, priorityFixes, rgba, type Finding, type Report } from "./types";
@@ -289,6 +290,8 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
       </div>
 
       <DiffBanner meta={report.meta} />
+
+      <ScorecardPanel scorecard={report.scorecard} />
 
       <div style={{ marginBottom: 18 }}>
         <ConfidenceLegend />
