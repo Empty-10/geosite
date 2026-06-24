@@ -10,6 +10,7 @@ from .fixes import generate_fixes
 from .models import Pillar, Report
 from .modules import geo_readiness, onpage, performance, technical
 from .modules.technical import NetInputs, parse_robots
+from .scorecard import build_scorecard
 from .scoring import build_report
 from .util import make_soup, visible_text, word_count
 
@@ -47,6 +48,7 @@ def scan_html(url: str, html: str, *, online: bool = False,
         "online_checks": online,
     }
     report = build_report(url, findings, meta, pillar_overrides=overrides)
+    report.scorecard = build_scorecard(report)
     if fixes:
         report.fixes = generate_fixes(soup, report, final_url)
     return report

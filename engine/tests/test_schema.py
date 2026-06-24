@@ -19,7 +19,7 @@ without tripping the too-short warning, used purely for the schema snapshot test
 </head><body><h1>Heading</h1><p>Some body copy for the scan to chew on.</p></body></html>"""
 
 REPORT_KEYS = {"schema_version", "url", "fetched_at", "overall_score", "pillar_scores", "meta",
-               "findings", "fixes"}
+               "findings", "fixes", "scorecard"}
 FINDING_KEYS = {"id", "pillar", "title", "status", "severity", "confidence", "value", "evidence", "recommendation"}
 
 ENUM_VALUES = {
@@ -34,7 +34,7 @@ def test_report_schema_snapshot():
     d = scan_html("https://example.com/schema", HTML, online=False).to_dict()
 
     assert set(d) == REPORT_KEYS
-    assert d["schema_version"] == SCHEMA_VERSION == "5"
+    assert d["schema_version"] == SCHEMA_VERSION == "6"
     assert isinstance(d["fixes"], list)
     assert isinstance(d["fetched_at"], str) and d["fetched_at"]
     assert isinstance(d["overall_score"], int)

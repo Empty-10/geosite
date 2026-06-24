@@ -18,7 +18,8 @@ from typing import Any
 #     onpage.link_attrs, schema.validation.
 # v5: response-header cluster (tech.x_robots_tag / tech.compression / tech.security_headers,
 #     live fetch only) + geo.data_density (quotable-data density).
-SCHEMA_VERSION = "5"
+# v6: top-level `scorecard` — 20-row aggregation + headline AI Retrievability score.
+SCHEMA_VERSION = "6"
 
 
 class Confidence(str, Enum):
@@ -103,6 +104,7 @@ class Report:
     overall_score: int = 0
     meta: dict[str, Any] = field(default_factory=dict)  # status code, fetch notes, etc.
     fixes: list[Any] = field(default_factory=list)  # generated remediation artifacts (Fix)
+    scorecard: dict[str, Any] | None = None  # 20-row aggregation + headline AI Retrievability
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -114,6 +116,7 @@ class Report:
             "meta": self.meta,
             "findings": [f.to_dict() for f in self.findings],
             "fixes": [f.to_dict() for f in self.fixes],
+            "scorecard": self.scorecard,
         }
 
 
