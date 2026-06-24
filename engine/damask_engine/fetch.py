@@ -22,7 +22,7 @@ TIMEOUT = 20
 RESOURCE_TIMEOUT = 10
 RENDER_TIMEOUT_MS = 15000
 CF_RENDER_ENDPOINT = "https://api.cloudflare.com/client/v4/accounts/{account}/browser-rendering/content"
-CF_RENDER_TIMEOUT = 30
+CF_RENDER_TIMEOUT = 35  # > the 20s networkidle0 page timeout + Cloudflare overhead
 
 
 @dataclass
@@ -91,10 +91,12 @@ def render_dom_cloudflare(url: str) -> str | None:
         r = requests.post(
             CF_RENDER_ENDPOINT.format(account=account),
             headers={"Authorization": f"Bearer {token}", "content-type": "application/json"},
-            json={"url": url},
+            # Wait for the SPA's JS + network to settle, else we capture the empty shell, not the
+            # rendered content (networkidle0 = no in-flight requests for 500ms, capped by timeout).
+            json={"url": url, "gotoOptions": {"waitUntil": "networkidle0", "timeout": 20000}},
             timeout=CF_RENDER_TIMEOUT,
         )
-        if r.status_code != 200:
+        if r.status_code != 200:  # incl. 429 rate-limit on the free tier → fall back to raw HTML
             return None
         html = r.json().get("result")
         return html if isinstance(html, str) and html.strip() else None
