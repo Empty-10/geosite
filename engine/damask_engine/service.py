@@ -30,8 +30,11 @@ from pydantic import BaseModel
 
 from . import store
 from .cloudflare_logs import fetch_cloudflare_logs
+from .config import get_pagespeed_key
 from .crawl import crawl
 from .crawler_logs import analyze_logs
+from .fetch import fetch_pagespeed
+from .modules import performance as performance_mod
 from .scanner import scan
 
 app = FastAPI(title="damask engine", version="1", description="GEO/SEO scan engine.")
@@ -60,6 +63,11 @@ class LogsRequest(BaseModel):
 class CloudflareLogsRequest(BaseModel):
     domain: str
     days: int = 7
+
+
+class PerformanceRequest(BaseModel):
+    url: str
+    strategy: str = "mobile"
 
 
 @app.get("/health")
@@ -103,6 +111,26 @@ def get_scan_endpoint(scan_id: int) -> dict:
 def logs_endpoint(req: LogsRequest) -> dict:
     """Analyze access-log text for AI-crawler activity. Fast/synchronous; bounded internally."""
     return analyze_logs(req.text, source=req.source).to_dict()
+
+
+@app.post("/performance")
+def performance_endpoint(req: PerformanceRequest) -> dict:
+    """Run only the PageSpeed/Lighthouse performance check for a URL (on-demand; slow).
+
+    Returns the Performance pillar score + findings so the report can merge them in. PSI is a
+    single blocking lab run (~10–30s) with no progress stream — failures surface in `error`.
+    """
+    strategy = req.strategy if req.strategy in ("mobile", "desktop") else "mobile"
+    psi = fetch_pagespeed(req.url, get_pagespeed_key(), strategy=strategy)
+    if psi is None:
+        return {"pillar": "performance", "score": None, "findings": [],
+                "error": "PageSpeed Insights was unavailable for this URL."}
+    return {
+        "pillar": "performance",
+        "strategy": strategy,
+        "score": performance_mod.pillar_score(psi),
+        "findings": [f.to_dict() for f in performance_mod.analyze(psi)],
+    }
 
 
 @app.post("/cloudflare-logs")

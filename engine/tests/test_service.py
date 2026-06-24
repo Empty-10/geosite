@@ -163,3 +163,33 @@ def test_scan_persists_and_diffs(monkeypatch, tmp_path):
 def test_get_scan_404_when_missing(monkeypatch, tmp_path):
     monkeypatch.setenv("DAMASK_DB_PATH", str(tmp_path / "s.db"))
     assert client.get("/scans/999").status_code == 404
+
+
+_PSI = {
+    "lighthouseResult": {
+        "categories": {"performance": {"score": 0.82}},
+        "configSettings": {"formFactor": "mobile"},
+        "audits": {
+            "largest-contentful-paint": {"numericValue": 2100, "displayValue": "2.1 s"},
+            "cumulative-layout-shift": {"numericValue": 0.05, "displayValue": "0.05"},
+        },
+    }
+}
+
+
+def test_performance_endpoint_returns_score_and_findings():
+    with patch("damask_engine.service.fetch_pagespeed", return_value=_PSI):
+        r = client.post("/performance", json={"url": "https://x.test"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["pillar"] == "performance"
+    assert body["score"] == 82
+    ids = {f["id"] for f in body["findings"]}
+    assert "perf.score" in ids and "perf.lcp" in ids
+
+
+def test_performance_endpoint_unavailable():
+    with patch("damask_engine.service.fetch_pagespeed", return_value=None):
+        body = client.post("/performance", json={"url": "https://x.test"}).json()
+    assert body["score"] is None
+    assert "error" in body

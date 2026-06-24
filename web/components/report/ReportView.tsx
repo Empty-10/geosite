@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { C } from "@/lib/tokens";
 import { ToolNav } from "./ToolNav";
@@ -8,10 +8,19 @@ import { ConfidenceLegend } from "./ConfidenceLegend";
 import { DiffBanner } from "./DiffBanner";
 import { FindingsList } from "./FindingsList";
 import { MeasuredCard } from "./MeasuredCard";
-import { PillarCards } from "./PillarCards";
+import { PillarCards, type PerfController } from "./PillarCards";
 import { ScoreRing } from "./ScoreRing";
 import { RenderTag } from "./RenderTag";
-import { fixesByFinding, PILLAR_SECTIONS, priorityFixes, rgba, type Report } from "./types";
+import { fixesByFinding, PILLAR_SECTIONS, priorityFixes, rgba, type Finding, type Report } from "./types";
+
+// Honest descriptions of what PageSpeed is actually doing (it gives no real progress stream),
+// advanced on our own elapsed timer.
+const PERF_STAGES = [
+  "Asking Google to run Lighthouse…",
+  "Lighthouse is auditing the page…",
+  "Measuring Core Web Vitals…",
+  "Parsing results…",
+];
 
 type State =
   | { phase: "empty" }
@@ -187,13 +196,76 @@ function Placeholder({ children }: { children: React.ReactNode }) {
   );
 }
 
+type PerfState = {
+  phase: "idle" | "loading" | "done" | "error";
+  score: number | null;
+  findings: Finding[];
+  elapsed: number;
+  error?: string;
+};
+
 function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n: number) => void }) {
-  const fixes = priorityFixes(report.findings);
   const fixMap = fixesByFinding(report);
   const finalUrl = (report.meta?.final_url as string) || report.url;
   const when = new Date(report.fetched_at);
-  const section = PILLAR_SECTIONS[tab];
-  const sectionFindings = report.findings.filter((f) => f.pillar === section.key);
+
+  // On-demand Performance. If the report already carries a performance score, start "done".
+  const [perf, setPerf] = useState<PerfState>(() => {
+    const pre = report.pillar_scores.performance;
+    return typeof pre === "number"
+      ? { phase: "done", score: pre, findings: report.findings.filter((f) => f.pillar === "performance"), elapsed: 0 }
+      : { phase: "idle", score: null, findings: [], elapsed: 0 };
+  });
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stop = () => {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = null;
+  };
+  useEffect(() => stop, []);
+
+  const runPerformance = useCallback(async () => {
+    setPerf((p) => ({ ...p, phase: "loading", elapsed: 0, error: undefined }));
+    stop();
+    timer.current = setInterval(() => setPerf((p) => (p.phase === "loading" ? { ...p, elapsed: p.elapsed + 1 } : p)), 1000);
+    try {
+      const res = await fetch("/api/performance", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: finalUrl }),
+      });
+      const data = await res.json();
+      stop();
+      if (!res.ok || data?.error || typeof data?.score !== "number") {
+        setPerf((p) => ({ ...p, phase: "error", error: data?.error || `Performance check failed (${res.status}).` }));
+        return;
+      }
+      setPerf({ phase: "done", score: data.score, findings: (data.findings as Finding[]) ?? [], elapsed: 0 });
+    } catch (e) {
+      stop();
+      setPerf((p) => ({ ...p, phase: "error", error: e instanceof Error ? e.message : "Performance check failed." }));
+    }
+  }, [finalUrl]);
+
+  const perfDone = perf.phase === "done" && typeof perf.score === "number";
+  const pillarScores = perfDone ? { ...report.pillar_scores, performance: perf.score! } : report.pillar_scores;
+  const allFindings = perf.findings.length ? [...report.findings, ...perf.findings] : report.findings;
+  const fixes = priorityFixes(allFindings);
+
+  // Add a Performance tab once it has findings to show.
+  const sections = perf.findings.length ? [...PILLAR_SECTIONS, { label: "Performance", key: "performance" }] : PILLAR_SECTIONS;
+  const activeTab = Math.min(tab, sections.length - 1);
+  const section = sections[activeTab];
+  const sectionFindings = allFindings.filter((f) => f.pillar === section.key);
+
+  const perfController: PerfController | undefined =
+    perf.phase === "done"
+      ? undefined
+      : {
+          state: perf.phase === "loading" ? "loading" : perf.phase === "error" ? "error" : "idle",
+          elapsed: perf.elapsed,
+          label: PERF_STAGES[Math.min(Math.floor(perf.elapsed / 6), PERF_STAGES.length - 1)],
+          onRun: runPerformance,
+        };
 
   return (
     <div style={{ animation: "dmFade 0.3s ease both" }}>
@@ -224,8 +296,12 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
 
       <div style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 14 }}>
         <ScoreRing score={report.overall_score} />
-        <PillarCards pillarScores={report.pillar_scores} />
+        <PillarCards pillarScores={pillarScores} perf={perfController} />
       </div>
+
+      {perf.phase === "error" && perf.error && (
+        <div style={{ fontSize: 12, color: C.fail, marginBottom: 14 }}>{perf.error}</div>
+      )}
 
       <div style={{ marginBottom: 24 }}>
         <MeasuredCard />
@@ -239,9 +315,9 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
       {/* per-pillar tabs */}
       <SectionTitle>All checks by pillar</SectionTitle>
       <div style={{ display: "flex", gap: 8, margin: "10px 0 14px", flexWrap: "wrap" }}>
-        {PILLAR_SECTIONS.map((s, i) => {
-          const active = i === tab;
-          const score = report.pillar_scores[s.key];
+        {sections.map((s, i) => {
+          const active = i === activeTab;
+          const score = pillarScores[s.key];
           return (
             <button
               key={s.key}
