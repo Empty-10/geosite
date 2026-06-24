@@ -248,7 +248,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
 
       <DiffBanner meta={report.meta} />
 
-      <ScorecardPanel scorecard={report.scorecard} />
+      <ScorecardPanel scorecard={report.scorecard} findings={allFindings} />
 
       <div style={{ marginBottom: 18 }}>
         <ConfidenceLegend />
