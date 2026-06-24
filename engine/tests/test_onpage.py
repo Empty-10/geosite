@@ -153,3 +153,44 @@ def test_schema_validation_absent_for_unknown_types():
             '{"@context":"https://schema.org","@type":"WebSite","name":"x"}'
             '</script></body>')  # WebSite isn't in the required-props registry → no finding
     assert "schema.validation" not in run(html)
+
+
+# ------------------------------------------------------------------------- canonical correctness
+
+def test_canonical_self_referencing_passes():
+    html = '<head><link rel="canonical" href="https://example.com/page"></head>'
+    f = run(html, "https://example.com/page")["canonical"]
+    assert f.status == Status.PASS and f.value["self_referencing"]
+
+
+def test_canonical_pointing_elsewhere_warns():
+    html = '<head><link rel="canonical" href="https://example.com/other"></head>'
+    f = run(html, "https://example.com/page")["canonical"]
+    assert f.status == Status.WARN and not f.value["self_referencing"]
+
+
+def test_canonical_multiple_warns():
+    html = ('<head><link rel="canonical" href="https://example.com/page">'
+            '<link rel="canonical" href="https://example.com/page2"></head>')
+    f = run(html, "https://example.com/page")["canonical"]
+    assert f.status == Status.WARN and f.value["count"] == 2
+
+
+def test_canonical_missing_warns():
+    assert run("<head></head>", "https://example.com/page")["canonical"].status == Status.WARN
+
+
+# ------------------------------------------------------------------------- snippet directives
+
+def test_snippet_directives_warn_on_nosnippet():
+    html = '<head><meta name="robots" content="index, nosnippet"></head>'
+    assert run(html)["onpage.snippet_directives"].status == Status.WARN
+
+
+def test_snippet_directives_pass_on_large_preview():
+    html = '<head><meta name="robots" content="max-image-preview:large"></head>'
+    assert run(html)["onpage.snippet_directives"].status == Status.PASS
+
+
+def test_snippet_directives_info_when_unset():
+    assert run("<head></head>")["onpage.snippet_directives"].status == Status.INFO

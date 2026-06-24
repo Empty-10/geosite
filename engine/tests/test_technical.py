@@ -220,3 +220,30 @@ def test_security_headers_pass_with_three():
 def test_security_headers_warn_when_sparse():
     f = _hrun({"x-frame-options": "DENY"})["tech.security_headers"]
     assert f.status == Status.WARN and f.value["count"] == 1
+
+
+# ------------------------------------------------------------------- indexability conflict
+
+_SITEMAP = ('<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            '<url><loc>https://example.com/page</loc></url></urlset>')
+
+
+def test_index_conflict_noindex_page_in_sitemap_fails():
+    soup = make_soup('<head><meta name="robots" content="noindex"></head>')
+    net = NetInputs(sitemap_status=200, sitemap_xml=_SITEMAP)
+    out = {f.id: f for f in analyze(soup, "https://example.com/page", 200, {}, net=net)}
+    assert out["tech.index_conflict"].status == Status.FAIL
+
+
+def test_index_conflict_absent_when_indexable():
+    soup = make_soup("<head></head>")
+    net = NetInputs(sitemap_status=200, sitemap_xml=_SITEMAP)
+    out = {f.id for f in analyze(soup, "https://example.com/page", 200, {}, net=net)}
+    assert "tech.index_conflict" not in out
+
+
+def test_index_conflict_absent_when_not_in_sitemap():
+    soup = make_soup('<head><meta name="robots" content="noindex"></head>')
+    net = NetInputs(sitemap_status=200, sitemap_xml=_SITEMAP)
+    out = {f.id for f in analyze(soup, "https://example.com/elsewhere", 200, {}, net=net)}
+    assert "tech.index_conflict" not in out

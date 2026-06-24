@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
@@ -72,13 +72,8 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
                        recommendation=None if headings else
                        "Break content up with H2/H3 subheadings (helps extraction)."))
 
-    # --- canonical ---
-    canonical = soup.find("link", rel="canonical")
-    out.append(Finding("canonical", P, "Canonical tag",
-                       Status.PASS if canonical else Status.WARN, Severity.LOW, C,
-                       value=bool(canonical),
-                       evidence=canonical.get("href") if canonical else None,
-                       recommendation=None if canonical else "Add a canonical link."))
+    # --- canonical correctness ---
+    out.append(_canonical_check(soup, url))
 
     # --- meta robots noindex ---
     robots = soup.find("meta", attrs={"name": "robots"})
@@ -90,6 +85,9 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
     else:
         out.append(Finding("robots.indexable", P, "Indexability", Status.PASS, Severity.INFO,
                             C, value="indexable"))
+
+    # --- snippet & preview directives (how much search/AI may display) ---
+    out.append(_snippet_directives(soup))
 
     # --- Open Graph ---
     og = soup.find("meta", attrs={"property": "og:title"})
@@ -212,6 +210,76 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
         out.append(_url_quality(url))
 
     return out
+
+
+def _norm_url(u: str) -> str:
+    """scheme://host/path with the fragment, query and a trailing slash dropped — for comparing
+    a canonical target to the page's own URL."""
+    p = urlparse(u)
+    path = p.path or "/"
+    if len(path) > 1 and path.endswith("/"):
+        path = path[:-1]
+    return f"{p.scheme}://{p.netloc.lower()}{path}"
+
+
+def _canonical_check(soup: BeautifulSoup, url: str) -> Finding:
+    cans = soup.find_all("link", rel="canonical")
+    if not cans:
+        return Finding("canonical", P, "Canonical tag", Status.WARN, Severity.LOW, C,
+                       value={"present": False},
+                       recommendation="Add a self-referencing canonical link (absolute URL).")
+    href = (cans[0].get("href") or "").strip()
+    absolute = href.lower().startswith(("http://", "https://"))
+    target = urljoin(url, href) if (url and href) else href
+    self_ref = bool(url and href and _norm_url(target) == _norm_url(url))
+    value = {"present": True, "count": len(cans), "self_referencing": self_ref,
+             "absolute": absolute, "target": href}
+
+    if len(cans) > 1:
+        return Finding("canonical", P, "Canonical tag", Status.WARN, Severity.MEDIUM, C, value=value,
+                       evidence=f"{len(cans)} canonical tags — conflicting",
+                       recommendation="Multiple canonical tags conflict; keep exactly one.")
+    if not href:
+        return Finding("canonical", P, "Canonical tag", Status.WARN, Severity.LOW, C, value=value,
+                       evidence="empty canonical href",
+                       recommendation="The canonical href is empty — set it to the page's absolute URL.")
+    if url and not self_ref:
+        return Finding("canonical", P, "Canonical tag", Status.WARN, Severity.MEDIUM, C, value=value,
+                       evidence=f"canonical → {href}",
+                       recommendation="This page declares a different canonical URL, so engines will "
+                       "index that URL instead of this one — confirm it's intended (a wrong canonical "
+                       "de-indexes the page).")
+    return Finding("canonical", P, "Canonical tag", Status.PASS if absolute else Status.WARN,
+                   Severity.LOW, C, value=value,
+                   evidence=f"self-referencing{'' if absolute else ', relative'}: {href}",
+                   recommendation=None if absolute else
+                   "Use an absolute canonical URL (https://…) rather than a relative one.")
+
+
+_SNIPPET_RESTRICTIVE = ("nosnippet", "noimageindex", "max-snippet:0", "max-image-preview:none")
+
+
+def _snippet_directives(soup: BeautifulSoup) -> Finding:
+    tokens: list[str] = []
+    for m in soup.find_all("meta", attrs={"name": True}):
+        if str(m.get("name", "")).lower() in ("robots", "googlebot"):
+            tokens += [t.strip().lower() for t in str(m.get("content", "")).split(",") if t.strip()]
+    restrictive = [t for t in tokens if t in _SNIPPET_RESTRICTIVE]
+    value = {"directives": tokens, "restrictive": restrictive}
+
+    if restrictive:
+        return Finding("onpage.snippet_directives", P, "Snippet & preview directives", Status.WARN,
+                       Severity.LOW, C, value=value, evidence="restrictive: " + ", ".join(restrictive),
+                       recommendation="These robots directives limit how much search and AI engines "
+                       "may show of your page (" + ", ".join(restrictive) + "). Remove them unless "
+                       "intentional, and add max-image-preview:large to allow rich previews.")
+    if "max-image-preview:large" in tokens:
+        return Finding("onpage.snippet_directives", P, "Snippet & preview directives", Status.PASS,
+                       Severity.INFO, C, value=value, evidence="max-image-preview:large")
+    return Finding("onpage.snippet_directives", P, "Snippet & preview directives", Status.INFO,
+                   Severity.INFO, C, value=value, evidence="no snippet/preview directives set",
+                   recommendation="Add max-image-preview:large (and a generous max-snippet) via meta "
+                   "robots to allow larger image/text previews in AI Overviews and search results.")
 
 
 def _is_labeled(soup: BeautifulSoup, control) -> bool:

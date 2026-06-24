@@ -19,7 +19,9 @@ from typing import Any
 # v5: response-header cluster (tech.x_robots_tag / tech.compression / tech.security_headers,
 #     live fetch only) + geo.data_density (quotable-data density).
 # v6: top-level `scorecard` — 20-row aggregation + headline AI Retrievability score.
-SCHEMA_VERSION = "6"
+# v7: indexability/AI-display cluster — canonical correctness, onpage.snippet_directives,
+#     tech.index_conflict (noindex page listed in sitemap).
+SCHEMA_VERSION = "7"
 
 
 class Confidence(str, Enum):

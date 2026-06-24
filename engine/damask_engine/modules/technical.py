@@ -224,6 +224,11 @@ def analyze(
     if net.sitemap_status is not None:
         out.extend(_sitemap_checks(net.sitemap_status, net.sitemap_xml or ""))
 
+    # --- indexability conflict: a noindex page that's listed in the sitemap ---
+    conflict = _index_conflict(soup, final_url, headers, net.sitemap_xml or "")
+    if conflict is not None:
+        out.append(conflict)
+
     # NOTE: the JS-dependent-content check (render_delta) lives in geo_readiness.py
     # (geo.js_rendered) — it's a GEO/crawlability concern, scored on the GEO pillar.
 
@@ -421,6 +426,51 @@ def _robots_checks(status: int, text: str) -> list[Finding]:
         "Reference your sitemap from robots.txt (Sitemap: https://…/sitemap.xml).",
     ))
     return out
+
+
+def _norm_url(u: str) -> str:
+    p = urlparse(u)
+    path = p.path or "/"
+    if len(path) > 1 and path.endswith("/"):
+        path = path[:-1]
+    return f"{p.scheme}://{p.netloc.lower()}{path}"
+
+
+def _sitemap_locs(xml: str) -> set[str]:
+    """Normalized <loc> URLs from a urlset sitemap (an index's child sitemaps aren't fetched here)."""
+    try:
+        root = ET.fromstring(xml.strip())
+    except ET.ParseError:
+        return set()
+    if _localname(root.tag) != "urlset":
+        return set()
+    locs = set()
+    for url_el in root:
+        for child in url_el:
+            if _localname(child.tag) == "loc" and child.text:
+                locs.add(_norm_url(child.text.strip()))
+    return locs
+
+
+def _index_conflict(soup: BeautifulSoup, final_url: str, headers: dict[str, str],
+                    sitemap_xml: str) -> Finding | None:
+    """A page set to noindex (meta or X-Robots-Tag header) that nonetheless appears in the
+    sitemap — contradictory signals that confuse crawlers and waste crawl budget."""
+    noindex = "noindex" in str(headers.get("x-robots-tag", "")).lower()
+    for m in soup.find_all("meta", attrs={"name": True}):
+        if str(m.get("name", "")).lower() in ("robots", "googlebot") \
+                and "noindex" in str(m.get("content", "")).lower():
+            noindex = True
+    if not noindex:
+        return None
+    locs = _sitemap_locs(sitemap_xml)
+    if locs and _norm_url(final_url) in locs:
+        return Finding("tech.index_conflict", P, "Indexability conflict", Status.FAIL,
+                       Severity.MEDIUM, C, value={"noindex": True, "in_sitemap": True},
+                       evidence="page is set to noindex but is listed in the XML sitemap",
+                       recommendation="Contradictory signals: this page is noindex yet appears in the "
+                       "sitemap. Remove it from the sitemap, or allow indexing if it should rank.")
+    return None
 
 
 def _sitemap_checks(status: int, xml: str) -> list[Finding]:

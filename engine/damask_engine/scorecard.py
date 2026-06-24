@@ -48,6 +48,7 @@ ROWS: list[tuple[int, str, list[str]]] = [
                                                  "tech.robots.sitemap", "tech.sitemap",
                                                  "tech.sitemap.missing", "tech.sitemap.invalid",
                                                  "tech.sitemap.freshness", "tech.security_headers",
+                                                 "tech.index_conflict", "onpage.snippet_directives",
                                                  "geo.js_rendered", "tech.llms_txt"]),
     (20, "Structured Data & Schema", ["schema.jsonld", "schema.missing", "schema.validation"]),
 ]
