@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { C } from "@/lib/tokens";
 import { ToolNav } from "./ToolNav";
@@ -212,6 +212,19 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
   const section = sections[activeTab];
   const sectionFindings = report.findings.filter((f) => f.pillar === section.key);
 
+  // Clicking a scored pillar card jumps to its checks (or to the Lighthouse panel).
+  const checksRef = useRef<HTMLDivElement>(null);
+  const perfRef = useRef<HTMLDivElement>(null);
+  const jumpToPillar = (key: string) => {
+    if (key === "performance") {
+      perfRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    const idx = PILLAR_SECTIONS.findIndex((s) => s.key === key);
+    if (idx >= 0) setTab(idx);
+    checksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <div style={{ animation: "dmFade 0.3s ease both" }}>
       {/* report header */}
@@ -243,14 +256,14 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
 
       <div style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 14 }}>
         <ScoreRing score={report.overall_score} />
-        <PillarCards pillarScores={pillarScores} perf={perfController} />
+        <PillarCards pillarScores={pillarScores} perf={perfController} onSelect={jumpToPillar} />
       </div>
 
       {perf.phase === "error" && perf.error && (
         <div style={{ fontSize: 12, color: C.fail, marginBottom: 14 }}>{perf.error}</div>
       )}
 
-      {perfFindings.length > 0 && <PerformancePanel findings={perfFindings} />}
+      <div ref={perfRef}>{perfFindings.length > 0 && <PerformancePanel findings={perfFindings} />}</div>
 
       <div style={{ marginBottom: 24 }}>
         <MeasuredCard />
@@ -262,8 +275,9 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
       </div>
 
       {/* per-pillar tabs */}
-      <SectionTitle>All checks by pillar</SectionTitle>
-      <div style={{ display: "flex", gap: 8, margin: "10px 0 14px", flexWrap: "wrap" }}>
+      <div ref={checksRef} style={{ scrollMarginTop: 16 }}>
+        <SectionTitle>All checks by pillar — what passed and what to fix</SectionTitle>
+        <div style={{ display: "flex", gap: 8, margin: "10px 0 14px", flexWrap: "wrap" }}>
         {sections.map((s, i) => {
           const active = i === activeTab;
           const score = pillarScores[s.key];
@@ -291,8 +305,9 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
           );
         })}
       </div>
-      {/* key remounts the list per tab so its expanded-row state resets */}
-      <FindingsList key={section.key} findings={sectionFindings} fixes={fixMap} url={finalUrl} openFirst={false} />
+        {/* key remounts the list per tab so its expanded-row state resets */}
+        <FindingsList key={section.key} findings={sectionFindings} fixes={fixMap} url={finalUrl} openFirst={false} />
+      </div>
     </div>
   );
 }

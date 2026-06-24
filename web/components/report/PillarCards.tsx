@@ -13,20 +13,30 @@ export type PerfController = {
   onRun: () => void;
 };
 
-/** The pillar metric cards. Pillars absent from a scan render as "not run yet". */
-export function PillarCards({ pillarScores, perf }: { pillarScores: Record<string, number>; perf?: PerfController }) {
+/** The pillar metric cards. Pillars absent from a scan render as "not run yet".
+ * onSelect(key) (report screen) makes a scored card jump to that pillar's checks. */
+export function PillarCards({ pillarScores, perf, onSelect }: {
+  pillarScores: Record<string, number>;
+  perf?: PerfController;
+  onSelect?: (key: string) => void;
+}) {
   return (
     <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
       {PILLAR_CARDS.map(({ label, key }, i) => {
         const value = pillarScores[key];
         const ran = typeof value === "number";
         const interactive = key === "performance" && !ran && !!perf;
-        const clickable = interactive && perf!.state !== "loading";
+        // A scored card jumps to its checks; an unrun Performance card runs the check.
+        const onClick = interactive && perf!.state !== "loading"
+          ? perf!.onRun
+          : ran && onSelect
+            ? () => onSelect(key)
+            : undefined;
         return (
           <div
             key={label}
-            onClick={clickable ? perf!.onRun : undefined}
-            role={clickable ? "button" : undefined}
+            onClick={onClick}
+            role={onClick ? "button" : undefined}
             style={{
               padding: "12px 14px",
               border: `1px solid ${interactive ? "var(--border-strong)" : "var(--border)"}`,
@@ -36,7 +46,7 @@ export function PillarCards({ pillarScores, perf }: { pillarScores: Record<strin
               flexDirection: "column",
               gap: 8,
               opacity: ran || interactive ? 1 : 0.6,
-              cursor: clickable ? "pointer" : "default",
+              cursor: onClick ? "pointer" : "default",
               animation: "dmRise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both",
               animationDelay: `${i * 80}ms`,
             }}
@@ -48,6 +58,9 @@ export function PillarCards({ pillarScores, perf }: { pillarScores: Record<strin
                 <div style={{ height: 4, borderRadius: 99, background: "var(--border)", overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${value}%`, background: scoreColor(value), borderRadius: 99 }} />
                 </div>
+                {onSelect && (
+                  <span style={{ fontSize: 10.5, color: "var(--accent)", fontFamily: "var(--mono)" }}>View checks ↓</span>
+                )}
               </>
             ) : interactive ? (
               <PerfCardBody perf={perf!} />
