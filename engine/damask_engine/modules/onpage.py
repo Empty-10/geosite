@@ -113,15 +113,19 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
         out.append(sv)
 
     # --- image alt coverage ---
+    # A *missing* alt is an absent attribute; alt="" is valid (intentionally decorative), so it
+    # counts as present — matching Lighthouse/WCAG. We track descriptive (non-empty) separately.
     imgs = soup.find_all("img")
     if imgs:
-        with_alt = sum(1 for i in imgs if (i.get("alt") or "").strip())
-        pct = round(100 * with_alt / len(imgs))
+        has_alt = sum(1 for i in imgs if i.get("alt") is not None)
+        descriptive = sum(1 for i in imgs if (i.get("alt") or "").strip())
+        pct = round(100 * has_alt / len(imgs))
         out.append(Finding("images.alt", P, "Image alt text",
                            Status.PASS if pct >= 90 else Status.WARN, Severity.LOW, C,
-                           value={"with_alt": with_alt, "total": len(imgs), "pct": pct},
+                           value={"with_alt": has_alt, "descriptive": descriptive, "total": len(imgs), "pct": pct},
                            recommendation=None if pct >= 90 else
-                           f"{len(imgs) - with_alt} image(s) missing alt text."))
+                           f"{len(imgs) - has_alt} image(s) have no alt attribute — add alt text "
+                           "(use alt=\"\" only for purely decorative images)."))
 
     # --- image dimensions & lazy-load (extends alt; CLS + delivery) ---
     if imgs:
@@ -143,10 +147,12 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
     total_links = internal + external
     if total_links:
         bad = len(generic)
-        ok = bad < 3 and bad / total_links <= 0.25
+        # Ratio-based: a few generic anchors on a big site is normal; flag when they're a
+        # meaningful share (a fixed "3+ = fail" wrongly failed large sites — benchmark finding).
+        ok = bad / total_links <= 0.10
         out.append(Finding(
             "onpage.links", P, "Link anchor text", Status.PASS if ok else Status.WARN,
-            Severity.MEDIUM, C, value={"internal": internal, "external": external, "generic": bad},
+            Severity.MEDIUM, C, value={"internal": internal, "external": external, "generic": bad, "total": total_links},
             evidence="; ".join(generic[:3]) or None,
             recommendation=None if ok else
             "Replace generic anchor text ('click here', 'read more', bare URLs) with descriptive "

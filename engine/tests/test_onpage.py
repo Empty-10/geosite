@@ -38,7 +38,7 @@ def test_internal_vs_external_counts():
       <a href="https://other.com/x">external resource reference</a>
     </body>"""
     f = run(html, "https://example.com/")
-    assert f["onpage.links"].value == {"internal": 1, "external": 1, "generic": 0}
+    assert f["onpage.links"].value == {"internal": 1, "external": 1, "generic": 0, "total": 2}
     assert f["onpage.outbound"].status == Status.PASS  # has an external link
 
 
@@ -194,3 +194,26 @@ def test_snippet_directives_pass_on_large_preview():
 
 def test_snippet_directives_info_when_unset():
     assert run("<head></head>")["onpage.snippet_directives"].status == Status.INFO
+
+
+# ------------------------------------------------------------------- image alt (benchmark fix)
+
+def test_alt_empty_counts_as_present_decorative():
+    # alt="" is valid for decorative images (matches Lighthouse/WCAG) — not "missing"
+    html = '<body><img src="a.png" alt=""><img src="b.png" alt="a real description"></body>'
+    f = run(html)["images.alt"]
+    assert f.status == Status.PASS
+    assert f.value["with_alt"] == 2 and f.value["descriptive"] == 1
+
+
+def test_alt_truly_missing_attribute_warns():
+    html = '<body><img src="a.png"><img src="b.png"><img src="c.png" alt="ok"></body>'
+    f = run(html)["images.alt"]
+    assert f.status == Status.WARN  # 1/3 has alt → under 90%
+
+
+def test_links_pass_with_few_generic_on_large_set():
+    # a handful of generic anchors among many is fine (ratio-based, not absolute)
+    links = "".join(f'<a href="/p{i}">descriptive link number {i} here</a>' for i in range(20))
+    f = run("<body>" + links + '<a href="/x">click here</a></body>', "https://example.com/")["onpage.links"]
+    assert f.status == Status.PASS  # 1 generic / 21 = ~5% < 10%
