@@ -35,6 +35,17 @@ JS_RENDER_WARN = 0.15    # ≥15% render-only → warn
 JS_RENDER_FAIL = 0.50    # >50% render-only → fail
 JS_RAW_MIN_WORDS = 50    # raw HTML this thin ≈ an empty shell without JS
 
+# Promotional/marketing language that signals an intro is selling rather than answering.
+PROMO_MARKERS = (
+    "#1", "number one", "world-class", "world's ", "award-winning", "industry-leading",
+    "best-in-class", "cutting-edge", "cutting edge", "revolutionary", "trusted by",
+    "leading provider", "market-leading", "premier ", "top-rated", "best in the",
+    "sign up", "get started", "buy now", "free trial", "book a demo", "shop now",
+    "subscribe now", "contact us today", "order now", "limited time",
+)
+CHUNK_MIN_WORDS = 15     # a substantive paragraph
+CHUNK_WALL_WORDS = 150   # a "wall of text" that's hard to extract a clean chunk from
+
 
 def analyze(soup: BeautifulSoup, text: str, render_delta: dict | None = None) -> list[Finding]:
     out: list[Finding] = []
@@ -108,6 +119,9 @@ def analyze(soup: BeautifulSoup, text: str, render_delta: dict | None = None) ->
 
     # --- new deterministic checks (coverage-map "Checks to add") ---
     out.append(_aeo(soup))
+    out.append(_summary_bullets(soup))   # Row 8 — bullets near the top (nav-aware)
+    out.append(_intro_quality(soup, text))  # Row 6 — promotional/unclear intro gate
+    out.append(_chunking(soup))          # Row 10 — extractable paragraph chunks
     out.append(_faq(soup))
     out.append(_trust(soup))
 
@@ -262,6 +276,124 @@ def _aeo(soup: BeautifulSoup) -> Finding:
     return Finding(
         "geo.aeo", P, "Up-front answer block", Status.PASS, Severity.INFO, C,
         value={"answer_word_offset": offset}, evidence=f"answer ~{offset} words in: “{snip}”",
+    )
+
+
+def _is_nav_list(lst: Tag) -> bool:
+    """A list that's navigation, not a content summary: inside nav/header/footer, or whose
+    items are mostly short link-only entries (a menu)."""
+    for parent in lst.parents:
+        if parent.name in ("nav", "header", "footer"):
+            return True
+        if (parent.get("role") or "").lower() == "navigation":
+            return True
+    items = lst.find_all("li")
+    if not items:
+        return False
+    linkish = sum(1 for li in items
+                  if li.find("a") is not None and len(li.get_text(" ", strip=True).split()) <= 4)
+    return linkish / len(items) >= 0.7
+
+
+def _summary_bullets(soup: BeautifulSoup) -> Finding:
+    """Row 8 — is there a real (non-navigation) bullet/numbered list high on the page?
+
+    Lists within the first AEO_WINDOW visible words are evaluated; a navigation menu near the
+    top doesn't count as a content summary (mirrors the friend-prompt's nav gate).
+    """
+    body = soup.body or soup
+    offset = 0
+    lists: list[tuple[int, Tag]] = []
+    for el in body.descendants:
+        if isinstance(el, Tag):
+            if el.name in ("ul", "ol") and offset < AEO_WINDOW and not any(
+                isinstance(p, Tag) and p.name in ("ul", "ol") for p in el.parents
+            ):
+                lists.append((offset, el))
+        elif isinstance(el, NavigableString):
+            if any(isinstance(p, Tag) and p.name in _SKIP_TEXT for p in el.parents):
+                continue
+            offset += len(str(el).split())
+
+    content = [(o, t) for o, t in lists if not _is_nav_list(t)]
+    if content:
+        o, t = content[0]
+        items = len(t.find_all("li"))
+        return Finding(
+            "geo.summary_bullets", P, "Summary bullets near top", Status.PASS, Severity.INFO, C,
+            value={"found": True, "navigation": False, "offset": o, "items": items},
+            evidence=f"content list ~{o} words in ({items} items)",
+        )
+    if lists:
+        return Finding(
+            "geo.summary_bullets", P, "Summary bullets near top", Status.WARN, Severity.MEDIUM, C,
+            value={"found": True, "navigation": True, "offset": lists[0][0]},
+            evidence=f"the only list in the first {AEO_WINDOW} words (~{lists[0][0]} in) is navigation",
+            recommendation="The list near the top is a navigation menu, not a content summary. Add a "
+            "short bulleted summary of the answer high on the page — answer engines lift concise bullets.",
+        )
+    return Finding(
+        "geo.summary_bullets", P, "Summary bullets near top", Status.WARN, Severity.MEDIUM, C,
+        value={"found": False},
+        evidence=f"no list in the first {AEO_WINDOW} visible words",
+        recommendation="Add a short summary bullet list high on the page — AI Overviews and answer "
+        "engines favour concise, scannable bullets near the top.",
+    )
+
+
+def _intro_quality(soup: BeautifulSoup, text: str) -> Finding:
+    """Row 6 — does the intro answer, or sell? Flags a promotional/marketing-heavy opening."""
+    intro = " ".join(text.split()[:80]).lower()
+    hits = [m.strip() for m in PROMO_MARKERS if m in intro]
+    exclaims = intro.count("!")
+    promotional = len(hits) >= 2 or (len(hits) >= 1 and exclaims >= 1) or exclaims >= 2
+    if promotional:
+        ev = "promotional language in the intro: " + ", ".join(f'"{h}"' for h in hits[:4])
+        if exclaims:
+            ev += f"; {exclaims} exclamation mark(s)"
+        return Finding(
+            "geo.intro_quality", P, "Intro clarity", Status.WARN, Severity.MEDIUM, C,
+            value={"promo_markers": hits, "exclamations": exclaims}, evidence=ev,
+            recommendation="Open with a clear, factual answer to the page's question rather than "
+            "marketing language — promotional intros get passed over by AI answer engines.",
+        )
+    return Finding(
+        "geo.intro_quality", P, "Intro clarity", Status.PASS, Severity.INFO, C,
+        value={"promo_markers": hits, "exclamations": exclaims},
+        evidence="intro reads informative, not promotional",
+    )
+
+
+def _chunking(soup: BeautifulSoup) -> Finding:
+    """Row 10 — is the body broken into discrete, extractable chunks (vs walls of text)?"""
+    counts = [
+        len(el.get_text(" ", strip=True).split())
+        for el in (soup.body or soup).find_all(True)
+        if _is_answer_block(el)
+    ]
+    counts = [c for c in counts if c >= 1]
+    substantive = [c for c in counts if c >= CHUNK_MIN_WORDS]
+    walls = [c for c in counts if c > CHUNK_WALL_WORDS]
+    value = {"text_blocks": len(counts), "substantive": len(substantive), "walls": len(walls)}
+
+    if not counts:
+        return Finding(
+            "geo.chunking", P, "Extractable chunks", Status.WARN, Severity.LOW, C, value=value,
+            evidence="no paragraph-level text blocks found",
+            recommendation="Structure body copy into discrete <p>/<li> blocks so AI can lift "
+            "self-contained chunks.",
+        )
+    ok = len(substantive) >= 3 and len(walls) <= max(1, len(substantive) // 4)
+    if ok:
+        return Finding(
+            "geo.chunking", P, "Extractable chunks", Status.PASS, Severity.INFO, C, value=value,
+            evidence=f"{len(substantive)} substantive paragraph(s), {len(walls)} wall(s) of text",
+        )
+    return Finding(
+        "geo.chunking", P, "Extractable chunks", Status.WARN, Severity.MEDIUM, C, value=value,
+        evidence=f"{len(substantive)} substantive paragraph(s), {len(walls)} wall(s) (>{CHUNK_WALL_WORDS} words)",
+        recommendation="Break content into discrete, self-contained paragraphs (~20–80 words each) "
+        "with subheadings — AI engines extract clean chunks, not walls of text.",
     )
 
 

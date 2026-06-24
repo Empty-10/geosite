@@ -141,3 +141,51 @@ def test_js_rendered_calls_out_js_only_schema_and_h1():
 def test_js_rendered_not_run_without_render_delta():
     ids = {f.id for f in analyze(make_soup("<body><p>x</p></body>"), "x")}
     assert "geo.js_rendered" not in ids
+
+
+# ---------------------------------------------------------------- summary bullets (Row 8)
+
+def test_summary_bullets_content_list_near_top_passes():
+    html = ("<body><p>" + "word " * 20 + "</p>"
+            "<ul><li>First substantive point about the topic explained</li>"
+            "<li>Second substantive point with real detail here too</li></ul></body>")
+    assert run(html)["geo.summary_bullets"].status == Status.PASS
+
+
+def test_summary_bullets_navigation_list_warns():
+    html = ('<body><nav><ul><li><a href="/a">Home</a></li><li><a href="/b">About</a></li>'
+            '<li><a href="/c">Contact</a></li></ul></nav>'
+            "<p>" + "word " * 40 + "</p></body>")
+    f = run(html)["geo.summary_bullets"]
+    assert f.status == Status.WARN and f.value.get("navigation") is True
+
+
+def test_summary_bullets_absent_warns():
+    assert run("<body><p>" + "word " * 50 + "</p></body>")["geo.summary_bullets"].status == Status.WARN
+
+
+# ---------------------------------------------------------------- intro quality (Row 6)
+
+def test_intro_quality_flags_promotional_opening():
+    html = "<body><p>We are the world-class, award-winning, #1 leading provider — sign up now!</p></body>"
+    f = run(html)["geo.intro_quality"]
+    assert f.status == Status.WARN and len(f.value["promo_markers"]) >= 2
+
+
+def test_intro_quality_passes_informative_opening():
+    html = ("<body><p>Pour-over coffee is a manual brewing method that uses a paper filter and a "
+            "1 to 16 ratio of grounds to water. It produces a clean, bright cup in about three minutes.</p></body>")
+    assert run(html)["geo.intro_quality"].status == Status.PASS
+
+
+# ---------------------------------------------------------------- chunking (Row 10)
+
+def test_chunking_passes_with_discrete_paragraphs():
+    para = "<p>" + "word " * 30 + "</p>"
+    assert run("<body>" + para * 4 + "</body>")["geo.chunking"].status == Status.PASS
+
+
+def test_chunking_warns_on_wall_of_text():
+    html = "<body><p>" + "word " * 400 + "</p></body>"
+    f = run(html)["geo.chunking"]
+    assert f.status == Status.WARN and f.value["walls"] == 1

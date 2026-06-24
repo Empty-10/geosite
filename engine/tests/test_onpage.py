@@ -112,3 +112,44 @@ def test_form_labels_pass_when_labeled():
 
 def test_form_labels_skipped_without_controls():
     assert "onpage.form_labels" not in run("<body><p>no forms here at all</p></body>")
+
+
+# ------------------------------------------------------------------------- link attributes (Row 13)
+
+def test_link_attrs_warns_on_blank_without_noopener():
+    html = '<body><a href="https://other.com/x" target="_blank">external</a></body>'
+    f = run(html, "https://example.com/")["onpage.link_attrs"]
+    assert f.status == Status.WARN and f.value["blank_without_noopener"] == 1
+
+
+def test_link_attrs_passes_with_noopener():
+    html = '<body><a href="https://other.com/x" target="_blank" rel="noopener">external</a></body>'
+    assert run(html, "https://example.com/")["onpage.link_attrs"].status == Status.PASS
+
+
+def test_link_attrs_absent_without_external_links():
+    assert "onpage.link_attrs" not in run('<body><a href="/internal">x</a></body>', "https://example.com/")
+
+
+# ------------------------------------------------------------------------- schema validation (Row 20)
+
+def test_schema_validation_warns_on_missing_required():
+    html = ('<body><script type="application/ld+json">'
+            '{"@context":"https://schema.org","@type":"Article","author":"Jo"}'
+            '</script></body>')  # Article without headline
+    f = run(html)["schema.validation"]
+    assert f.status == Status.WARN and "headline" in f.evidence
+
+
+def test_schema_validation_passes_when_required_present():
+    html = ('<body><script type="application/ld+json">'
+            '{"@context":"https://schema.org","@type":"Article","headline":"How to brew coffee"}'
+            '</script></body>')
+    assert run(html)["schema.validation"].status == Status.PASS
+
+
+def test_schema_validation_absent_for_unknown_types():
+    html = ('<body><script type="application/ld+json">'
+            '{"@context":"https://schema.org","@type":"WebSite","name":"x"}'
+            '</script></body>')  # WebSite isn't in the required-props registry → no finding
+    assert "schema.validation" not in run(html)

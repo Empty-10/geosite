@@ -109,6 +109,11 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
                            recommendation="Add schema.org JSON-LD (Organization, Article, "
                            "FAQ, Product…) — helps both SEO and AI extraction."))
 
+    # --- structured-data validity (required properties for known rich-result types) ---
+    sv = _schema_validation(soup)
+    if sv is not None:
+        out.append(sv)
+
     # --- image alt coverage ---
     imgs = soup.find_all("img")
     if imgs:
@@ -157,6 +162,11 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
             recommendation=None if external >= 1 else
             "Link out to authoritative sources where relevant — citing sources is a trust signal.",
         ))
+
+    # --- link attributes & semantic hints (rel / target hygiene on external links) ---
+    la = _link_attrs(soup, host)
+    if la is not None:
+        out.append(la)
 
     # --- in-page jump/anchor links (table-of-contents, deep-linkable sections) ---
     jumps = [a["href"][1:] for a in soup.find_all("a", href=True)
@@ -262,6 +272,123 @@ def _url_quality(url: str) -> Finding:
         recommendation=None if ok else
         "Prefer short, lowercase, hyphenated URLs with shallow depth and no query junk — "
         "issues: " + ", ".join(issues) + ".",
+    )
+
+
+# Minimal required properties Google needs for common rich-result types (lower-cased keys).
+SCHEMA_REQUIRED: dict[str, list[str]] = {
+    "article": ["headline"],
+    "newsarticle": ["headline"],
+    "blogposting": ["headline"],
+    "product": ["name"],
+    "faqpage": ["mainentity"],
+    "qapage": ["mainentity"],
+    "organization": ["name"],
+    "localbusiness": ["name", "address"],
+    "breadcrumblist": ["itemlistelement"],
+    "event": ["name", "startdate", "location"],
+    "howto": ["name", "step"],
+    "recipe": ["name", "image"],
+    "person": ["name"],
+    "videoobject": ["name", "thumbnailurl", "uploaddate"],
+}
+
+
+def _link_attrs(soup: BeautifulSoup, host: str) -> Finding | None:
+    """Row 13 — rel/target hygiene on external links. Returns None when there are no external
+    links to judge. Flags target=_blank links missing rel=noopener (a real security/SEO issue)."""
+    external = with_rel = 0
+    blank_unsafe: list[str] = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        if not href or href.startswith(("#", "mailto:", "tel:", "javascript:")):
+            continue
+        p = urlparse(href)
+        is_external = bool(p.scheme in ("http", "https") and p.netloc
+                           and (not host or p.netloc.lower().split(":")[0] != host))
+        if not is_external:
+            continue
+        external += 1
+        rel_val = a.get("rel")
+        rel = " ".join(rel_val).lower() if isinstance(rel_val, list) else str(rel_val or "").lower()
+        if rel.strip():
+            with_rel += 1
+        if (a.get("target") or "").lower() == "_blank" and "noopener" not in rel and "noreferrer" not in rel:
+            blank_unsafe.append(href)
+    if external == 0:
+        return None
+    ok = not blank_unsafe
+    return Finding(
+        "onpage.link_attrs", P, "Link attributes", Status.PASS if ok else Status.WARN,
+        Severity.LOW, C,
+        value={"external": external, "with_rel": with_rel, "blank_without_noopener": len(blank_unsafe)},
+        evidence=("; ".join(blank_unsafe[:3]) if blank_unsafe
+                  else f"{with_rel}/{external} external link(s) carry rel hints"),
+        recommendation=None if ok else
+        f"{len(blank_unsafe)} external link(s) open in a new tab (target=\"_blank\") without "
+        "rel=\"noopener\" — add it for security, and mark paid/UGC links rel=\"sponsored\"/\"ugc\".",
+    )
+
+
+def _jsonld_nodes(soup: BeautifulSoup) -> list[dict]:
+    """All JSON-LD object nodes on the page, flattening top-level lists and @graph containers."""
+    out: list[dict] = []
+    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        raw = script.string or script.get_text() or ""
+        try:
+            data = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        stack = list(data) if isinstance(data, list) else [data]
+        while stack:
+            node = stack.pop()
+            if isinstance(node, list):
+                stack.extend(node)
+            elif isinstance(node, dict):
+                graph = node.get("@graph")
+                if isinstance(graph, list):
+                    stack.extend(graph)
+                out.append(node)
+    return out
+
+
+def _node_type_set(node: dict) -> set[str]:
+    t = node.get("@type")
+    if isinstance(t, list):
+        return {str(x).lower() for x in t}
+    return {str(t).lower()} if t else set()
+
+
+def _schema_validation(soup: BeautifulSoup) -> Finding | None:
+    """Row 20 — check known schema types carry the properties Google requires for rich results.
+    Returns None when there's no JSON-LD, or none of a type we validate (absence is covered by
+    schema.missing; unknown types aren't penalised)."""
+    nodes = _jsonld_nodes(soup)
+    if not nodes:
+        return None
+    problems: list[str] = []
+    validated = 0
+    for node in nodes:
+        keys = {k.lower() for k in node.keys()}
+        for t in _node_type_set(node):
+            req = SCHEMA_REQUIRED.get(t)
+            if req:
+                validated += 1
+                missing = [r for r in req if r not in keys]
+                if missing:
+                    problems.append(f"{t}: missing {', '.join(missing)}")
+                break  # one validated type per node
+    if validated == 0:
+        return None
+    ok = not problems
+    return Finding(
+        "schema.validation", P, "Schema validity", Status.PASS if ok else Status.WARN,
+        Severity.MEDIUM, C, value={"validated": validated, "problems": len(problems)},
+        evidence="; ".join(problems[:4]) if problems
+        else f"{validated} schema object(s) have their required properties",
+        recommendation=None if ok else
+        "Structured data is missing properties Google requires for rich results — "
+        + "; ".join(problems[:4]) + ". Add them so the markup is eligible.",
     )
 
 

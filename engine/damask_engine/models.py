@@ -14,7 +14,9 @@ from typing import Any
 # Bump when the report's check coverage or shape changes in a way consumers should notice.
 # v2: added geo.aeo / geo.faq / geo.trust (+ further coverage-map checks).
 # v3: added the top-level `fixes` array (generated remediation artifacts). Snapshot-tested.
-SCHEMA_VERSION = "3"
+# v4: 20-row scorecard parity checks — geo.summary_bullets / geo.intro_quality / geo.chunking,
+#     onpage.link_attrs, schema.validation.
+SCHEMA_VERSION = "4"
 
 
 class Confidence(str, Enum):
