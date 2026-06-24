@@ -60,10 +60,22 @@ DATA_RICH_PER_100 = 1.5  # …or this density per 100 words
 DATA_SUBSTANTIAL_WORDS = 300  # a content page this long with almost no data is weak for citation
 
 
+NO_CONTENT_WORDS = 10  # below this, the page is effectively empty (usually a JS app shell)
+
+
 def analyze(soup: BeautifulSoup, text: str, render_delta: dict | None = None) -> list[Finding]:
     out: list[Finding] = []
     words = text.split()
     total = len(words)
+
+    # Root-cause guard: a near-empty page (often a client-rendered SPA whose content isn't in the
+    # HTML). Collapse the granular content checks — which would all fire as confusing symptoms —
+    # into ONE clear, critical finding. (Still run the JS-render check for the raw-vs-rendered nuance.)
+    if total < NO_CONTENT_WORDS:
+        out.append(_no_content(total, render_delta))
+        if render_delta is not None:
+            out.append(_js_render_check(render_delta))
+        return out
 
     # --- front-loading: do the first ~150 words carry a real answer? ---
     first = words[:150]
@@ -144,6 +156,26 @@ def analyze(soup: BeautifulSoup, text: str, render_delta: dict | None = None) ->
         out.append(_js_render_check(render_delta))
 
     return out
+
+
+def _no_content(total: int, render_delta: dict | None) -> Finding:
+    js = ""
+    if render_delta:
+        rendered = int(render_delta.get("rendered_words", 0))
+        raw = int(render_delta.get("raw_words", 0))
+        if rendered > raw + 20:
+            js = (" The content appears only after JavaScript runs, so crawlers that don't execute "
+                  "JS see this near-empty page.")
+    return Finding(
+        "geo.no_content", P, "No readable content", Status.FAIL, Severity.CRITICAL, C,
+        value={"words": total},
+        evidence=f"only {total} visible word(s) in the page HTML",
+        recommendation="This page has almost no readable text in its HTML, so AI answer engines and "
+        "non-JS crawlers can't read or cite it." + js + " If it's a JavaScript app, server-render or "
+        "prerender it (SSR / static generation / prerendering) so the headline, product description "
+        "and key content are in the initial HTML. This is the root cause behind the missing-H1 and "
+        "other empty-content findings.",
+    )
 
 
 def _js_render_check(delta: dict) -> Finding:

@@ -21,7 +21,9 @@ from typing import Any
 # v6: top-level `scorecard` — 20-row aggregation + headline AI Retrievability score.
 # v7: indexability/AI-display cluster — canonical correctness, onpage.snippet_directives,
 #     tech.index_conflict (noindex page listed in sitemap).
-SCHEMA_VERSION = "7"
+# v8: geo.no_content — collapses an empty/JS-shell page's symptom cluster into one critical
+#     root-cause finding (and tanks the GEO scorecard rows honestly).
+SCHEMA_VERSION = "8"
 
 
 class Confidence(str, Enum):

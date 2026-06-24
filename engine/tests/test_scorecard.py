@@ -88,3 +88,9 @@ def test_overlay_total_capped_at_8():
     c = _card(GOOD)
     assert c["overlay"]["total"] <= 8.0
     assert c["headline_score"] <= 100
+
+
+def test_empty_page_tanks_geo_rows():
+    c = scan_html("https://x.test/empty", "<html><body><div id='root'></div></body></html>", online=False).scorecard
+    rows = {r["n"]: r for r in c["rows"]}
+    assert rows[7]["score"] == 0 and rows[10]["score"] == 0  # answer + content rows fail

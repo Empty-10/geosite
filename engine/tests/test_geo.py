@@ -32,7 +32,9 @@ def test_aeo_warn_when_answer_too_deep():
 
 
 def test_aeo_fail_when_no_answer_paragraph():
-    f = run("<body><h1>Title</h1><ul><li>buy</li><li>now</li></ul></body>")["geo.aeo"]
+    # enough words to not be "empty", but no self-contained answer paragraph (short list items)
+    html = "<body><h1>Our product page title here</h1><ul><li>buy now</li><li>sign up</li><li>get started today</li></ul></body>"
+    f = run(html)["geo.aeo"]
     assert f.status == Status.FAIL
     assert f.value["answer_word_offset"] is None
 
@@ -61,7 +63,8 @@ FAQ_SCHEMA = """<script type="application/ld+json">
 
 
 def test_faq_pass_via_schema():
-    assert run(f"<head>{FAQ_SCHEMA}</head><body><p>hi there friend</p></body>")["geo.faq"].status == Status.PASS
+    body = "<body><p>hi there friend this is a body paragraph with plenty of words now</p></body>"
+    assert run(f"<head>{FAQ_SCHEMA}</head>{body}")["geo.faq"].status == Status.PASS
 
 
 def test_faq_pass_via_two_qa_pairs():
@@ -210,3 +213,19 @@ def test_data_density_counts_categories():
     html = "<body><p>In 2024 sales rose 12% to €5,000 over 10 km.</p></body>"
     v = run(html)["geo.data_density"].value
     assert v["year"] >= 1 and v["percent"] >= 1 and v["currency"] >= 1 and v["measure"] >= 1
+
+
+# ---------------------------------------------------------------- empty-page collapse (no_content)
+
+def test_no_content_collapses_symptom_cluster():
+    out = {f.id: f for f in analyze(make_soup('<body><div id="root"></div></body>'), "")}
+    assert out["geo.no_content"].severity.value == "critical"
+    # the granular content checks are suppressed in favour of the single root cause
+    for sym in ("geo.frontload", "geo.aeo", "geo.summary_bullets", "geo.thin_content"):
+        assert sym not in out
+
+
+def test_normal_page_keeps_granular_checks():
+    html = "<body><h1>Guide</h1><p>" + ("word " * 60) + "</p></body>"
+    out = {f.id for f in analyze(make_soup(html), "word " * 60)}
+    assert "geo.no_content" not in out and "geo.frontload" in out
