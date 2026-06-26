@@ -20,6 +20,9 @@ export type PromptResult = {
   excerpt: string;
 };
 
+export type CitedSource = { domain: string; citations: number; isYou: boolean };
+export type Sentiment = { positive: number; neutral: number; negative: number; n: number };
+
 export type VisibilityReport = {
   scan_type: "visibility";
   confidence: "measured";
@@ -33,5 +36,7 @@ export type VisibilityReport = {
   citation: Rate; // overall: domain cited
   per_engine: EngineRate[];
   share_of_voice: ShareOfVoiceRow[]; // the headline metric
+  top_sources: CitedSource[]; // which domains the engines cite for these queries
+  sentiment: Sentiment | null; // how the brand is portrayed (when it appeared)
   prompts: PromptResult[];
 };

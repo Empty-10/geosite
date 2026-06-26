@@ -7,8 +7,8 @@
 //
 // MEASURED, never VERIFIED: a sample on a date, shown with confidence bands.
 
-import { analyzeSample, wilson } from "@/lib/visibility";
-import { enabledEngines } from "@/lib/visibilityEngines";
+import { analyzeSample, hostOf, wilson } from "@/lib/visibility";
+import { classifySentiment, enabledEngines } from "@/lib/visibilityEngines";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,7 +51,7 @@ function rate(count: number, n: number): { count: number; n: number; rate: numbe
   return { count, n, rate: n ? count / n : 0, ci: wilson(count, n) };
 }
 
-type Row = { engine: string; prompt: string; appeared: boolean; cited: boolean; competitors: string[]; excerpt: string };
+type Row = { engine: string; prompt: string; appeared: boolean; cited: boolean; competitors: string[]; excerpt: string; sources: string[] };
 
 export async function POST(req: Request): Promise<Response> {
   const engines = enabledEngines();
@@ -87,7 +87,7 @@ export async function POST(req: Request): Promise<Response> {
         eng.sample(prompt).then((s) => {
           if (!s) return null;
           const a = analyzeSample(s.text, s.sources, brand, domain, competitors);
-          return { engine: eng.name, prompt, appeared: a.appeared, cited: a.cited, competitors: a.competitors, excerpt: a.excerpt };
+          return { engine: eng.name, prompt, appeared: a.appeared, cited: a.cited, competitors: a.competitors, excerpt: a.excerpt, sources: s.sources };
         }).catch(() => null),
       );
     }
@@ -115,6 +115,36 @@ export async function POST(req: Request): Promise<Response> {
     .map(([name, mentions]) => ({ name, mentions, share: mentions / total, isTarget: name === brand }))
     .sort((x, y) => y.mentions - x.mentions);
 
+  // Source intelligence: which domains the engines cite for these queries.
+  const domainCounts = new Map<string, number>();
+  for (const r of rows) {
+    const seen = new Set<string>(); // count a domain once per answer
+    for (const url of r.sources) {
+      const h = hostOf(url);
+      if (h && !seen.has(h)) {
+        seen.add(h);
+        domainCounts.set(h, (domainCounts.get(h) ?? 0) + 1);
+      }
+    }
+  }
+  const top_sources = [...domainCounts.entries()]
+    .map(([d, citations]) => ({ domain: d, citations, isYou: d === domain.replace(/^www\./, "") }))
+    .sort((a, b) => b.citations - a.citations)
+    .slice(0, 8);
+
+  // Sentiment: how the brand is portrayed where it appeared (one cheap Haiku call).
+  let sentiment = null as { positive: number; neutral: number; negative: number; n: number } | null;
+  const appearedExcerpts = rows.filter((r) => r.appeared && r.excerpt).map((r) => r.excerpt);
+  const labels = await classifySentiment(brand, appearedExcerpts);
+  if (labels && labels.length) {
+    sentiment = {
+      positive: labels.filter((l) => l === "positive").length,
+      neutral: labels.filter((l) => l === "neutral").length,
+      negative: labels.filter((l) => l === "negative").length,
+      n: labels.length,
+    };
+  }
+
   // Per-prompt grid (cells per engine).
   const promptResults = prompts.map((prompt) => {
     const pr = rows.filter((r) => r.prompt === prompt);
@@ -140,6 +170,8 @@ export async function POST(req: Request): Promise<Response> {
     citation: rate(cited, n),
     per_engine,
     share_of_voice,
+    top_sources,
+    sentiment,
     prompts: promptResults,
   });
 }

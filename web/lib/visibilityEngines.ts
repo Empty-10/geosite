@@ -22,6 +22,34 @@ export function enabledEngines(): Engine[] {
   return engines;
 }
 
+export type Sentiment = "positive" | "neutral" | "negative";
+
+/** Classify how the brand is portrayed in each passage — one cheap Haiku call for the whole run. */
+export async function classifySentiment(brand: string, passages: string[]): Promise<Sentiment[] | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || passages.length === 0) return null;
+  try {
+    const msg = await new Anthropic({ apiKey }).messages.create({
+      model: process.env.DAMASK_SENTIMENT_MODEL || "claude-haiku-4-5",
+      max_tokens: 300,
+      system:
+        `For each numbered passage, classify how the brand "${brand}" is portrayed: positive, ` +
+        `neutral, or negative. Return ONLY a JSON array of strings (one per passage), e.g. ["positive","neutral"].`,
+      messages: [{ role: "user", content: passages.map((p, i) => `${i + 1}. ${p}`).join("\n\n") }],
+    });
+    const block = msg.content.find((b) => b.type === "text");
+    const text = block && "text" in block ? block.text : "";
+    const m = text.match(/\[[\s\S]*\]/);
+    if (!m) return null;
+    return (JSON.parse(m[0]) as string[]).map((s) => {
+      const v = String(s).toLowerCase();
+      return v.startsWith("pos") ? "positive" : v.startsWith("neg") ? "negative" : "neutral";
+    });
+  } catch {
+    return null;
+  }
+}
+
 async function sampleClaude(prompt: string, apiKey: string): Promise<Sample | null> {
   const model = process.env.DAMASK_VISIBILITY_MODEL || "claude-sonnet-4-6";
   try {

@@ -28,6 +28,15 @@ export function pct(x: number): number {
   return Math.round(x * 100);
 }
 
+/** Registrable-ish host of a URL (www-stripped, lowercased), or null. */
+export function hostOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 /** Detect, from one engine's answer + its cited sources, whether the brand/domain shows up. */
 export function analyzeSample(text: string, sources: string[], brand: string, domain: string, competitors: string[]) {
   const low = text.toLowerCase();

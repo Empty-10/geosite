@@ -5,7 +5,7 @@ import { C } from "@/lib/tokens";
 import { pct } from "@/lib/visibility";
 import { ToolNav } from "./ToolNav";
 import { rgba } from "./types";
-import type { EngineRate, Rate, ShareOfVoiceRow, VisibilityReport } from "./visibilityTypes";
+import type { CitedSource, EngineRate, Rate, Sentiment, ShareOfVoiceRow, VisibilityReport } from "./visibilityTypes";
 
 type State =
   | { phase: "idle" }
@@ -140,7 +140,17 @@ function Results({ report }: { report: VisibilityReport }) {
       <div style={{ display: "flex", gap: 12, marginBottom: 22, flexWrap: "wrap" }}>
         <RateCard title="Brand visibility" subtitle="answers that named your brand" rate={report.visibility} />
         <RateCard title="Citation rate" subtitle="answers that cited your domain" rate={report.citation} />
+        {report.sentiment && report.sentiment.n > 0 && <SentimentCard s={report.sentiment} />}
       </div>
+
+      {report.top_sources.length > 0 && (
+        <>
+          <SectionTitle>Who gets cited (for these questions)</SectionTitle>
+          <div style={{ marginBottom: 22 }}>
+            <Sources rows={report.top_sources} />
+          </div>
+        </>
+      )}
 
       {report.per_engine.length > 1 && (
         <>
@@ -214,6 +224,47 @@ function RateCard({ title, subtitle, rate }: { title: string; subtitle: string; 
         <div style={{ position: "absolute", left: `${pct(rate.rate)}%`, top: -2, width: 2, height: 9, background: M }} />
       </div>
       <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 8 }}>{subtitle}</div>
+    </div>
+  );
+}
+
+function SentimentCard({ s }: { s: Sentiment }) {
+  const seg = [
+    { label: "positive", n: s.positive, color: C.accent },
+    { label: "neutral", n: s.neutral, color: C.text3 },
+    { label: "negative", n: s.negative, color: C.fail },
+  ];
+  return (
+    <div style={{ flex: 1, minWidth: 240, border: `1px solid ${rgba(M, 0.3)}`, borderRadius: 14, background: rgba(M, 0.05), padding: "16px 18px" }}>
+      <div style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 8 }}>Sentiment</div>
+      <div style={{ display: "flex", height: 10, borderRadius: 999, overflow: "hidden", background: "var(--raised)", marginBottom: 10 }}>
+        {seg.map((g) => g.n > 0 && <div key={g.label} style={{ width: `${pct(g.n / s.n)}%`, background: g.color }} />)}
+      </div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 11.5, fontFamily: "var(--mono)" }}>
+        {seg.map((g) => (
+          <span key={g.label} style={{ color: g.color }}>{g.label} {pct(g.n / s.n)}%</span>
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 8 }}>how you&apos;re described when named (n={s.n})</div>
+    </div>
+  );
+}
+
+function Sources({ rows }: { rows: CitedSource[] }) {
+  const max = Math.max(...rows.map((r) => r.citations), 1);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      {rows.map((r) => (
+        <div key={r.domain} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ width: 180, fontSize: 12.5, color: r.isYou ? C.accent : "var(--text-2)", fontWeight: r.isYou ? 600 : 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {r.domain}{r.isYou ? " (you)" : ""}
+          </span>
+          <div style={{ flex: 1, height: 7, borderRadius: 999, background: "var(--raised)", overflow: "hidden" }}>
+            <div style={{ width: `${pct(r.citations / max)}%`, height: "100%", background: r.isYou ? C.accent : "var(--border-strong)" }} />
+          </div>
+          <span style={{ width: 30, textAlign: "right", fontSize: 12, color: "var(--text-3)", fontFamily: "var(--mono)" }}>{r.citations}</span>
+        </div>
+      ))}
     </div>
   );
 }
