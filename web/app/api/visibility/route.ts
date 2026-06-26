@@ -1,28 +1,23 @@
-// POST /api/visibility — MEASURED AI-visibility sampling.
+// POST /api/visibility — MEASURED multi-engine AI-visibility sampling.
 //
-// For each prompt, ask Claude the question WITH web search on, then measure: did the brand get
-// named in the answer, and did the domain get cited as a source? Aggregate across prompts into
-// rates with Wilson 95% confidence intervals + sample size. This is the only multi-call LLM
-// surface; it costs real money (web search + tokens), so it is bounded and metered.
+// For each prompt × each configured engine (Claude, Perplexity, Gemini — whichever keys are set),
+// ask the engine the question with web search/grounding, then measure: did the brand get named,
+// and did the domain get cited as a source? Aggregate into overall + per-engine rates (Wilson
+// 95% CIs) and SHARE OF VOICE (you vs competitors). Bounded + metered — it costs real money.
 //
-// MEASURED, never VERIFIED: results are a sample on a date, reported with a confidence band.
-// Single engine for now (Claude); Perplexity/Gemini/OpenAI arrive when their keys are added.
+// MEASURED, never VERIFIED: a sample on a date, shown with confidence bands.
 
-import Anthropic from "@anthropic-ai/sdk";
-import { hostMatches, wilson } from "@/lib/visibility";
+import { analyzeSample, wilson } from "@/lib/visibility";
+import { enabledEngines } from "@/lib/visibilityEngines";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const MODEL = process.env.DAMASK_VISIBILITY_MODEL || "claude-sonnet-4-6";
 const MAX_PROMPTS = 5;
 const MAX_COMPETITORS = 6;
-const MAX_TOKENS = 1024;
-const WEB_SEARCH_USES = 4;
 
-// In-memory metering (per-instance; resets on cold start). A run = up to MAX_PROMPTS engine
-// calls, so we meter runs, conservatively, to cap spend.
+// In-memory metering (per-instance). A run = up to MAX_PROMPTS × engines calls.
 const ipHits = new Map<string, { n: number; reset: number }>();
 let dayCount = 0;
 let dayReset = Date.now() + 86_400_000;
@@ -47,51 +42,22 @@ function rateLimited(ip: string): string | null {
   return null;
 }
 
-type Analysis = {
-  appeared: boolean;
-  domainCited: boolean;
-  domainSearched: boolean;
-  competitors: string[];
-  excerpt: string;
-};
-
-/** Pull answer text + cited/searched source URLs out of a web-search response. */
-function analyze(content: unknown[], brand: string, domain: string, competitors: string[]): Analysis {
-  let answer = "";
-  const cited = new Set<string>();
-  const searched = new Set<string>();
-  for (const raw of content) {
-    const block = raw as { type?: string; text?: string; citations?: { url?: string }[]; content?: unknown };
-    if (block.type === "text") {
-      answer += (block.text ?? "") + " ";
-      for (const c of block.citations ?? []) if (c?.url) cited.add(c.url);
-    } else if (block.type === "web_search_tool_result") {
-      const results = block.content;
-      if (Array.isArray(results)) for (const r of results) if (r?.url) searched.add(r.url);
-    }
-  }
-  const low = answer.toLowerCase();
-  return {
-    appeared: !!brand && low.includes(brand.toLowerCase()),
-    domainCited: [...cited].some((u) => hostMatches(u, domain)),
-    domainSearched: [...searched].some((u) => hostMatches(u, domain)),
-    competitors: competitors.filter((c) => low.includes(c.toLowerCase())),
-    excerpt: answer.replace(/\s+/g, " ").trim().slice(0, 320),
-  };
-}
-
 function asList(v: unknown, cap: number): string[] {
-  const arr = Array.isArray(v)
-    ? v
-    : typeof v === "string"
-      ? v.split(/\r?\n|,/)
-      : [];
+  const arr = Array.isArray(v) ? v : typeof v === "string" ? v.split(/\r?\n|,/) : [];
   return arr.map((s) => String(s).trim()).filter(Boolean).slice(0, cap);
 }
 
+function rate(count: number, n: number): { count: number; n: number; rate: number; ci: [number, number] } {
+  return { count, n, rate: n ? count / n : 0, ci: wilson(count, n) };
+}
+
+type Row = { engine: string; prompt: string; appeared: boolean; cited: boolean; competitors: string[]; excerpt: string };
+
 export async function POST(req: Request): Promise<Response> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return json({ error: "AI visibility sampling isn't configured on this deployment." }, 503);
+  const engines = enabledEngines();
+  if (engines.length === 0) {
+    return json({ error: "AI visibility isn't configured — set ANTHROPIC_API_KEY (and optionally PERPLEXITY_API_KEY / GEMINI_API_KEY)." }, 503);
+  }
 
   let body: unknown;
   try {
@@ -113,66 +79,67 @@ export async function POST(req: Request): Promise<Response> {
   const limited = rateLimited(ip);
   if (limited) return json({ error: limited }, 429);
 
-  const client = new Anthropic({ apiKey });
-
-  const sampleOne = async (prompt: string) => {
-    try {
-      const msg = await client.messages.create({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        messages: [{ role: "user", content: prompt }],
-        tools: [{ type: "web_search_20260209", name: "web_search", max_uses: WEB_SEARCH_USES }],
-      });
-      if (msg.stop_reason === "refusal") return { prompt, error: "declined" };
-      const a = analyze(msg.content as unknown[], brand, domain, competitors);
-      return {
-        prompt,
-        appeared: a.appeared,
-        cited: a.domainCited,
-        found_not_cited: a.domainSearched && !a.domainCited,
-        competitors: a.competitors,
-        excerpt: a.excerpt,
-      };
-    } catch {
-      return { prompt, error: "sampling failed" };
+  // Fan out: every (engine, prompt) pair, in parallel.
+  const tasks: Promise<Row | null>[] = [];
+  for (const eng of engines) {
+    for (const prompt of prompts) {
+      tasks.push(
+        eng.sample(prompt).then((s) => {
+          if (!s) return null;
+          const a = analyzeSample(s.text, s.sources, brand, domain, competitors);
+          return { engine: eng.name, prompt, appeared: a.appeared, cited: a.cited, competitors: a.competitors, excerpt: a.excerpt };
+        }).catch(() => null),
+      );
     }
-  };
+  }
+  const rows = (await Promise.all(tasks)).filter(Boolean) as Row[];
+  if (rows.length === 0) return json({ error: "Every sample failed — please try again." }, 502);
 
-  const settled = await Promise.all(prompts.map(sampleOne));
-  const ok = settled.filter((r) => !("error" in r && r.error)) as {
-    prompt: string; appeared: boolean; cited: boolean; found_not_cited: boolean; competitors: string[]; excerpt: string;
-  }[];
-  if (ok.length === 0) return json({ error: "Every sample failed — please try again." }, 502);
+  const n = rows.length;
+  const appeared = rows.filter((r) => r.appeared).length;
+  const cited = rows.filter((r) => r.cited).length;
 
-  const n = ok.length;
-  const appeared = ok.filter((r) => r.appeared).length;
-  const cited = ok.filter((r) => r.cited).length;
-  const mkRate = (count: number) => ({ count, n, rate: count / n, ci: wilson(count, n) });
+  const per_engine = engines
+    .map((e) => {
+      const er = rows.filter((r) => r.engine === e.name);
+      if (er.length === 0) return null;
+      return { engine: e.name, visibility: rate(er.filter((r) => r.appeared).length, er.length), citation: rate(er.filter((r) => r.cited).length, er.length) };
+    })
+    .filter(Boolean);
 
-  // Share of voice: how often the brand is named vs each competitor, across the sample.
+  // Share of voice: brand-named vs each competitor across all samples.
   const tally = new Map<string, number>([[brand, appeared]]);
-  for (const c of competitors) tally.set(c, ok.filter((r) => r.competitors.includes(c)).length);
+  for (const c of competitors) tally.set(c, rows.filter((r) => r.competitors.includes(c)).length);
   const total = [...tally.values()].reduce((s, v) => s + v, 0) || 1;
   const share_of_voice = [...tally.entries()]
     .map(([name, mentions]) => ({ name, mentions, share: mentions / total, isTarget: name === brand }))
     .sort((x, y) => y.mentions - x.mentions);
 
-  const report = {
-    scan_type: "visibility" as const,
-    confidence: "measured" as const,
-    brand,
-    domain,
-    engine: "Claude (web search)",
-    model: MODEL,
-    sampled_at: new Date().toISOString(),
-    sample_size: n,
-    requested: prompts.length,
-    visibility: mkRate(appeared),
-    citation: mkRate(cited),
-    share_of_voice,
-    prompts: ok,
-  };
+  // Per-prompt grid (cells per engine).
+  const promptResults = prompts.map((prompt) => {
+    const pr = rows.filter((r) => r.prompt === prompt);
+    return {
+      prompt,
+      cells: pr.map((r) => ({ engine: r.engine, appeared: r.appeared, cited: r.cited })),
+      competitors: [...new Set(pr.flatMap((r) => r.competitors))],
+      excerpt: pr[0]?.excerpt ?? "",
+    };
+  });
 
   dayCount += 1;
-  return json(report);
+  return json({
+    scan_type: "visibility",
+    confidence: "measured",
+    brand,
+    domain,
+    engines: engines.map((e) => e.name),
+    sampled_at: new Date().toISOString(),
+    sample_size: n,
+    requested: engines.length * prompts.length,
+    visibility: rate(appeared, n),
+    citation: rate(cited, n),
+    per_engine,
+    share_of_voice,
+    prompts: promptResults,
+  });
 }

@@ -1,4 +1,4 @@
-// Types for AI visibility (citation) sampling — the MEASURED layer.
+// Types for multi-engine AI visibility (citation) sampling — the MEASURED layer.
 
 export type Rate = {
   count: number; // successes
@@ -7,30 +7,31 @@ export type Rate = {
   ci: [number, number]; // Wilson 95% interval, 0..1
 };
 
-export type PromptResult = {
-  prompt: string;
-  appeared: boolean; // brand named in the answer
-  cited: boolean; // domain cited as a source
-  found_not_cited: boolean; // domain surfaced in search but not cited in the answer
-  competitors: string[]; // competitor brands named in the answer
-  excerpt: string;
-  error?: string;
-};
+export type EngineRate = { engine: string; visibility: Rate; citation: Rate };
 
 export type ShareOfVoiceRow = { name: string; mentions: number; share: number; isTarget: boolean };
+
+export type PromptCell = { engine: string; appeared: boolean; cited: boolean };
+
+export type PromptResult = {
+  prompt: string;
+  cells: PromptCell[]; // one per engine that answered
+  competitors: string[];
+  excerpt: string;
+};
 
 export type VisibilityReport = {
   scan_type: "visibility";
   confidence: "measured";
   brand: string;
   domain: string;
-  engine: string; // e.g. "Claude (web search)"
-  model: string;
+  engines: string[]; // which engines ran
   sampled_at: string;
-  sample_size: number; // successful prompts
-  requested: number; // prompts attempted
-  visibility: Rate; // brand appeared
-  citation: Rate; // domain cited
-  share_of_voice: ShareOfVoiceRow[];
+  sample_size: number; // total (engine × prompt) samples that succeeded
+  requested: number; // prompts × engines attempted
+  visibility: Rate; // overall: brand appeared
+  citation: Rate; // overall: domain cited
+  per_engine: EngineRate[];
+  share_of_voice: ShareOfVoiceRow[]; // the headline metric
   prompts: PromptResult[];
 };

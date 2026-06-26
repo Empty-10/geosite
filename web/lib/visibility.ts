@@ -27,3 +27,14 @@ export function hostMatches(url: string, domain: string): boolean {
 export function pct(x: number): number {
   return Math.round(x * 100);
 }
+
+/** Detect, from one engine's answer + its cited sources, whether the brand/domain shows up. */
+export function analyzeSample(text: string, sources: string[], brand: string, domain: string, competitors: string[]) {
+  const low = text.toLowerCase();
+  return {
+    appeared: !!brand && low.includes(brand.toLowerCase()),
+    cited: sources.some((u) => hostMatches(u, domain)),
+    competitors: competitors.filter((c) => low.includes(c.toLowerCase())),
+    excerpt: text.replace(/\s+/g, " ").trim().slice(0, 280),
+  };
+}
