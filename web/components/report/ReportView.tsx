@@ -20,6 +20,7 @@ import { fixesByFinding, PILLAR_SECTIONS, priorityFixes, rgba, type Report } fro
 type State =
   | { phase: "empty" }
   | { phase: "loading"; url: string }
+  | { phase: "loadingSaved" }
   | { phase: "error"; url: string; message: string }
   | { phase: "done"; url: string; report: Report };
 
@@ -31,6 +32,7 @@ function normalizeForSubmit(raw: string): string {
 export function ReportView() {
   const params = useSearchParams();
   const urlParam = params.get("url") ?? "";
+  const idParam = params.get("id") ?? "";
   const [state, setState] = useState<State>({ phase: "empty" });
   const [input, setInput] = useState(urlParam);
   const [tab, setTab] = useState(0);
@@ -52,15 +54,33 @@ export function ReportView() {
     }
   }, []);
 
-  // Kick off a scan whenever the ?url= param changes (e.g. arriving from the hero demo).
+  // Load a previously-saved report (shareable ?id= link) instead of re-scanning.
+  const loadSaved = useCallback(async (id: string) => {
+    setState({ phase: "loadingSaved" });
+    setTab(0);
+    try {
+      const res = await fetch(`/api/scans/${encodeURIComponent(id)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `Couldn't load report (${res.status}).`);
+      const url = (data.meta?.final_url as string) || data.url || "";
+      setInput(url);
+      setState({ phase: "done", url, report: data });
+    } catch (e) {
+      setState({ phase: "error", url: "", message: e instanceof Error ? e.message : "Couldn't load the saved report." });
+    }
+  }, []);
+
+  // ?id= loads a saved report; ?url= runs a fresh scan.
   useEffect(() => {
-    if (urlParam) {
+    if (idParam) {
+      loadSaved(idParam);
+    } else if (urlParam) {
       setInput(urlParam);
       runScan(normalizeForSubmit(urlParam));
     } else {
       setState({ phase: "empty" });
     }
-  }, [urlParam, runScan]);
+  }, [idParam, urlParam, runScan, loadSaved]);
 
   const submit = () => {
     if (input.trim()) runScan(normalizeForSubmit(input));
@@ -148,6 +168,8 @@ export function ReportView() {
 
         {state.phase === "loading" && <ScanProgress url={state.url} />}
 
+        {state.phase === "loadingSaved" && <Placeholder>Loading saved report…</Placeholder>}
+
         {state.phase === "error" && (
           <div
             style={{
@@ -234,12 +256,12 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
           <h1 style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em", marginBottom: 6, wordBreak: "break-all" }}>
             {finalUrl}
           </h1>
-          <a
-            href={`/site?url=${encodeURIComponent(finalUrl)}`}
-            style={{ fontSize: 12.5, color: C.accent, whiteSpace: "nowrap", marginLeft: "auto" }}
-          >
-            Crawl whole site →
-          </a>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 14, alignItems: "baseline" }}>
+            {report.meta?.scan_id != null && <ShareButton scanId={report.meta.scan_id as number} />}
+            <a href={`/site?url=${encodeURIComponent(finalUrl)}`} style={{ fontSize: 12.5, color: C.accent, whiteSpace: "nowrap" }}>
+              Crawl whole site →
+            </a>
+          </div>
         </div>
         <div style={{ fontSize: 12.5, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
           scanned {when.toLocaleString()} · {report.findings.length} checks · schema v{report.schema_version ?? "?"}
@@ -315,4 +337,27 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500, marginBottom: 10 }}>{children}</div>;
+}
+
+function ShareButton({ scanId }: { scanId: number }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    const url = `${window.location.origin}/report?id=${scanId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      /* clipboard blocked — the URL is still shareable from the address bar */
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+  return (
+    <button
+      onClick={copy}
+      title="Copy a shareable link to this saved report"
+      style={{ fontSize: 12.5, color: copied ? C.accent : "var(--text-2)", background: "transparent", border: "none", cursor: "pointer", padding: 0, whiteSpace: "nowrap" }}
+    >
+      {copied ? "✓ Link copied" : "🔗 Share"}
+    </button>
+  );
 }
