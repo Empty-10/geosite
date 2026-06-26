@@ -27,7 +27,8 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
     title = (soup.title.string or "").strip() if soup.title and soup.title.string else ""
     if not title:
         out.append(Finding("title.missing", P, "Page title", Status.FAIL, Severity.CRITICAL,
-                            C, recommendation="Add a unique <title> of ~50–60 characters."))
+                            C, evidence="no <title> element in the page <head>",
+                            recommendation="Add a unique <title> of ~50–60 characters."))
     else:
         n = len(title)
         ok = 15 <= n <= 60
@@ -42,7 +43,7 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
     content = (md.get("content") or "").strip() if md else ""
     if not content:
         out.append(Finding("meta.description.missing", P, "Meta description", Status.FAIL,
-                            Severity.MEDIUM, C,
+                            Severity.MEDIUM, C, evidence='no <meta name="description"> in the page <head>',
                             recommendation="Add a meta description of ~120–160 characters."))
     else:
         n = len(content)
@@ -56,10 +57,12 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
     h1s = soup.find_all("h1")
     if len(h1s) == 0:
         out.append(Finding("h1.missing", P, "H1 heading", Status.FAIL, Severity.HIGH, C,
+                            evidence="no <h1> element on the page",
                             recommendation="Add a single, descriptive H1."))
     elif len(h1s) > 1:
         out.append(Finding("h1.multiple", P, "H1 heading", Status.WARN, Severity.MEDIUM, C,
                             value=len(h1s),
+                            evidence="; ".join(f'"{h.get_text(strip=True)[:40]}"' for h in h1s[:3]),
                             recommendation="Use exactly one H1 per page."))
     else:
         out.append(Finding("h1.ok", P, "H1 heading", Status.PASS, Severity.INFO, C,
@@ -128,9 +131,13 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
         has_alt = sum(1 for i in imgs if i.get("alt") is not None)
         descriptive = sum(1 for i in imgs if (i.get("alt") or "").strip())
         pct = round(100 * has_alt / len(imgs))
+        missing_srcs = [str(i.get("src") or "") for i in imgs if i.get("alt") is None]
+        evidence = ("missing alt on: " + "; ".join(s.rsplit("/", 1)[-1] for s in missing_srcs[:3] if s)
+                    if missing_srcs else f"all {len(imgs)} image(s) have an alt attribute")
         out.append(Finding("images.alt", P, "Image alt text",
                            Status.PASS if pct >= 90 else Status.WARN, Severity.LOW, C,
                            value={"with_alt": has_alt, "descriptive": descriptive, "total": len(imgs), "pct": pct},
+                           evidence=evidence,
                            recommendation=None if pct >= 90 else
                            f"{len(imgs) - has_alt} image(s) have no alt attribute — add alt text "
                            "(use alt=\"\" only for purely decorative images)."))

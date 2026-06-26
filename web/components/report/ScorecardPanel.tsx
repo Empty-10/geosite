@@ -106,13 +106,21 @@ function Row({ row, byId }: { row: ScorecardRow; byId: Map<string, Finding> }) {
           {checks.map((f) => {
             const st = STATUS[f.status] ?? STATUS.info;
             const isIssue = f.status === "fail" || f.status === "warn";
-            const detail = isIssue ? f.recommendation || f.evidence : f.evidence || f.recommendation;
             return (
               <div key={f.id} style={{ display: "flex", gap: 10, padding: "7px 0", borderTop: "1px solid var(--border)" }}>
                 <span style={{ color: st.color, fontSize: 12, width: 14, textAlign: "center", flexShrink: 0, fontWeight: 600 }}>{st.mark}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12.5, color: "var(--text)" }}>{f.title}</div>
-                  {detail && <div style={{ fontSize: 11.5, color: "var(--text-3)", marginTop: 2, lineHeight: 1.5 }}>{detail}</div>}
+                  {/* where/how it was found */}
+                  {f.evidence && (
+                    <div style={{ fontSize: 11.5, color: "var(--text-3)", marginTop: 2, lineHeight: 1.5, fontFamily: "var(--mono)" }}>
+                      {f.evidence}
+                    </div>
+                  )}
+                  {/* the fix, for issues */}
+                  {isIssue && f.recommendation && (
+                    <div style={{ fontSize: 11.5, color: "var(--text-2)", marginTop: 3, lineHeight: 1.5 }}>→ {f.recommendation}</div>
+                  )}
                 </div>
               </div>
             );
