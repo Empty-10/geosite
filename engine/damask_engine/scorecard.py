@@ -19,11 +19,12 @@ _POINTS = {Status.PASS: 100, Status.INFO: 80, Status.WARN: 55, Status.FAIL: 0}
 # Each row collects whichever of its candidate finding ids are present (one finding → one row).
 ROWS: list[tuple[int, str, list[str]]] = [
     (1, "Page Identity & Intent Clarity", ["h1.missing", "h1.multiple", "h1.ok",
-                                           "robots.indexable", "robots.noindex", "tech.x_robots_tag"]),
+                                           "robots.indexable", "robots.noindex", "tech.x_robots_tag",
+                                           "opengraph"]),
     (2, "Title Tag Quality", ["title.length", "title.missing"]),
     (3, "Meta Description Quality", ["meta.description.length", "meta.description.missing"]),
     (4, "URL Structure & Canonical Consistency", ["onpage.url", "canonical"]),
-    (5, "Heading Architecture", ["headings.structure"]),
+    (5, "Heading Architecture", ["headings.structure", "onpage.heading_order"]),
     (6, "Intro Block Quality", ["geo.frontload", "geo.intro_quality", "geo.no_content"]),
     (7, "Featured Answer Blocks (AEO Core)", ["geo.aeo", "geo.definitive", "geo.no_content"]),
     (8, "Summary Bullets Near Top", ["geo.summary_bullets", "geo.no_content"]),
@@ -31,7 +32,7 @@ ROWS: list[tuple[int, str, list[str]]] = [
     (10, "Chunking & Extractable Paragraphs", ["geo.chunking", "geo.depth", "geo.thin_content",
                                                "geo.data_density", "geo.no_content"]),
     (11, "Lists & Tables for Extractability", ["geo.structure", "geo.no_content"]),
-    (12, "Internal Linking & Anchor Text", ["onpage.links", "onpage.jump_links"]),
+    (12, "Internal Linking & Anchor Text", ["onpage.links", "onpage.jump_links", "onpage.crawlable_anchors"]),
     (13, "Link Attributes & Semantic Hints", ["onpage.link_attrs"]),
     (14, "External Links to Authoritative Sources", ["onpage.outbound"]),
     (15, "Images & Media", ["images.alt", "onpage.images.dims"]),
@@ -49,7 +50,7 @@ ROWS: list[tuple[int, str, list[str]]] = [
                                                  "tech.sitemap.missing", "tech.sitemap.invalid",
                                                  "tech.sitemap.freshness", "tech.security_headers",
                                                  "tech.index_conflict", "onpage.snippet_directives",
-                                                 "geo.js_rendered", "tech.llms_txt"]),
+                                                 "onpage.hreflang", "geo.js_rendered", "tech.llms_txt"]),
     (20, "Structured Data & Schema", ["schema.jsonld", "schema.missing", "schema.validation"]),
 ]
 

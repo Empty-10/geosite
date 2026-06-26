@@ -23,7 +23,9 @@ from typing import Any
 #     tech.index_conflict (noindex page listed in sitemap).
 # v8: geo.no_content — collapses an empty/JS-shell page's symptom cluster into one critical
 #     root-cause finding (and tanks the GEO scorecard rows honestly).
-SCHEMA_VERSION = "8"
+# v9: cheap coverage gaps — Open Graph/Twitter completeness (opengraph), onpage.heading_order,
+#     onpage.crawlable_anchors, onpage.hreflang.
+SCHEMA_VERSION = "9"
 
 
 class Confidence(str, Enum):

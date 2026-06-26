@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
@@ -89,11 +90,18 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
     # --- snippet & preview directives (how much search/AI may display) ---
     out.append(_snippet_directives(soup))
 
-    # --- Open Graph ---
-    og = soup.find("meta", attrs={"property": "og:title"})
-    out.append(Finding("opengraph", P, "Open Graph tags",
-                       Status.PASS if og else Status.WARN, Severity.LOW, C, value=bool(og),
-                       recommendation=None if og else "Add Open Graph tags for richer sharing."))
+    # --- Open Graph + Twitter completeness ---
+    out.append(_social_meta(soup))
+
+    # --- heading hierarchy order (no skipped levels) ---
+    ho = _heading_order(soup)
+    if ho is not None:
+        out.append(ho)
+
+    # --- hreflang (only when the site uses it) ---
+    hl = _hreflang(soup)
+    if hl is not None:
+        out.append(hl)
 
     # --- JSON-LD structured data ---
     types = _jsonld_types(soup)
@@ -171,6 +179,11 @@ def analyze(soup: BeautifulSoup, text: str, url: str = "") -> list[Finding]:
     la = _link_attrs(soup, host)
     if la is not None:
         out.append(la)
+
+    # --- crawlable anchors (links crawlers/AI bots can actually follow) ---
+    ca = _crawlable_anchors(soup)
+    if ca is not None:
+        out.append(ca)
 
     # --- in-page jump/anchor links (table-of-contents, deep-linkable sections) ---
     jumps = [a["href"][1:] for a in soup.find_all("a", href=True)
@@ -346,6 +359,107 @@ def _url_quality(url: str) -> Finding:
         recommendation=None if ok else
         "Prefer short, lowercase, hyphenated URLs with shallow depth and no query junk — "
         "issues: " + ", ".join(issues) + ".",
+    )
+
+
+def _social_meta(soup: BeautifulSoup) -> Finding:
+    """Open Graph + Twitter Card completeness (was: og:title presence only)."""
+    def og(prop: str) -> bool:
+        return soup.find("meta", attrs={"property": prop}) is not None
+
+    tags = {
+        "og:title": og("og:title"),
+        "og:description": og("og:description"),
+        "og:image": og("og:image"),
+        "og:url": og("og:url"),
+        "og:type": og("og:type"),
+        "twitter:card": soup.find("meta", attrs={"name": "twitter:card"}) is not None,
+    }
+    present = [k for k, v in tags.items() if v]
+    missing = [k for k, v in tags.items() if not v]
+    core = tags["og:title"] and tags["og:description"] and tags["og:image"]
+    core_missing = [k for k in ("og:title", "og:description", "og:image") if k in missing]
+    return Finding(
+        "opengraph", P, "Open Graph & Twitter tags", Status.PASS if core else Status.WARN,
+        Severity.LOW, C, value={"present": present, "missing": missing},
+        evidence=("present: " + ", ".join(present)) if present else "no social tags",
+        recommendation=None if core else
+        "Add the core social tags (" + ", ".join(core_missing) + ", and ideally og:url + "
+        "twitter:card) so links and AI snippets show a rich title, description and image.",
+    )
+
+
+def _heading_order(soup: BeautifulSoup) -> Finding | None:
+    """Flag skipped heading levels (e.g. H1 → H3). None if the page has no headings."""
+    headings = soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"])
+    if not headings:
+        return None
+    skips, prev = [], 0
+    for h in headings:
+        lvl = int(h.name[1])
+        if prev and lvl > prev + 1:
+            skips.append(f"h{prev}→h{lvl}")
+        prev = lvl
+    if not skips:
+        return Finding("onpage.heading_order", P, "Heading order", Status.PASS, Severity.INFO, C,
+                       value={"headings": len(headings), "skips": 0})
+    return Finding(
+        "onpage.heading_order", P, "Heading order", Status.WARN, Severity.LOW, C,
+        value={"headings": len(headings), "skips": len(skips)},
+        evidence="skipped: " + ", ".join(skips[:4]),
+        recommendation="Headings skip levels (" + ", ".join(skips[:4]) + "). Keep a clean "
+        "H1→H2→H3 outline (don't jump levels) — it helps both extraction and accessibility.",
+    )
+
+
+_HREFLANG_RE = re.compile(r"^[a-z]{2,3}(-[a-z]{2,4})?$|^x-default$", re.I)
+
+
+def _hreflang(soup: BeautifulSoup) -> Finding | None:
+    """Validate hreflang alternates — only when the site actually uses them (no penalty otherwise)."""
+    langs = [str(link.get("hreflang")).strip()
+             for link in soup.find_all("link", rel="alternate") if link.get("hreflang")]
+    if not langs:
+        return None
+    invalid = [x for x in langs if not _HREFLANG_RE.match(x)]
+    has_xdefault = any(x.lower() == "x-default" for x in langs)
+    issues = []
+    if invalid:
+        issues.append("invalid codes: " + ", ".join(invalid[:3]))
+    if not has_xdefault:
+        issues.append("no x-default")
+    if not issues:
+        return Finding("onpage.hreflang", P, "hreflang", Status.PASS, Severity.INFO, C,
+                       value={"count": len(langs), "x_default": True})
+    return Finding(
+        "onpage.hreflang", P, "hreflang", Status.WARN, Severity.LOW, C,
+        value={"count": len(langs), "invalid": invalid, "x_default": has_xdefault},
+        evidence="; ".join(issues),
+        recommendation="Fix hreflang: " + "; ".join(issues) + ". Use valid lang(-REGION) codes "
+        "and include an x-default for international targeting.",
+    )
+
+
+def _crawlable_anchors(soup: BeautifulSoup) -> Finding | None:
+    """Links that navigate via JavaScript (javascript: / onclick, no real href) — uncrawlable."""
+    anchors = soup.find_all("a")
+    if not anchors:
+        return None
+    bad = []
+    for a in anchors:
+        href = (a.get("href") or "").strip()
+        if href.lower().startswith("javascript:"):
+            bad.append(href[:50])
+        elif a.get("onclick") and href in ("", "#"):
+            bad.append("(onclick, no href)")
+    if not bad:
+        return Finding("onpage.crawlable_anchors", P, "Crawlable links", Status.PASS, Severity.INFO,
+                       C, value={"uncrawlable": 0, "total": len(anchors)})
+    return Finding(
+        "onpage.crawlable_anchors", P, "Crawlable links", Status.WARN, Severity.MEDIUM, C,
+        value={"uncrawlable": len(bad), "total": len(anchors)}, evidence="; ".join(bad[:3]),
+        recommendation=f"{len(bad)} link(s) navigate via JavaScript (javascript: or onclick) with no "
+        "real href — search and AI crawlers can't follow them. Use <a href=\"…\"> with a real URL.",
     )
 
 

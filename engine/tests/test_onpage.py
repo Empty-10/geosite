@@ -217,3 +217,53 @@ def test_links_pass_with_few_generic_on_large_set():
     links = "".join(f'<a href="/p{i}">descriptive link number {i} here</a>' for i in range(20))
     f = run("<body>" + links + '<a href="/x">click here</a></body>', "https://example.com/")["onpage.links"]
     assert f.status == Status.PASS  # 1 generic / 21 = ~5% < 10%
+
+
+# ------------------------------------------------------------------- cheap coverage gaps (batch)
+
+def test_opengraph_pass_with_core_tags():
+    html = ('<head><meta property="og:title" content="T"><meta property="og:description" content="D">'
+            '<meta property="og:image" content="i.png"></head>')
+    assert run(html)["opengraph"].status == Status.PASS
+
+
+def test_opengraph_warn_when_incomplete():
+    f = run('<head><meta property="og:title" content="T"></head>')["opengraph"]
+    assert f.status == Status.WARN and "og:image" in f.value["missing"]
+
+
+def test_heading_order_pass_clean_outline():
+    html = "<body><h1>A</h1><h2>B</h2><h3>C</h3><h2>D</h2></body>"
+    assert run(html)["onpage.heading_order"].status == Status.PASS
+
+
+def test_heading_order_warn_on_skip():
+    html = "<body><h1>A</h1><h3>skips h2</h3></body>"
+    f = run(html)["onpage.heading_order"]
+    assert f.status == Status.WARN and "h1→h3" in f.evidence
+
+
+def test_crawlable_anchors_warn_on_js_nav():
+    html = '<body><a href="javascript:void(0)">go</a><a href="/real">real</a></body>'
+    f = run(html)["onpage.crawlable_anchors"]
+    assert f.status == Status.WARN and f.value["uncrawlable"] == 1
+
+
+def test_crawlable_anchors_pass_with_real_hrefs():
+    assert run('<body><a href="/a">a</a><a href="https://x.com">b</a></body>')["onpage.crawlable_anchors"].status == Status.PASS
+
+
+def test_hreflang_absent_when_unused():
+    assert "onpage.hreflang" not in run("<head></head>")
+
+
+def test_hreflang_warn_missing_xdefault():
+    html = '<head><link rel="alternate" hreflang="en" href="/en"><link rel="alternate" hreflang="fr" href="/fr"></head>'
+    f = run(html)["onpage.hreflang"]
+    assert f.status == Status.WARN and "x-default" in f.evidence
+
+
+def test_hreflang_pass_valid_with_xdefault():
+    html = ('<head><link rel="alternate" hreflang="en-US" href="/en">'
+            '<link rel="alternate" hreflang="x-default" href="/"></head>')
+    assert run(html)["onpage.hreflang"].status == Status.PASS
