@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import threading
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -37,7 +38,28 @@ from .fetch import fetch_pagespeed
 from .modules import performance as performance_mod
 from .scanner import scan
 
-app = FastAPI(title="damask engine", version="1", description="GEO/SEO scan engine.")
+# Optional remote MCP endpoint (Streamable HTTP). Mounted at /mcp when the [mcp] extra is
+# installed, so claude.ai / Claude Desktop can call audit_url & scan_url over HTTP. Without the
+# extra the REST API still works exactly the same — the mount is simply skipped.
+try:
+    from .mcp_server import mcp as _mcp
+
+    _mcp.settings.stateless_http = True       # no per-session state — fine for our scan tools
+    _mcp.settings.streamable_http_path = "/"  # so mounting at /mcp gives the endpoint /mcp
+    _mcp_app = _mcp.streamable_http_app()
+
+    @asynccontextmanager
+    async def _lifespan(_app: "FastAPI"):
+        async with _mcp.session_manager.run():
+            yield
+
+    _LIFESPAN = _lifespan
+except Exception:  # noqa: BLE001 — [mcp] not installed; REST API runs without /mcp
+    _mcp_app = None
+    _LIFESPAN = None
+
+app = FastAPI(title="damask engine", version="1", description="GEO/SEO scan engine.",
+              lifespan=_LIFESPAN)
 
 # In-memory crawl jobs. Fine for the single Render instance; evicted oldest-first past a cap.
 _MAX_JOBS = 200
@@ -181,3 +203,8 @@ def crawl_status(job_id: str) -> dict:
         if job is None:
             raise HTTPException(status_code=404, detail="unknown or expired job")
         return {"job_id": job_id, **job}
+
+
+# Remote MCP endpoint at /mcp (Streamable HTTP). Last, so it doesn't shadow the REST routes.
+if _mcp_app is not None:
+    app.mount("/mcp", _mcp_app)

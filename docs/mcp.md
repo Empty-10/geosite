@@ -43,6 +43,28 @@ PATH isn't the one with the engine installed.
 Then ask the assistant: *"Audit https://example.com/pricing for AI visibility"* — it calls
 `audit_url` and reasons over the deterministic scorecard.
 
+## Remote (HTTP) — for claude.ai web/mobile
+
+The engine service also exposes the same tools over **Streamable HTTP**, mounted at **`/mcp/`**
+(the `[mcp]` extra is installed in the Docker image). Once the engine is deployed:
+
+    https://<your-engine-host>/mcp/        e.g. https://geosite-eyyg.onrender.com/mcp/
+
+Add it on **claude.ai** → Settings → **Connectors** → *Add custom connector* → paste that URL.
+Then in any chat: *"audit stripe.com for AI visibility"* → Claude calls `audit_url`.
+
+Verified handshake:
+
+    curl -X POST https://<host>/mcp/ -H 'content-type: application/json' \
+      -H 'accept: application/json, text/event-stream' \
+      -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
+    # → 200, serverInfo {"name":"damask"}
+
+> ⚠️ The remote endpoint is **public** — anyone with the URL can run scans against the engine
+> (compute cost; and the engine's scan path has no SSRF guard yet). Before promoting it widely,
+> add auth (OAuth / a gateway token) and an SSRF guard on the engine fetch. Fine for personal /
+> low-traffic use now.
+
 ## Notes
 
 - Every number is **VERIFIED** — read straight from the live HTML, reproducible on re-run.

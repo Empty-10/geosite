@@ -12,10 +12,10 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install the engine + its FastAPI service extra (requests/bs4/lxml/certifi + fastapi/uvicorn).
+# Install the engine + the FastAPI service extra + the MCP extra (so /mcp is served too).
 COPY pyproject.toml ./
 COPY damask_engine ./damask_engine
-RUN pip install --no-cache-dir -e ".[service]"
+RUN pip install --no-cache-dir -e ".[service,mcp]"
 
 # Hosts (Render/Railway/Fly) inject $PORT; default to 8000 locally.
 ENV PORT=8000
