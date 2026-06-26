@@ -309,7 +309,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 function primaryBtn(busy: boolean): React.CSSProperties {
-  return { fontSize: 14, fontWeight: 500, border: "none", padding: "0 22px", height: 46, borderRadius: 10, cursor: busy ? "default" : "pointer", background: busy ? C.raised : M, color: busy ? C.text3 : "#fff" };
+  return { fontSize: 14, fontWeight: 500, border: "none", padding: "0 22px", height: 46, borderRadius: 10, cursor: busy ? "default" : "pointer", background: busy ? "var(--raised)" : M, color: busy ? C.text3 : "#fff" };
 }
 
 function ghostBtn(busy: boolean): React.CSSProperties {

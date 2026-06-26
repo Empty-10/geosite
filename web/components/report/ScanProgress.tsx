@@ -59,15 +59,15 @@ export function ScanProgress({ url }: { url?: string }) {
                   justifyContent: "center",
                   fontSize: 11,
                   flexShrink: 0,
-                  background: done ? rgba(C.accent, 0.14) : C.raised,
-                  border: `1.5px solid ${done ? C.accent : running ? C.measured : C.borderStrong}`,
+                  background: done ? rgba(C.accent, 0.14) : "var(--raised)",
+                  border: `1.5px solid ${done ? C.accent : running ? C.measured : "var(--border-strong)"}`,
                   color: done ? C.accent : C.text3,
                   animation: running ? "dmPulse 1s ease infinite" : done ? "dmTick 0.3s ease both" : undefined,
                 }}
               >
                 {done ? "✓" : notRun ? "–" : ""}
               </div>
-              <span style={{ flex: 1, fontSize: 14, color: done ? C.text2 : running ? C.text : C.text3 }}>{name}</span>
+              <span style={{ flex: 1, fontSize: 14, color: done ? "var(--text-2)" : running ? "var(--text)" : C.text3 }}>{name}</span>
               <span style={{ fontSize: 12, color: "var(--text-3)", fontFamily: "var(--mono)" }}>
                 {done ? "done" : running ? "scanning…" : notRun ? "on demand" : "queued"}
               </span>

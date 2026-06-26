@@ -32,7 +32,7 @@ function Tile({
             top: -10,
             left: 26,
             fontSize: 11,
-            color: "var(--ink)",
+            color: "var(--on-accent)",
             background: "var(--accent)",
             padding: "3px 9px",
             borderRadius: 6,

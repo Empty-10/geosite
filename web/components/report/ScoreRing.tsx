@@ -50,7 +50,7 @@ export function ScoreRing({ score, animate = true, label = "Overall GEO score" }
     >
       <div style={{ position: "relative", width: 116, height: 116 }}>
         <svg width={116} height={116} viewBox="0 0 116 116" style={{ transform: "rotate(-90deg)" }}>
-          <circle cx={58} cy={58} r={R} fill="none" stroke={C.border} strokeWidth={9} />
+          <circle cx={58} cy={58} r={R} fill="none" stroke="var(--border)" strokeWidth={9} />
           <circle
             cx={58}
             cy={58}

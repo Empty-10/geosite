@@ -3,6 +3,7 @@
 
 import { C } from "@/lib/tokens";
 import { Logo } from "../Logo";
+import { ThemeToggle } from "../ThemeToggle";
 import { rgba } from "./types";
 
 const TOOLS = [
@@ -29,7 +30,7 @@ export function ToolNav({ active }: { active: "report" | "site" | "crawlers" | "
         <Logo size={20} />
         <span style={{ fontSize: 15, fontWeight: 500, letterSpacing: "-0.01em" }}>damask</span>
       </a>
-      <nav style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+      <nav style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
         {TOOLS.map((t) => {
           const isActive = t.key === active;
           return (
@@ -51,6 +52,7 @@ export function ToolNav({ active }: { active: "report" | "site" | "crawlers" | "
             </a>
           );
         })}
+        <ThemeToggle />
       </nav>
     </header>
   );

@@ -15,7 +15,23 @@
   --measured: #4D8DF6;
   --warn: #E0A22B;
   --fail: #E5484D;
+  --on-accent: #0D0F12; /* text on the green button — stays dark in BOTH themes */
   --mono: 'Geist Mono', ui-monospace, monospace;
+  color-scheme: dark;
+}
+
+/* Light theme — only the neutrals change; brand colours work on both. Toggled via
+   <html data-theme="light"> (set before paint by the inline script in layout.tsx). */
+:root[data-theme="light"] {
+  --ink: #F7F8FA;
+  --surface: #FFFFFF;
+  --raised: #EEF1F4;
+  --border: #E4E8ED;
+  --border-strong: #CCD3DB;
+  --text: #181B20;
+  --text-2: #555D67;
+  --text-3: #848B95;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -73,6 +89,13 @@ input { font-family: inherit; }
     radial-gradient(ellipse 52% 48% at 50% 40%, rgba(196, 210, 220, 0.05), transparent 70%),
     radial-gradient(circle at center, #262B33 1px, transparent 1.6px);
   background-size: 100% 100%, 24px 24px;
+}
+
+/* light-mode hero grid (the dark dots above would vanish on a light background) */
+:root[data-theme="light"] .hero-bg {
+  background-image:
+    radial-gradient(ellipse 52% 48% at 50% 40%, rgba(40, 70, 100, 0.04), transparent 70%),
+    radial-gradient(circle at center, #D7DDE4 1px, transparent 1.6px);
   -webkit-mask-image: radial-gradient(ellipse 82% 74% at 50% 34%, #000, transparent 76%);
   mask-image: radial-gradient(ellipse 82% 74% at 50% 34%, #000, transparent 76%);
 }

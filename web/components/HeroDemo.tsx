@@ -53,7 +53,7 @@ export function HeroDemo() {
               gap: 10,
               padding: "0 14px",
               height: 46,
-              border: `1px solid ${C.border}`,
+              border: `1px solid var(--border)`,
               borderRadius: 10,
               background: "var(--ink)",
             }}

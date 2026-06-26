@@ -135,7 +135,7 @@ export function ReportView() {
               borderRadius: 10,
               cursor: state.phase === "loading" ? "default" : "pointer",
               flexShrink: 0,
-              background: state.phase === "loading" ? C.raised : C.accent,
+              background: state.phase === "loading" ? "var(--raised)" : C.accent,
               color: state.phase === "loading" ? C.text3 : C.ink,
             }}
           >

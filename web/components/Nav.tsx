@@ -1,4 +1,5 @@
 import { Logo } from "./Logo";
+import { ThemeToggle } from "./ThemeToggle";
 
 const linkStyle: React.CSSProperties = {
   fontSize: 14,
@@ -34,13 +35,14 @@ export function Nav() {
         <a style={linkStyle}>Docs</a>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <ThemeToggle />
         <a style={linkStyle} href="/crawlers">Crawler logs</a>
         <a
           href="/report"
           style={{
             fontSize: 14,
             fontWeight: 500,
-            color: "var(--ink)",
+            color: "var(--on-accent)",
             background: "var(--accent)",
             border: "none",
             padding: "9px 16px",

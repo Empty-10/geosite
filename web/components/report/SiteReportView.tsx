@@ -163,7 +163,7 @@ export function SiteReportView() {
               borderRadius: 10,
               cursor: busy ? "default" : "pointer",
               flexShrink: 0,
-              background: busy ? C.raised : C.accent,
+              background: busy ? "var(--raised)" : C.accent,
               color: busy ? C.text3 : C.ink,
             }}
           >

@@ -27,7 +27,7 @@ export function AgencyCta() {
           </div>
           <div style={{ display: "flex", gap: 12 }}>
             <button
-              style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", background: "var(--accent)", border: "none", padding: "11px 18px", borderRadius: 9, cursor: "pointer" }}
+              style={{ fontSize: 14, fontWeight: 500, color: "var(--on-accent)", background: "var(--accent)", border: "none", padding: "11px 18px", borderRadius: 9, cursor: "pointer" }}
             >
               Book a demo
             </button>

@@ -119,7 +119,7 @@ export function LogReportView() {
               height: 44,
               borderRadius: 10,
               cursor: state.phase === "analyzing" || !text.trim() ? "default" : "pointer",
-              background: state.phase === "analyzing" || !text.trim() ? C.raised : C.accent,
+              background: state.phase === "analyzing" || !text.trim() ? "var(--raised)" : C.accent,
               color: state.phase === "analyzing" || !text.trim() ? C.text3 : C.ink,
             }}
           >
