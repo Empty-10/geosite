@@ -18,10 +18,12 @@ const STATUS: Record<string, { mark: string; color: string }> = {
 };
 
 export function ScorecardPanel({ scorecard, findings = [] }: { scorecard?: Scorecard | null; findings?: Finding[] }) {
+  const [showRows, setShowRows] = useState(false);
   const byId = new Map(findings.map((f) => [f.id, f]));
   if (!scorecard) return null;
   const { headline_score, technical_score, overlay, categories, rows } = scorecard;
   const hc = scoreColor(headline_score);
+  const needWork = rows.filter((r) => r.status === "warn" || r.status === "fail").length;
 
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 16, background: "var(--surface)", overflow: "hidden", marginBottom: 22 }}>
@@ -59,22 +61,51 @@ export function ScorecardPanel({ scorecard, findings = [] }: { scorecard?: Score
         </div>
       </div>
 
-      {/* 20-row table (expandable) */}
-      <div style={{ borderTop: "1px solid var(--border)" }}>
-        {rows.map((r) => (
-          <Row key={r.n} row={r} byId={byId} />
-        ))}
-      </div>
+      {/* toggle for the dev-detail 20-row breakdown */}
+      <button
+        onClick={() => setShowRows((v) => !v)}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "11px 22px",
+          borderTop: "1px solid var(--border)",
+          background: "transparent",
+          cursor: "pointer",
+          color: "var(--text-2)",
+          fontSize: 12.5,
+        }}
+      >
+        <span style={{ flex: 1, textAlign: "left" }}>
+          {showRows ? "Hide" : "View"} the 20-row breakdown
+        </span>
+        <span style={{ fontSize: 11.5, color: needWork ? C.warn : C.accent, fontFamily: "var(--mono)" }}>
+          {needWork ? `${needWork} need work` : "all clear"}
+        </span>
+        <span style={{ fontSize: 12, color: "var(--text-3)", transform: showRows ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}>⌄</span>
+      </button>
 
-      {/* overlay */}
-      <div style={{ borderTop: "1px solid var(--border)", padding: "10px 22px", display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", background: "var(--ink)" }}>
-        <span style={{ fontSize: 11.5, color: "var(--text-3)", fontFamily: "var(--mono)" }}>overlay +{overlay.total}/{overlay.max}</span>
-        {overlay.factors.map((f) => (
-          <span key={f.name} style={{ fontSize: 11, color: f.points > 0 ? C.accent : "var(--text-3)", fontFamily: "var(--mono)" }}>
-            {f.points > 0 ? "✓" : "·"} {f.name} +{f.points}
-          </span>
-        ))}
-      </div>
+      {showRows && (
+        <>
+          {/* 20-row table (expandable) */}
+          <div style={{ borderTop: "1px solid var(--border)" }}>
+            {rows.map((r) => (
+              <Row key={r.n} row={r} byId={byId} />
+            ))}
+          </div>
+
+          {/* overlay */}
+          <div style={{ borderTop: "1px solid var(--border)", padding: "10px 22px", display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", background: "var(--ink)" }}>
+            <span style={{ fontSize: 11.5, color: "var(--text-3)", fontFamily: "var(--mono)" }}>overlay +{overlay.total}/{overlay.max}</span>
+            {overlay.factors.map((f) => (
+              <span key={f.name} style={{ fontSize: 11, color: f.points > 0 ? C.accent : "var(--text-3)", fontFamily: "var(--mono)" }}>
+                {f.points > 0 ? "✓" : "·"} {f.name} +{f.points}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

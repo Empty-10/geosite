@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(git check-ignore *)",
+      "mcp__google-analytics__get_ga4_data"
+    ]
+  }
+}

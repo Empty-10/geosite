@@ -30,7 +30,7 @@ most pour-over brewers and keeps the total brew time near three minutes.</p>
 def test_scorecard_structure():
     c = _card(GOOD)
     assert set(c) == {"confidence", "headline_score", "technical_score", "overlay", "rows",
-                      "categories", "summary"}
+                      "categories", "summary", "citation"}
     assert c["confidence"] == "verified"
     assert len(c["rows"]) == 20
     assert all(r["n"] == i + 1 for i, r in enumerate(c["rows"]))
@@ -60,6 +60,17 @@ def test_at_risk_page_names_opportunities():
     c = _card("<!doctype html><html><head><title>x</title></head><body></body></html>")
     assert c["summary"]["band"] in {"needs work", "at risk"}
     assert c["summary"]["opportunities"]
+
+
+def test_citation_readiness():
+    good = _card(GOOD)["citation"]
+    assert set(good) == {"band", "score", "reasons"}
+    assert good["band"] in {"well positioned", "partially positioned", "poorly positioned"}
+    assert 0 <= good["score"] <= 100
+    # An empty page is poorly positioned to be cited, with concrete reasons.
+    empty = _card("<!doctype html><html><head><title>x</title></head><body></body></html>")["citation"]
+    assert empty["band"] == "poorly positioned"
+    assert empty["reasons"] and all(set(r) == {"n", "text"} for r in empty["reasons"])
 
 
 def test_rows_map_to_findings():

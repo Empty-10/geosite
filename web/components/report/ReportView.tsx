@@ -4,11 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { C } from "@/lib/tokens";
 import { ToolNav } from "./ToolNav";
+import { CitationBridge } from "./CitationBridge";
 import { ConfidenceLegend } from "./ConfidenceLegend";
 import { DiffBanner } from "./DiffBanner";
 import { ExecutiveSummary } from "./ExecutiveSummary";
 import { FindingsList } from "./FindingsList";
-import { MeasuredCard } from "./MeasuredCard";
 import { PerformancePanel } from "./PerformancePanel";
 import { ScanProgress } from "./ScanProgress";
 import { PillarCards } from "./PillarCards";
@@ -237,6 +237,10 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
   const section = sections[activeTab];
   const sectionFindings = report.findings.filter((f) => f.pillar === section.key);
 
+  // Two-audience layering: the exec view (verdict → score → priority fixes) is always visible;
+  // the dev detail (every check, by pillar) opens on demand.
+  const [showAllChecks, setShowAllChecks] = useState(false);
+
   // Clicking a scored pillar card jumps to its checks (or to the Lighthouse panel).
   const checksRef = useRef<HTMLDivElement>(null);
   const perfRef = useRef<HTMLDivElement>(null);
@@ -247,6 +251,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
     }
     const idx = PILLAR_SECTIONS.findIndex((s) => s.key === key);
     if (idx >= 0) setTab(idx);
+    setShowAllChecks(true);
     checksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -293,7 +298,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
       <div ref={perfRef}>{perfFindings.length > 0 && <PerformancePanel findings={perfFindings} />}</div>
 
       <div style={{ marginBottom: 24 }}>
-        <MeasuredCard />
+        <CitationBridge citation={report.scorecard?.citation} url={finalUrl} />
       </div>
 
       <SectionTitle>Priority fixes — highest score gain first</SectionTitle>
@@ -301,10 +306,33 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
         <FindingsList findings={fixes} fixes={fixMap} url={finalUrl} impacts={impacts} />
       </div>
 
-      {/* per-pillar tabs */}
+      {/* per-pillar tabs — dev detail, collapsed by default */}
       <div ref={checksRef} style={{ scrollMarginTop: 16 }}>
-        <SectionTitle>All checks by pillar — what passed and what to fix</SectionTitle>
-        <div style={{ display: "flex", gap: 8, margin: "10px 0 14px", flexWrap: "wrap" }}>
+        <button
+          onClick={() => setShowAllChecks((v) => !v)}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "12px 14px",
+            border: "1px solid var(--border)",
+            borderRadius: 10,
+            background: "var(--surface)",
+            cursor: "pointer",
+            color: "var(--text)",
+            fontSize: 13,
+            fontWeight: 500,
+            marginBottom: showAllChecks ? 14 : 0,
+          }}
+        >
+          <span style={{ flex: 1, textAlign: "left" }}>All checks by pillar — what passed and what to fix</span>
+          <span style={{ fontSize: 12, color: "var(--text-3)", fontFamily: "var(--mono)" }}>{allFindings.length} checks</span>
+          <span style={{ fontSize: 12, color: "var(--text-3)", transform: showAllChecks ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}>⌄</span>
+        </button>
+        {showAllChecks && (
+          <>
+        <div style={{ display: "flex", gap: 8, margin: "0 0 14px", flexWrap: "wrap" }}>
         {sections.map((s, i) => {
           const active = i === activeTab;
           const score = pillarScores[s.key];
@@ -334,6 +362,8 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
       </div>
         {/* key remounts the list per tab so its expanded-row state resets */}
         <FindingsList key={section.key} findings={sectionFindings} fixes={fixMap} url={finalUrl} openFirst={false} impacts={impacts} />
+          </>
+        )}
       </div>
     </div>
   );

@@ -117,6 +117,7 @@ def build_scorecard(report: Report) -> dict:
         "rows": rows,
         "categories": categories,
         "summary": _summary(headline, rows),
+        "citation": _citation_readiness(rows),
     }
 
 
@@ -143,6 +144,34 @@ _ISSUE_PHRASES: dict[int, str] = {
     19: "fixing technical and indexability issues",
     20: "adding structured data (schema)",
 }
+
+
+# Rows whose signals most directly govern whether an AI engine extracts and cites the page —
+# the bridge from deterministic readiness (VERIFIED) to actual citation (MEASURED, separate tool).
+_CITATION_ROWS: dict[int, str] = {
+    6: "a clear answer front-loaded in the intro",
+    7: "a direct answer block near the top",
+    8: "a summary list near the top",
+    9: "an FAQ section",
+    10: "content broken into short, extractable chunks",
+    11: "lists or tables AI can extract",
+    20: "structured data (schema)",
+}
+
+
+def _citation_readiness(rows: list[dict]) -> dict:
+    """A deterministic read on how *citable* the page is — derived only from the on-page signals
+    answer engines actually use to pick sources. Honest: this is readiness, not a measured rate."""
+    byn = {r["n"]: r for r in rows}
+    present = [byn[n] for n in _CITATION_ROWS if n in byn and byn[n]["score"] is not None]
+    if not present:
+        return {"band": "unknown", "score": None, "reasons": []}
+    score = _round_half(sum(r["score"] for r in present) / len(present))
+    band = ("well positioned" if score >= 80 else
+            "partially positioned" if score >= 50 else "poorly positioned")
+    gaps = sorted((r for r in present if r["status"] in ("warn", "fail")), key=lambda r: r["score"])
+    reasons = [{"n": r["n"], "text": _CITATION_ROWS[r["n"]]} for r in gaps[:4]]
+    return {"band": band, "score": score, "reasons": reasons}
 
 
 def _summary(headline: float, rows: list[dict]) -> dict:

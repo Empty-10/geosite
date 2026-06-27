@@ -19,6 +19,12 @@ export type ScorecardSummary = {
   opportunities: ScorecardOpportunity[];
 };
 
+export type CitationReadiness = {
+  band: string; // well positioned | partially positioned | poorly positioned | unknown
+  score: number | null;
+  reasons: { n: number; text: string }[];
+};
+
 export type Scorecard = {
   confidence: "verified";
   headline_score: number;
@@ -27,4 +33,5 @@ export type Scorecard = {
   rows: ScorecardRow[];
   categories: { label: string; score: number | null }[];
   summary?: ScorecardSummary;
+  citation?: CitationReadiness;
 };
