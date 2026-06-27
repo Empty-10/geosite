@@ -265,6 +265,9 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
           </h1>
           <div style={{ marginLeft: "auto", display: "flex", gap: 14, alignItems: "baseline" }}>
             {report.meta?.scan_id != null && <ShareButton scanId={report.meta.scan_id as number} />}
+            <a href={`/compare?url=${encodeURIComponent(finalUrl)}`} style={{ fontSize: 12.5, color: C.accent, whiteSpace: "nowrap" }}>
+              Compare vs competitors →
+            </a>
             <a href={`/site?url=${encodeURIComponent(finalUrl)}`} style={{ fontSize: 12.5, color: C.accent, whiteSpace: "nowrap" }}>
               Crawl whole site →
             </a>

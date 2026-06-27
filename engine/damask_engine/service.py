@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -31,10 +32,12 @@ from pydantic import BaseModel
 
 from . import store
 from .cloudflare_logs import fetch_cloudflare_logs
+from .compare import compare_reports
 from .config import get_pagespeed_key
 from .crawl import crawl
 from .crawler_logs import analyze_logs
 from .fetch import fetch_pagespeed
+from .models import Report
 from .modules import performance as performance_mod
 from .scanner import scan
 
@@ -69,6 +72,7 @@ app = FastAPI(title="damask engine", version="1", description="GEO/SEO scan engi
 # In-memory crawl jobs. Fine for the single Render instance; evicted oldest-first past a cap.
 _MAX_JOBS = 200
 _MAX_PAGES_CAP = 50
+_MAX_COMPARE = 4  # your page + up to 3 competitors
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 
@@ -80,6 +84,10 @@ class ScanRequest(BaseModel):
 class CrawlRequest(BaseModel):
     url: str
     max_pages: int = 25
+
+
+class CompareRequest(BaseModel):
+    urls: list[str]
 
 
 class LogsRequest(BaseModel):
@@ -117,6 +125,30 @@ def scan_endpoint(req: ScanRequest) -> dict:
         if prev:
             report["meta"]["diff"] = store.diff_reports(prev, report)
     return report
+
+
+def _safe_scan(url: str) -> Report:
+    """Scan one URL for the comparison, never raising — a fetch failure becomes meta.error so one
+    bad competitor URL doesn't sink the whole benchmark."""
+    try:
+        return scan(url, fixes=False)
+    except Exception as exc:  # noqa: BLE001
+        return Report(url=url, meta={"error": f"{type(exc).__name__}: {exc}"})
+
+
+@app.post("/compare")
+def compare_endpoint(req: CompareRequest) -> dict:
+    """Scan 2–4 pages concurrently and return a deterministic side-by-side benchmark.
+
+    The first URL is treated as the primary site ("you"); the rest are competitors. No external
+    APIs, no LLM — just N scans and a row-by-row comparison of their scorecards.
+    """
+    urls = [u.strip() for u in req.urls if u and u.strip()][:_MAX_COMPARE]
+    if len(urls) < 2:
+        raise HTTPException(status_code=400, detail="Provide at least 2 URLs to compare.")
+    with ThreadPoolExecutor(max_workers=len(urls)) as ex:
+        reports = list(ex.map(_safe_scan, urls))  # map preserves input order
+    return {"count": len(urls), "comparison": compare_reports(reports)}
 
 
 @app.get("/history")

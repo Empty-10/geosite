@@ -8,12 +8,13 @@ import { rgba } from "./types";
 
 const TOOLS = [
   { key: "report", href: "/report", label: "Page report" },
+  { key: "compare", href: "/compare", label: "Compare" },
   { key: "site", href: "/site", label: "Site crawl" },
   { key: "crawlers", href: "/crawlers", label: "Crawler logs" },
   { key: "visibility", href: "/visibility", label: "AI visibility" },
 ] as const;
 
-export function ToolNav({ active }: { active: "report" | "site" | "crawlers" | "visibility" }) {
+export function ToolNav({ active }: { active: "report" | "compare" | "site" | "crawlers" | "visibility" }) {
   return (
     <header
       style={{
