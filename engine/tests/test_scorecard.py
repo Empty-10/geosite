@@ -29,12 +29,37 @@ most pour-over brewers and keeps the total brew time near three minutes.</p>
 
 def test_scorecard_structure():
     c = _card(GOOD)
-    assert set(c) == {"confidence", "headline_score", "technical_score", "overlay", "rows", "categories"}
+    assert set(c) == {"confidence", "headline_score", "technical_score", "overlay", "rows",
+                      "categories", "summary"}
     assert c["confidence"] == "verified"
     assert len(c["rows"]) == 20
     assert all(r["n"] == i + 1 for i, r in enumerate(c["rows"]))
+    assert all("impact" in r for r in c["rows"])
     assert 0 <= c["headline_score"] <= 100
     assert c["headline_score"] * 2 == round(c["headline_score"] * 2)  # rounded to 0.5
+
+
+def test_summary_shape_and_band():
+    s = _card(GOOD)["summary"]
+    assert set(s) == {"band", "verdict", "opportunities"}
+    assert s["band"] in {"strong", "solid", "needs work", "at risk"}
+    assert isinstance(s["verdict"], str) and s["verdict"]
+    assert len(s["opportunities"]) <= 3
+    for o in s["opportunities"]:
+        assert set(o) == {"n", "text", "impact"} and o["impact"] > 0
+
+
+def test_row_impact_zero_for_perfect_or_na_rows():
+    for r in _card(GOOD)["rows"]:
+        if r["score"] is None or r["score"] == 100:
+            assert r["impact"] == 0.0
+
+
+def test_at_risk_page_names_opportunities():
+    # An all-but-empty page collapses to a low-band verdict with concrete opportunities.
+    c = _card("<!doctype html><html><head><title>x</title></head><body></body></html>")
+    assert c["summary"]["band"] in {"needs work", "at risk"}
+    assert c["summary"]["opportunities"]
 
 
 def test_rows_map_to_findings():

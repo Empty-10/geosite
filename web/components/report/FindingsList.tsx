@@ -4,7 +4,7 @@ import { useState } from "react";
 import { C } from "@/lib/tokens";
 import { AiDraftBlock } from "./AiDraftBlock";
 import { FixBlock } from "./FixBlock";
-import { conf, GENERATIVE_FINDINGS, rgba, sev, type Finding, type Fix } from "./types";
+import { conf, effortOf, GENERATIVE_FINDINGS, rgba, sev, type Finding, type Fix } from "./types";
 
 const STATUS: Record<string, { label: string; color: string }> = {
   fail: { label: "Fail", color: C.fail },
@@ -22,11 +22,12 @@ function statusOf(s: string) {
  * (no modals, per the design brief). Used for the priority-fix list and per-pillar checks.
  * Parents that swap the `findings` set (e.g. pillar tabs) should pass a `key` to remount.
  */
-export function FindingsList({ findings, fixes = {}, url, openFirst = true }: {
+export function FindingsList({ findings, fixes = {}, url, openFirst = true, impacts = {} }: {
   findings: Finding[];
   fixes?: Record<string, Fix>;
   url?: string; // when set, generative findings get an on-demand "Draft with AI" button
   openFirst?: boolean;
+  impacts?: Record<string, number>; // finding id → headline points gained if fixed
 }) {
   const [expanded, setExpanded] = useState<string | null>(openFirst ? findings[0]?.id ?? null : null);
 
@@ -102,6 +103,28 @@ export function FindingsList({ findings, fixes = {}, url, openFirst = true }: {
                 </span>
               )}
               <span style={{ flex: 1, fontSize: 13.5, color: "var(--text)" }}>{f.title}</span>
+              {issue && impacts[f.id] > 0 && (
+                <span
+                  title="Estimated gain to your readiness score if fixed"
+                  style={{ fontSize: 11.5, color: C.accent, fontFamily: "var(--mono)", flexShrink: 0 }}
+                >
+                  +{impacts[f.id]}
+                </span>
+              )}
+              {issue && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text-3)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 6,
+                    padding: "2px 7px",
+                    flexShrink: 0,
+                  }}
+                >
+                  {effortOf(f.id).label}
+                </span>
+              )}
               <span
                 style={{
                   display: "inline-flex",

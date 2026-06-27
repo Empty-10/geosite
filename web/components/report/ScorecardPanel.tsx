@@ -41,6 +41,9 @@ export function ScorecardPanel({ scorecard, findings = [] }: { scorecard?: Score
           <div style={{ fontSize: 11.5, color: "var(--text-3)", fontFamily: "var(--mono)", marginTop: 6 }}>
             technical {technical_score} + overlay {overlay.total}
           </div>
+          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 6, lineHeight: 1.45, maxWidth: 210 }}>
+            On-page readiness for AI answer engines — deterministic, not a measured citation rate.
+          </div>
         </div>
 
         <div style={{ flex: 1, minWidth: 240, display: "flex", flexDirection: "column", gap: 7 }}>

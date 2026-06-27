@@ -90,8 +90,19 @@ def build_scorecard(report: Report) -> dict:
 
     overlay = _overlay(byid)
     scored = [r["score"] for r in rows if r["score"] is not None]
-    technical = sum(scored) / len(scored) if scored else 0.0
+    n = len(scored)
+    technical = sum(scored) / n if n else 0.0
     headline = min(100.0, technical + overlay["total"])
+
+    # Per-row "impact": how many headline points this row would add if brought to full marks
+    # (capped at the 0–100 ceiling). Lets the report rank fixes by ROI, not just severity.
+    for r in rows:
+        s = r["score"]
+        if s is not None and s < 100 and n:
+            gained = min(100.0, technical + (100.0 - s) / n + overlay["total"]) - headline
+            r["impact"] = _round_half(max(0.0, gained))
+        else:
+            r["impact"] = 0.0
 
     categories = []
     for clabel, nums in CATEGORIES:
@@ -105,7 +116,69 @@ def build_scorecard(report: Report) -> dict:
         "overlay": overlay,
         "rows": rows,
         "categories": categories,
+        "summary": _summary(headline, rows),
     }
+
+
+# Brand-readable phrasing for the verdict, keyed by row number — plain English, not jargon.
+_ISSUE_PHRASES: dict[int, str] = {
+    1: "clarifying the page's identity and intent",
+    2: "improving the title tag",
+    3: "improving the meta description",
+    4: "fixing the URL and canonical setup",
+    5: "fixing the heading structure",
+    6: "front-loading a clear answer in the intro",
+    7: "adding a direct answer block near the top",
+    8: "adding a summary list near the top",
+    9: "adding a proper FAQ section",
+    10: "breaking content into short, extractable chunks",
+    11: "adding lists or tables AI can extract",
+    12: "improving internal links and anchor text",
+    13: "adding semantic link attributes",
+    14: "linking out to authoritative sources",
+    15: "fixing image alt text and dimensions",
+    16: "fixing accessibility basics",
+    17: "improving page performance",
+    18: "strengthening authority and trust signals (E-E-A-T)",
+    19: "fixing technical and indexability issues",
+    20: "adding structured data (schema)",
+}
+
+
+def _summary(headline: float, rows: list[dict]) -> dict:
+    """A deterministic, plain-English verdict + the top opportunities, ranked by headline impact.
+
+    Pure presentation derived from the rows — the same brand-facing summary the web report, MCP
+    tool and WordPress plugin all render, so they never tell different stories.
+    """
+    if headline >= 85:
+        band, lead = "strong", "This page is well-structured for AI answer engines."
+    elif headline >= 70:
+        band, lead = "solid", "This page is mostly ready for AI answer engines, with a few gaps holding it back."
+    elif headline >= 50:
+        band, lead = "needs work", "This page has real gaps that make it hard for AI engines to retrieve and cite."
+    else:
+        band, lead = "at risk", "AI answer engines will struggle to retrieve or cite this page as it stands."
+
+    opps = sorted(
+        (r for r in rows if r["status"] in ("warn", "fail") and r.get("impact", 0) > 0),
+        key=lambda r: r["impact"], reverse=True,
+    )[:3]
+    opportunities = [
+        {"n": r["n"], "text": _ISSUE_PHRASES.get(r["n"], r["label"]), "impact": r["impact"]}
+        for r in opps
+    ]
+
+    if opportunities:
+        names = [o["text"] for o in opportunities]
+        tail = names[0] if len(names) == 1 else (
+            f"{names[0]} and {names[1]}" if len(names) == 2
+            else f"{names[0]}, {names[1]}, and {names[2]}")
+        verdict = f"{lead} The biggest opportunities are {tail}."
+    else:
+        verdict = f"{lead} No major issues — only minor refinements remain."
+
+    return {"band": band, "verdict": verdict, "opportunities": opportunities}
 
 
 def _apply_gate(num: int, score: float, byid: dict) -> float:

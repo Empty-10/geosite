@@ -4,6 +4,39 @@
 import { C } from "@/lib/tokens";
 import type { Scorecard } from "./scorecardTypes";
 
+// Rough remediation effort per check — lets the report frame fixes by ROI (impact vs effort).
+// Quick = a templated/one-line change; Involved = server/infra work; everything else Moderate.
+const EFFORT_QUICK = new Set([
+  "title.length", "title.missing", "meta.description.length", "meta.description.missing",
+  "canonical", "onpage.url", "robots.noindex", "robots.indexable", "tech.x_robots_tag",
+  "opengraph", "onpage.snippet_directives", "onpage.hreflang", "onpage.lang", "onpage.form_labels",
+  "images.alt", "onpage.images.dims", "schema.jsonld", "schema.missing", "schema.validation",
+  "tech.llms_txt", "tech.security_headers", "tech.compression", "tech.resource_hints",
+  "tech.viewport", "tech.robots.missing", "tech.robots.ai", "tech.sitemap.missing",
+]);
+const EFFORT_INVOLVED = new Set([
+  "tech.https", "tech.tls", "tech.hsts", "tech.redirect", "tech.redirect.chain",
+  "tech.mixed_content", "geo.js_rendered", "perf.score", "perf.lcp", "perf.cls", "perf.tbt",
+  "perf.fcp", "perf.si", "perf.field",
+]);
+
+export function effortOf(id: string): { label: string; rank: number } {
+  if (EFFORT_QUICK.has(id)) return { label: "Quick fix", rank: 0 };
+  if (EFFORT_INVOLVED.has(id)) return { label: "Involved", rank: 2 };
+  return { label: "Moderate", rank: 1 };
+}
+
+/** Map each finding id → the headline points its scorecard row would gain if fully fixed. */
+export function impactByFinding(scorecard?: Scorecard | null): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of scorecard?.rows ?? []) {
+    if (r.impact && r.impact > 0) {
+      for (const id of r.findings) out[id] = Math.max(out[id] ?? 0, r.impact);
+    }
+  }
+  return out;
+}
+
 export type Finding = {
   id: string;
   pillar: string;
@@ -100,9 +133,15 @@ export function conf(c: string) {
   return CONF[c] ?? CONF.verified;
 }
 
-/** Failing/warning findings, most urgent first — the actionable "priority fixes" list. */
-export function priorityFixes(findings: Finding[]): Finding[] {
+/**
+ * Failing/warning findings, ranked for action. When scorecard impact is available we lead with
+ * biggest score gain (ROI), falling back to severity; otherwise pure severity order.
+ */
+export function priorityFixes(findings: Finding[], impacts: Record<string, number> = {}): Finding[] {
   return findings
     .filter((f) => f.status === "fail" || f.status === "warn")
-    .sort((a, b) => sev(a.severity).rank - sev(b.severity).rank);
+    .sort((a, b) => {
+      const di = (impacts[b.id] ?? 0) - (impacts[a.id] ?? 0);
+      return di !== 0 ? di : sev(a.severity).rank - sev(b.severity).rank;
+    });
 }

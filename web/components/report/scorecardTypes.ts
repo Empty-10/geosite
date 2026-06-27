@@ -6,9 +6,18 @@ export type ScorecardRow = {
   score: number | null;
   status: string; // pass | warn | fail | n/a
   findings: string[];
+  impact?: number; // headline points this row would add if brought to full marks
 };
 
 export type OverlayFactor = { name: string; points: number; max: number };
+
+export type ScorecardOpportunity = { n: number; text: string; impact: number };
+
+export type ScorecardSummary = {
+  band: string; // strong | solid | needs work | at risk
+  verdict: string;
+  opportunities: ScorecardOpportunity[];
+};
 
 export type Scorecard = {
   confidence: "verified";
@@ -17,4 +26,5 @@ export type Scorecard = {
   overlay: { total: number; max: number; factors: OverlayFactor[] };
   rows: ScorecardRow[];
   categories: { label: string; score: number | null }[];
+  summary?: ScorecardSummary;
 };

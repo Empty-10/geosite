@@ -6,6 +6,7 @@ import { C } from "@/lib/tokens";
 import { ToolNav } from "./ToolNav";
 import { ConfidenceLegend } from "./ConfidenceLegend";
 import { DiffBanner } from "./DiffBanner";
+import { ExecutiveSummary } from "./ExecutiveSummary";
 import { FindingsList } from "./FindingsList";
 import { MeasuredCard } from "./MeasuredCard";
 import { PerformancePanel } from "./PerformancePanel";
@@ -15,7 +16,7 @@ import { ScorecardPanel } from "./ScorecardPanel";
 import { ScoreRing } from "./ScoreRing";
 import { RenderTag } from "./RenderTag";
 import { usePerformance } from "./usePerformance";
-import { fixesByFinding, PILLAR_SECTIONS, priorityFixes, rgba, type Report } from "./types";
+import { fixesByFinding, impactByFinding, PILLAR_SECTIONS, priorityFixes, rgba, type Report } from "./types";
 
 type State =
   | { phase: "empty" }
@@ -227,7 +228,8 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
 
   const pillarScores = { ...report.pillar_scores, ...pillarOverride };
   const allFindings = perfFindings.length ? [...report.findings, ...perfFindings] : report.findings;
-  const fixes = priorityFixes(allFindings);
+  const impacts = impactByFinding(report.scorecard);
+  const fixes = priorityFixes(allFindings, impacts);
 
   // Performance detail gets its own "Google Lighthouse" panel (below), not a pillar tab.
   const sections = PILLAR_SECTIONS;
@@ -271,6 +273,8 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
 
       <DiffBanner meta={report.meta} />
 
+      <ExecutiveSummary scorecard={report.scorecard} />
+
       <ScorecardPanel scorecard={report.scorecard} findings={allFindings} />
 
       <div style={{ marginBottom: 18 }}>
@@ -292,9 +296,9 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
         <MeasuredCard />
       </div>
 
-      <SectionTitle>Priority fixes</SectionTitle>
+      <SectionTitle>Priority fixes — highest score gain first</SectionTitle>
       <div style={{ marginBottom: 28 }}>
-        <FindingsList findings={fixes} fixes={fixMap} url={finalUrl} />
+        <FindingsList findings={fixes} fixes={fixMap} url={finalUrl} impacts={impacts} />
       </div>
 
       {/* per-pillar tabs */}
@@ -329,7 +333,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
         })}
       </div>
         {/* key remounts the list per tab so its expanded-row state resets */}
-        <FindingsList key={section.key} findings={sectionFindings} fixes={fixMap} url={finalUrl} openFirst={false} />
+        <FindingsList key={section.key} findings={sectionFindings} fixes={fixMap} url={finalUrl} openFirst={false} impacts={impacts} />
       </div>
     </div>
   );
