@@ -24,6 +24,9 @@ export function ScanProgress({ url }: { url?: string }) {
     return () => timers.forEach(clearTimeout);
   }, []);
 
+  // Every module (except the on-demand Performance one) has ticked done.
+  const allDone = status.every((s, i) => i === PERF_INDEX || s === 2);
+
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--surface)", padding: 18 }}>
       <div style={{ fontSize: 13.5, color: "var(--text)", marginBottom: 14, fontFamily: "var(--mono)" }}>
@@ -75,10 +78,15 @@ export function ScanProgress({ url }: { url?: string }) {
           );
         })}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, fontSize: 12, color: "var(--text-3)" }}>
-        <span style={{ width: 12, height: 12, borderRadius: "50%", border: "1.5px solid var(--border-strong)", borderTopColor: C.accent, animation: "dmSpin 0.7s linear infinite" }} />
-        Compiling your report…
-      </div>
+      {allDone && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginTop: 28, marginBottom: 8, textAlign: "center", animation: "dmFade 0.3s ease both" }}>
+          <span style={{ width: 26, height: 26, borderRadius: "50%", border: "2.5px solid var(--border-strong)", borderTopColor: C.accent, animation: "dmSpin 0.75s linear infinite" }} />
+          <div style={{ fontSize: 15, color: "var(--text)", fontWeight: 500 }}>Compiling your findings…</div>
+          <div style={{ fontSize: 12.5, color: "var(--text-3)", maxWidth: 320 }}>
+            This usually takes 20–30 seconds (longer on the first scan after a quiet period).
+          </div>
+        </div>
+      )}
     </div>
   );
 }
