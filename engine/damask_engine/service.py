@@ -42,10 +42,15 @@ from .scanner import scan
 # installed, so claude.ai / Claude Desktop can call audit_url & scan_url over HTTP. Without the
 # extra the REST API still works exactly the same — the mount is simply skipped.
 try:
+    from mcp.server.transport_security import TransportSecuritySettings
+
     from .mcp_server import mcp as _mcp
 
     _mcp.settings.stateless_http = True       # no per-session state — fine for our scan tools
     _mcp.settings.streamable_http_path = "/"  # so mounting at /mcp gives the endpoint /mcp
+    # DNS-rebinding protection defaults to localhost-only, which 421s a public host (Render). This
+    # is a public endpoint reached at an arbitrary host, so turn it off.
+    _mcp.settings.transport_security = TransportSecuritySettings(enable_dns_rebinding_protection=False)
     _mcp_app = _mcp.streamable_http_app()
 
     @asynccontextmanager
