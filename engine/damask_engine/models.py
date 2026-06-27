@@ -25,7 +25,9 @@ from typing import Any
 #     root-cause finding (and tanks the GEO scorecard rows honestly).
 # v9: cheap coverage gaps — Open Graph/Twitter completeness (opengraph), onpage.heading_order,
 #     onpage.crawlable_anchors, onpage.hreflang.
-SCHEMA_VERSION = "9"
+# v10: scorecard `summary` (verdict + impact-ranked opportunities), per-row `impact`, `citation`
+#     readiness; geo.bot_access — "what the AI bot saw" (fetch-as-GPTBot WAF/cloaking check).
+SCHEMA_VERSION = "10"
 
 
 class Confidence(str, Enum):

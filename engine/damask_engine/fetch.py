@@ -18,6 +18,10 @@ import requests
 from .config import get_cloudflare
 
 USER_AGENT = "damaskbot/0.1 (+https://example.com/bot; GEO/SEO scanner)"
+# OpenAI's documented GPTBot UA — the most widely enforced AI crawler. We probe with it to see
+# what AI answer engines actually receive (WAF/CDN blocks, challenge pages, cloaked content).
+GPTBOT_UA = ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; "
+             "GPTBot/1.1; +https://openai.com/gptbot")
 TIMEOUT = 20
 RESOURCE_TIMEOUT = 10
 RENDER_TIMEOUT_MS = 15000
@@ -37,6 +41,15 @@ class FetchResult:
     redirect_chain: list[tuple[int, str]] = field(default_factory=list)
     # DOM after JS execution (Playwright). None when rendering was off or unavailable.
     rendered_html: str | None = None
+    error: str | None = None
+
+
+@dataclass
+class BotFetch:
+    """What an AI crawler is served — a lightweight GET under an AI-crawler user agent."""
+    status_code: int
+    word_count: int  # visible words in the served HTML (no JS executed — like the bot)
+    final_url: str
     error: str | None = None
 
 
@@ -74,6 +87,20 @@ def fetch(url: str, *, render: bool = False) -> FetchResult:
     if render and result.html:
         result.rendered_html = render_dom(result.final_url)
     return result
+
+
+def fetch_as_bot(url: str, ua: str = GPTBOT_UA) -> BotFetch:
+    """GET a URL as an AI crawler to see what it's actually served — catching WAF/CDN blocks,
+    challenge pages and cloaking that robots.txt parsing can't see. Lightweight (status + visible
+    word count, no JS execution — exactly the bot's view). Never raises."""
+    from .util import make_soup, visible_text, word_count
+    try:
+        resp = requests.get(url, headers={"User-Agent": ua, "Accept": "text/html,*/*"},
+                            timeout=TIMEOUT, allow_redirects=True)
+        words = word_count(visible_text(make_soup(resp.text))) if resp.text else 0
+        return BotFetch(status_code=resp.status_code, word_count=words, final_url=resp.url)
+    except requests.RequestException as exc:
+        return BotFetch(status_code=0, word_count=0, final_url=url, error=str(exc))
 
 
 def render_dom_cloudflare(url: str) -> str | None:

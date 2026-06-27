@@ -5,10 +5,11 @@ from __future__ import annotations
 from urllib.parse import urljoin, urlparse
 
 from .config import get_pagespeed_key
-from .fetch import FetchResult, fetch, fetch_pagespeed, fetch_resource, render_dom_cloudflare, tls_info
+from .fetch import (BotFetch, FetchResult, fetch, fetch_as_bot, fetch_pagespeed, fetch_resource,
+                    render_dom_cloudflare, tls_info)
 from .fixes import generate_fixes
 from .models import Pillar, Report
-from .modules import geo_readiness, onpage, performance, technical
+from .modules import bot_view, geo_readiness, onpage, performance, technical
 from .modules.technical import NetInputs, parse_robots
 from .scorecard import build_scorecard
 from .scoring import build_report
@@ -18,7 +19,8 @@ from .util import make_soup, visible_text, word_count
 def scan_html(url: str, html: str, *, online: bool = False,
               status_code: int = 200, headers: dict | None = None,
               final_url: str | None = None, net: NetInputs | None = None,
-              performance_psi: dict | None = None, fixes: bool = False) -> Report:
+              performance_psi: dict | None = None, fixes: bool = False,
+              bot: BotFetch | None = None, normal_raw_words: int | None = None) -> Report:
     """Run all modules against already-fetched HTML. Offline-safe (used by tests).
 
     Network-derived material (robots.txt, sitemap, TLS, redirects, PageSpeed) is passed in
@@ -33,6 +35,8 @@ def scan_html(url: str, html: str, *, online: bool = False,
     findings += onpage.analyze(soup, text, final_url)
     findings += technical.analyze(soup, final_url, status_code, headers, net=net)
     findings += geo_readiness.analyze(soup, text, render_delta=net.render_delta if net else None)
+    nrw = normal_raw_words if normal_raw_words is not None else word_count(text)
+    findings += bot_view.analyze(status_code, nrw, bot)
 
     overrides: dict[Pillar, int] = {}
     if performance_psi is not None:
@@ -159,10 +163,15 @@ def scan(url: str, *, render: bool = False, performance: bool = False,
         psi = fetch_pagespeed(res.final_url, get_pagespeed_key())
         meta_extra["performance_checked"] = psi is not None
 
+    # "What the AI bot saw": fetch as GPTBot to catch WAF/CDN blocks & cloaking, and compare against
+    # the raw (non-JS) word count a non-rendering crawler would also see.
+    bot = fetch_as_bot(res.final_url)
+    normal_raw_words = word_count(visible_text(make_soup(res.html)))
+
     report = scan_html(
         url, html_to_scan, online=True, status_code=res.status_code,
         headers=res.headers, final_url=res.final_url, net=_gather_network(res),
-        performance_psi=psi, fixes=fixes,
+        performance_psi=psi, fixes=fixes, bot=bot, normal_raw_words=normal_raw_words,
     )
     report.meta.update(meta_extra)
     return report

@@ -56,6 +56,8 @@ def generate_fixes(soup: BeautifulSoup, report: Report, url: str) -> list[Fix]:
         fixes.append(_fix_robots(url, "tech.robots.missing"))
     elif "tech.robots.ai" in ids:
         fixes.append(_fix_robots(url, "tech.robots.ai"))
+    elif "geo.bot_access" in ids:
+        fixes.append(_fix_robots(url, "geo.bot_access"))
     if "tech.llms_txt" in {f.id for f in report.findings if f.value is False}:
         fixes.append(_fix_llms(soup, url))
 

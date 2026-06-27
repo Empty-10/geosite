@@ -50,7 +50,8 @@ ROWS: list[tuple[int, str, list[str]]] = [
                                                  "tech.sitemap.missing", "tech.sitemap.invalid",
                                                  "tech.sitemap.freshness", "tech.security_headers",
                                                  "tech.index_conflict", "onpage.snippet_directives",
-                                                 "onpage.hreflang", "geo.js_rendered", "tech.llms_txt"]),
+                                                 "onpage.hreflang", "geo.js_rendered", "geo.bot_access",
+                                                 "tech.llms_txt"]),
     (20, "Structured Data & Schema", ["schema.jsonld", "schema.missing", "schema.validation"]),
 ]
 
@@ -116,7 +117,7 @@ def build_scorecard(report: Report) -> dict:
         "overlay": overlay,
         "rows": rows,
         "categories": categories,
-        "summary": _summary(headline, rows),
+        "summary": _summary(headline, rows, byid),
         "citation": _citation_readiness(rows),
     }
 
@@ -174,7 +175,7 @@ def _citation_readiness(rows: list[dict]) -> dict:
     return {"band": band, "score": score, "reasons": reasons}
 
 
-def _summary(headline: float, rows: list[dict]) -> dict:
+def _summary(headline: float, rows: list[dict], byid: dict) -> dict:
     """A deterministic, plain-English verdict + the top opportunities, ranked by headline impact.
 
     Pure presentation derived from the rows — the same brand-facing summary the web report, MCP
@@ -207,7 +208,17 @@ def _summary(headline: float, rows: list[dict]) -> dict:
     else:
         verdict = f"{lead} No major issues — only minor refinements remain."
 
-    return {"band": band, "verdict": verdict, "opportunities": opportunities}
+    # A hard AI-crawler block trumps everything else: you can't be cited if the bot can't fetch
+    # the page. Lead the verdict with it and make it the first opportunity.
+    bot = byid.get("geo.bot_access")
+    if bot is not None and bot.status == Status.FAIL and isinstance(bot.value, dict) and bot.value.get("blocked"):
+        verdict = ("AI crawlers are currently blocked from this page — they can't cite what they "
+                   "can't read. Unblock GPTBot, ClaudeBot and PerplexityBot at your CDN/WAF and in "
+                   "robots.txt first. ") + verdict
+        opportunities = [{"n": 19, "text": "unblocking AI crawlers at your CDN/WAF", "impact": 0}
+                         ] + [o for o in opportunities if o["text"] != "fixing technical and indexability issues"]
+
+    return {"band": band, "verdict": verdict, "opportunities": opportunities[:3]}
 
 
 def _apply_gate(num: int, score: float, byid: dict) -> float:
