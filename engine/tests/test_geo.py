@@ -108,6 +108,48 @@ def test_trust_warn_when_signals_sparse():
     assert f.value["count"] < 3
 
 
+def test_trust_ignores_decorative_author_class_and_bare_time():
+    # A decorative author-avatar (image only) + a <time> without datetime are no longer counted.
+    html = """<body>
+      <div class="author-avatar"><img src="a.png"></div>
+      <time>recently</time>
+      <p>Body copy that is plenty long but carries no real trust signals at all here.</p>
+    </body>"""
+    f = run(html)["geo.trust"]
+    assert "author byline" not in f.value["present"]
+    assert "published/updated date" not in f.value["present"]
+
+
+# ------------------------------------------------------------ structure: navigation lists excluded
+
+def test_structure_warns_when_only_nav_lists():
+    html = """<body><nav><ul><li><a href="/a">Home</a></li><li><a href="/b">About</a></li></ul></nav>
+      <p>Some prose with no content list or table anywhere on the page at all.</p></body>"""
+    f = run(html)["geo.structure"]
+    assert f.status == Status.WARN
+    assert f.value["lists"] == 0
+
+
+def test_structure_passes_on_content_list():
+    html = ("<body><p>Here is a short guide to brewing better coffee at home today.</p>"
+            "<ul><li>Use thirty grams of coffee</li><li>Bloom for thirty seconds</li></ul></body>")
+    assert run(html)["geo.structure"].status == Status.PASS
+
+
+# ----------------------------------------------------------------- front-load: real answer sentence
+
+def test_frontload_warns_on_fragmented_opening():
+    # Headings + short fragments, no complete (punctuated) sentence in the opening.
+    html = ("<body><h1>Best Coffee Beans</h1><h2>Fast Delivery</h2><h2>Cheap Prices</h2>"
+            "<ul><li>Free Shipping</li><li>Great Taste</li><li>Buy It Today</li></ul></body>")
+    assert run(html)["geo.frontload"].status == Status.WARN
+
+
+def test_frontload_passes_with_real_opening_sentence():
+    html = "<body><p>Pour-over coffee uses a one to sixteen ratio of grounds to water brewed slowly.</p></body>"
+    assert run(html)["geo.frontload"].status == Status.PASS
+
+
 # ------------------------------------------------------------------ JS-dependent content
 
 def js(raw: int, rendered: int, **extra):

@@ -77,16 +77,25 @@ def analyze(soup: BeautifulSoup, text: str, render_delta: dict | None = None) ->
             out.append(_js_render_check(render_delta))
         return out
 
-    # --- front-loading: do the first ~150 words carry a real answer? ---
-    first = words[:150]
+    # --- front-loading: does the opening lead with a real answer sentence (not preamble)? ---
+    # Stronger than a raw word count: the first ~150 words must contain a complete declarative
+    # sentence, not just headings, taglines or navigation fragments.
+    opening = " ".join(words[:150])
+    # Only count spans that actually terminate with sentence punctuation — a run of headings,
+    # taglines or menu items (no full stops) won't masquerade as one long "sentence".
+    candidates = re.findall(r"[^.!?]*[.!?]", opening)
+    lead = next((c.strip() for c in candidates if len(c.split()) >= MIN_ANSWER_WORDS), None)
+    front_ok = lead is not None
     out.append(Finding(
         "geo.frontload", P, "Front-loaded answer",
-        Status.PASS if len(first) >= 40 else Status.WARN, Severity.HIGH, C,
-        value=len(first),
-        evidence=" ".join(first[:30]) + ("…" if len(first) > 30 else ""),
-        recommendation=None if len(first) >= 40 else
-        "Open with a direct, complete answer in the first ~150 words — AI extracts from "
-        "the top of the page.",
+        Status.PASS if front_ok else Status.WARN, Severity.HIGH, C,
+        value={"opening_words": len(words[:150]), "has_answer_sentence": front_ok},
+        evidence=(f"opens with: “{(lead[:120] + '…') if len(lead) > 120 else lead}”" if front_ok
+                  else "the first ~150 words hold no complete answer sentence (headings, taglines "
+                       "or fragments only)"),
+        recommendation=None if front_ok else
+        "Open with a direct, complete answer sentence in the first ~150 words — not a heading, "
+        "tagline or menu. AI engines extract from the very top of the page.",
     ))
 
     # --- definitive vs hedged language ---
@@ -103,17 +112,22 @@ def analyze(soup: BeautifulSoup, text: str, render_delta: dict | None = None) ->
             "confident, direct language.",
         ))
 
-    # --- extractable structure: lists & tables ---
-    lists = len(soup.find_all(["ul", "ol"]))
-    tables = len(soup.find_all("table"))
-    has_structure = (lists + tables) > 0
+    # --- extractable structure: content lists & tables (navigation menus don't count) ---
+    all_lists = soup.find_all(["ul", "ol"])
+    content_lists = [lst for lst in all_lists if not _is_nav_list(lst)]
+    tables = soup.find_all("table")
+    has_structure = (len(content_lists) + len(tables)) > 0
+    nav_only = not has_structure and len(all_lists) > 0
     out.append(Finding(
         "geo.structure", P, "Extractable structure (lists/tables)",
         Status.PASS if has_structure else Status.WARN, Severity.MEDIUM, C,
-        value={"lists": lists, "tables": tables},
-        recommendation=None if has_structure else
-        "Add lists/tables and short paragraphs — AI engines lift discrete chunks, and "
-        "AI Overviews favour list formatting.",
+        value={"lists": len(content_lists), "tables": len(tables)},
+        evidence="only navigation menus found — no content lists or tables" if nav_only else None,
+        recommendation=None if has_structure else (
+            "Add a real content list or table near the answer — the lists on this page are "
+            "navigation menus, which AI engines ignore." if nav_only else
+            "Add lists/tables and short paragraphs — AI engines lift discrete chunks, and AI "
+            "Overviews favour list formatting."),
     ))
 
     # --- question-style headings (match the way people prompt) ---
@@ -511,22 +525,43 @@ def _faq(soup: BeautifulSoup) -> Finding:
 # ----------------------------------------------------------------------------- trust/E-E-A-T
 
 
-def _trust(soup: BeautifulSoup) -> Finding:
-    def has_class(substr: str) -> bool:
-        return bool(soup.find(class_=lambda c: c and substr in " ".join(c).lower()
-                              if isinstance(c, list) else c and substr in c.lower()))
+def _author_by_class(soup: BeautifulSoup) -> bool:
+    """A class-name author signal — but only when it wraps a short, name-like text (a real byline),
+    not a decorative 'author-avatar'/'author-photo' wrapper. Cuts class-sniffing false positives."""
+    def cls_match(c) -> bool:
+        if not c:
+            return False
+        joined = " ".join(c).lower() if isinstance(c, list) else str(c).lower()
+        return "author" in joined or "byline" in joined
 
+    for el in soup.find_all(class_=cls_match):
+        if el.name in ("img", "svg", "picture"):
+            continue
+        txt = el.get_text(" ", strip=True)
+        if 1 <= len(txt.split()) <= 6 and any(ch.isalpha() for ch in txt):
+            return True
+    return False
+
+
+def _trust(soup: BeautifulSoup) -> Finding:
+    objs = _jsonld_objects(soup)
+
+    # Strong, explicit author signals (markup/metadata) first, then the stricter class fallback.
     author = bool(
         soup.find("meta", attrs={"name": "author"})
         or soup.find(attrs={"rel": "author"})
         or soup.find(attrs={"itemprop": "author"})
-        or has_class("author") or has_class("byline")
-    )
+        or any(o.get("author") for o in objs)
+    ) or _author_by_class(soup)
+
+    # A real published/updated date — a <time datetime>, a date meta/itemprop, or JSON-LD date.
+    # A bare <time> with no datetime attribute no longer counts (too easy a false positive).
     date = bool(
-        soup.find("time")
+        soup.find("time", attrs={"datetime": True})
         or soup.find("meta", attrs={"property": "article:published_time"})
         or soup.find("meta", attrs={"property": "article:modified_time"})
         or soup.find(attrs={"itemprop": lambda v: v in ("datePublished", "dateModified")})
+        or any(o.get("datePublished") or o.get("dateModified") for o in objs)
     )
     anchors = soup.find_all("a")
     hrefs = " ".join((a.get("href") or "").lower() for a in anchors)
@@ -535,7 +570,7 @@ def _trust(soup: BeautifulSoup) -> Finding:
                      and ("/contact" in hrefs or "contact" in labels))
     entity_sameas = any(
         (_types_of(o) & {"organization", "person"}) and o.get("sameAs")
-        for o in _jsonld_objects(soup)
+        for o in objs
     )
 
     signals = {
@@ -553,7 +588,7 @@ def _trust(soup: BeautifulSoup) -> Finding:
         evidence=("present: " + ", ".join(present) if present else "none found")
         + ("; missing: " + ", ".join(missing) if missing else ""),
         recommendation=None if ok else
-        "Add author/E-E-A-T signals: a visible author byline, a published/updated date, "
-        "About + Contact links, and Organization/Person JSON-LD with sameAs — strong "
-        "citation-trust factors.",
+        "Add author/E-E-A-T signals: a visible author byline, a published/updated date (a <time "
+        "datetime> or Article JSON-LD with datePublished), About + Contact links, and "
+        "Organization/Person JSON-LD with sameAs — strong citation-trust factors.",
     )
