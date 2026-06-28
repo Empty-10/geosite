@@ -12,6 +12,7 @@ into ChatGPT and score it" workflow.
 |---|---|
 | `audit_url(url)` | AI Retrievability scorecard — headline 0–100, the 20-row breakdown, category scores, the +8 overlay, and the top prioritised issues with fix recommendations. |
 | `scan_url(url)`  | Full report — every finding (on-page / technical / GEO-readiness) with status, severity, evidence, recommendation, plus pillar scores and the scorecard. |
+| `fix_plan(url)`  | A complete, **agent-actionable** remediation plan, ordered by severity. Each item: the `finding_id` it resolves, an `action` (`create_file` / `add_to_head` / `rewrite_content` / `review`), a `target` location hint, the exact `content` to apply (deterministic fixes), a plain-English `instruction`, `source` (`deterministic` \| `advisory`) and `ai_draftable`. **damask diagnoses; the dev's coding agent applies the fix to the files** — so "audit my project and fix everything" becomes a loop: `fix_plan` → apply → `audit_url` to confirm. |
 
 ## Run
 

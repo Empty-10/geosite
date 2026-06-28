@@ -49,4 +49,21 @@ def test_tools_are_registered():
 
     tools = anyio.run(srv.mcp.list_tools)
     names = {t.name for t in tools}
-    assert {"audit_url", "scan_url"} <= names
+    assert {"audit_url", "scan_url", "fix_plan"} <= names
+
+
+def test_fix_plan_is_agent_actionable(monkeypatch):
+    # pass fixes through so deterministic artifacts are generated
+    monkeypatch.setattr(srv, "scan", lambda url, fixes=False: scan_html(url, HTML, online=False, fixes=fixes))
+    out = srv.fix_plan("https://example.com/coffee")
+    assert isinstance(out["ai_retrievability"], (int, float))
+    assert isinstance(out["fixes"], list) and out["fixes"]
+    for fx in out["fixes"]:
+        assert {"finding_id", "title", "action", "target", "instruction", "source"} <= set(fx)
+        assert fx["source"] in ("deterministic", "advisory")
+
+
+def test_fix_plan_surfaces_error(monkeypatch):
+    bad = Report(url="https://x.test", meta={"error": "could not resolve host"})
+    monkeypatch.setattr(srv, "scan", lambda url, fixes=False: bad)
+    assert srv.fix_plan("https://x.test")["error"] == "could not resolve host"

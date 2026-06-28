@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
+from .fixes import build_fix_plan
 from .scanner import scan
 
 mcp = FastMCP("damask")
@@ -72,6 +73,38 @@ def audit_url(url: str) -> dict:
         url: The page URL to audit, e.g. https://example.com/pricing.
     """
     return _audit_payload(scan(url, fixes=False))
+
+
+@mcp.tool()
+def fix_plan(url: str) -> dict:
+    """Audit a page and return a complete, agent-actionable remediation plan — everything an AI
+    coding agent needs to FIX the page itself, ordered by severity.
+
+    Each item carries: the finding it resolves, an `action` (create_file / add_to_head /
+    rewrite_content / review), a `target` location hint, the exact `content` to apply (for
+    deterministic fixes), and a plain-English `instruction`. Deterministic fixes (schema,
+    robots.txt, llms.txt, meta) come ready to paste; judgment-dependent ones are flagged
+    `ai_draftable` for you to write the edit. damask diagnoses; you apply the fix to the files.
+
+    Use this after audit_url when the user wants to actually fix the issues, not just see them.
+
+    Args:
+        url: The page URL to audit and plan fixes for (e.g. http://localhost:3000/pricing).
+    """
+    report = scan(url, fixes=True)
+    d = report.to_dict()
+    if d["meta"].get("error"):
+        return {"url": report.url, "error": d["meta"]["error"]}
+    sc = d.get("scorecard") or {}
+    return {
+        "url": d["meta"].get("final_url", report.url),
+        "ai_retrievability": sc.get("headline_score"),
+        "verdict": (sc.get("summary") or {}).get("verdict"),
+        "fixes": build_fix_plan(report),
+        "confidence": "verified",
+        "note": "Deterministic audit. Apply each fix to your source files (you have them); "
+                "damask supplies the exact remediation. Re-run to confirm the score rose.",
+    }
 
 
 @mcp.tool()

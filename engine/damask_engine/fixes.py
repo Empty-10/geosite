@@ -32,6 +32,84 @@ class Fix:
         return asdict(self)
 
 
+# Findings whose remediation is judgment-dependent (an AI coding agent should draft the edit
+# rather than paste a fixed artifact). Mirrors the web GENERATIVE_FINDINGS set.
+GENERATIVE_FINDINGS = {"geo.aeo", "geo.frontload", "geo.definitive", "geo.thin_content"}
+
+_SEV_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+
+# How an AI coding agent should apply each fix kind: (action, target hint, how-to).
+_FIX_ACTION = {
+    "robots": ("create_file", "robots.txt (site root)",
+               "Create or replace robots.txt at your web root — public/robots.txt in Next.js, "
+               "the document root for a static site, or your CMS's robots settings."),
+    "llms-txt": ("create_file", "llms.txt (site root)",
+                 "Create llms.txt at your web root — e.g. public/llms.txt in Next.js."),
+    "json-ld": ("add_to_head", "page <head>",
+                "Add this JSON-LD <script> to the page's <head> — your layout/template or the "
+                "page's head component."),
+    "meta": ("add_to_head", "page <head>",
+             "Add or replace this tag in the page's <head>."),
+}
+_FIX_ACTION_DEFAULT = ("edit_content", "page content", "Apply this change to the page.")
+
+
+def _enum_val(x: Any) -> Any:
+    return getattr(x, "value", x)
+
+
+def actionable_fix(fix: "Fix", finding: Any | None = None) -> dict:
+    """Shape a deterministic Fix for an AI coding agent: what to do, where, and the exact content.
+    The dev's assistant has the files; damask supplies the precise, ready-to-apply remediation."""
+    action, target, how = _FIX_ACTION.get(fix.kind, _FIX_ACTION_DEFAULT)
+    out = {
+        "finding_id": fix.finding_id,
+        "title": fix.title,
+        "action": action,
+        "target": target,
+        "language": fix.language,
+        "content": fix.content,
+        "instruction": f"{how} {fix.note}" if fix.note else how,
+        "source": "deterministic",
+        "ai_draftable": False,
+    }
+    if finding is not None:
+        out["severity"] = _enum_val(finding.severity)
+        out["evidence"] = finding.evidence
+    return out
+
+
+def build_fix_plan(report: Report) -> list[dict]:
+    """A complete, agent-actionable remediation list for a scanned report, ordered by severity:
+    deterministic artifacts where we can generate them, advisory steps (carrying the finding's
+    recommendation) otherwise. Everything an AI coding agent needs to fix the page itself.
+
+    Requires the report to have been scanned with fixes=True (so report.fixes is populated).
+    """
+    fixes_by_id = {fx.finding_id: fx for fx in (report.fixes or [])}
+    issues = [f for f in report.findings if _enum_val(f.status) in ("fail", "warn")]
+    issues.sort(key=lambda f: _SEV_RANK.get(_enum_val(f.severity), 9))
+
+    plan: list[dict] = []
+    for f in issues:
+        fx = fixes_by_id.get(f.id)
+        if fx is not None:
+            plan.append(actionable_fix(fx, f))
+        elif f.recommendation:
+            plan.append({
+                "finding_id": f.id,
+                "title": f.title,
+                "action": "rewrite_content" if f.id in GENERATIVE_FINDINGS else "review",
+                "target": "page content",
+                "instruction": f.recommendation,
+                "evidence": f.evidence,
+                "severity": _enum_val(f.severity),
+                "source": "advisory",
+                "ai_draftable": f.id in GENERATIVE_FINDINGS,
+            })
+    return plan
+
+
 def generate_fixes(soup: BeautifulSoup, report: Report, url: str) -> list[Fix]:
     """Build remediation artifacts for the findings that fired. Order = report order."""
     ids = {f.id for f in report.findings if f.status in ("fail", "warn")}

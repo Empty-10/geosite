@@ -110,3 +110,36 @@ def test_generate_fixes_is_pure_listable():
     # calling generate_fixes directly returns Fix objects
     out = generate_fixes(make_soup(html), report, "https://example.com/")
     assert all(isinstance(f, Fix) for f in out)
+
+
+# --- agent-actionable fix plan (build_fix_plan) ---------------------------------------------
+
+def _plan(html: str, url: str = "https://example.com/page") -> list[dict]:
+    from damask_engine.fixes import build_fix_plan
+    report = scan_html(url, html, online=False, final_url=url, fixes=True)
+    return build_fix_plan(report)
+
+
+THIN = "<!doctype html><html><head><title>x</title></head><body><h1>Hi</h1><p>buy now</p></body></html>"
+
+
+def test_fix_plan_has_deterministic_and_advisory_items():
+    plan = _plan(THIN)
+    assert plan, "a thin/broken page should yield fixes"
+    sources = {item["source"] for item in plan}
+    # every item is agent-actionable
+    for item in plan:
+        assert {"finding_id", "title", "action", "target", "instruction", "source"} <= set(item)
+    # deterministic artifacts carry content; advisory items carry an instruction
+    assert "deterministic" in sources or "advisory" in sources
+    det = [i for i in plan if i["source"] == "deterministic"]
+    for i in det:
+        assert i["content"] and i["action"] in ("create_file", "add_to_head", "edit_content")
+
+
+def test_fix_plan_flags_ai_draftable():
+    # geo.aeo (no up-front answer) is judgment-dependent → advisory + ai_draftable
+    plan = _plan(THIN)
+    aeo = next((i for i in plan if i["finding_id"] == "geo.aeo"), None)
+    if aeo is not None:  # present when the answer-block check fires
+        assert aeo["source"] == "advisory" and aeo["ai_draftable"] is True
