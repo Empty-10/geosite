@@ -2,7 +2,7 @@
 //
 // Kept separate from /api/scan because it's slow (PSI is a single blocking lab run, ~10–30s)
 // with no progress stream. Thin proxy to the engine, which holds the PageSpeed key. Requires
-// DAMASK_ENGINE_URL. Engine reports "couldn't run" via { error } in a 200 body.
+// ASTOVA_ENGINE_URL. Engine reports "couldn't run" via { error } in a 200 body.
 
 import { normalizeUrl, ssrfReason } from "@/lib/scanUrl";
 
@@ -10,12 +10,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const ENGINE_URL = process.env.DAMASK_ENGINE_URL;
+const ENGINE_URL = process.env.ASTOVA_ENGINE_URL;
 const HTTP_TIMEOUT_MS = 55_000;
 
 const NO_ENGINE =
   "Performance checks aren't available on this deployment yet — they run on the scan engine " +
-  "service. Set DAMASK_ENGINE_URL to its URL (see web/README.md).";
+  "service. Set ASTOVA_ENGINE_URL to its URL (see web/README.md).";
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });

@@ -1,4 +1,4 @@
-// Slim trust strip under the hero: the AI answer engines damask checks you against. Text
+// Slim trust strip under the hero: the AI answer engines astova checks you against. Text
 // wordmarks (no fake customer logos) — honest, and it signals category fit instantly.
 
 const ENGINES = ["ChatGPT", "Perplexity", "Gemini", "Google AI Overviews", "Copilot"];

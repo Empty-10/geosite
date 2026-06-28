@@ -3,8 +3,8 @@ transform Cloudflare-rows -> LogReport is exercised offline, with no token or ne
 
 from __future__ import annotations
 
-import damask_engine.cloudflare_logs as cf
-from damask_engine.cloudflare_logs import fetch_cloudflare_logs
+import astova_engine.cloudflare_logs as cf
+from astova_engine.cloudflare_logs import fetch_cloudflare_logs
 
 
 class _Resp:

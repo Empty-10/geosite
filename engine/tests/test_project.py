@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from damask_engine import project
+from astova_engine import project
 
 
 def test_detect_framework():

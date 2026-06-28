@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from damask_engine.fetch import BotFetch
-from damask_engine.models import Pillar, Severity, Status
-from damask_engine.modules import bot_view
-from damask_engine.scorecard import build_scorecard
-from damask_engine.models import Report, Finding, Confidence
+from astova_engine.fetch import BotFetch
+from astova_engine.models import Pillar, Severity, Status
+from astova_engine.modules import bot_view
+from astova_engine.scorecard import build_scorecard
+from astova_engine.models import Report, Finding, Confidence
 
 
 def _one(normal_status, normal_words, bot):

@@ -6,10 +6,10 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from damask_engine import scan_html
-from damask_engine.compare import compare_reports
-from damask_engine.models import Report
-from damask_engine.service import app
+from astova_engine import scan_html
+from astova_engine.compare import compare_reports
+from astova_engine.models import Report
+from astova_engine.service import app
 
 client = TestClient(app)
 
@@ -69,7 +69,7 @@ def test_compare_handles_errored_site():
 
 def test_compare_endpoint(monkeypatch):
     you, comp = _report(STRONG, "https://you.test"), _report(WEAK, "https://rival.test")
-    with patch("damask_engine.service._safe_scan", side_effect=[you, comp]):
+    with patch("astova_engine.service._safe_scan", side_effect=[you, comp]):
         r = client.post("/compare", json={"urls": ["you.test", "rival.test"]})
     assert r.status_code == 200
     body = r.json()

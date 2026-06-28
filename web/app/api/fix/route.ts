@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-const MODEL = process.env.DAMASK_FIX_MODEL || "claude-haiku-4-5";
+const MODEL = process.env.ASTOVA_FIX_MODEL || "claude-haiku-4-5";
 const MAX_TOKENS = 800;
 const PAGE_TIMEOUT_MS = 12_000;
 
@@ -174,7 +174,7 @@ export async function POST(req: Request): Promise<Response> {
   let html: string;
   try {
     const res = await fetch(target, {
-      headers: { "user-agent": "damaskbot/0.1 (+fixes)" },
+      headers: { "user-agent": "astovabot/0.1 (+fixes)" },
       signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
     });
     html = await res.text();

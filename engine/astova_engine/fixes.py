@@ -60,7 +60,7 @@ def _enum_val(x: Any) -> Any:
 
 def actionable_fix(fix: "Fix", finding: Any | None = None) -> dict:
     """Shape a deterministic Fix for an AI coding agent: what to do, where, and the exact content.
-    The dev's assistant has the files; damask supplies the precise, ready-to-apply remediation."""
+    The dev's assistant has the files; astova supplies the precise, ready-to-apply remediation."""
     action, target, how = _FIX_ACTION.get(fix.kind, _FIX_ACTION_DEFAULT)
     out = {
         "finding_id": fix.finding_id,

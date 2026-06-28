@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "damask — know exactly how AI engines see your site";
+export const alt = "Astova — know exactly how AI engines see your site";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -35,7 +35,7 @@ export default function OpengraphImage() {
         >
           <div style={{ width: 34, height: 34, background: "#19B36B", borderRadius: 5 }} />
         </div>
-        <div style={{ fontSize: 88, fontWeight: 600, letterSpacing: "-3px" }}>damask</div>
+        <div style={{ fontSize: 88, fontWeight: 600, letterSpacing: "-3px" }}>Astova</div>
         <div
           style={{
             fontSize: 34,

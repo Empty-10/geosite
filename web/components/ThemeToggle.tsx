@@ -17,7 +17,7 @@ export function ThemeToggle() {
     if (next === "light") document.documentElement.setAttribute("data-theme", "light");
     else document.documentElement.removeAttribute("data-theme");
     try {
-      localStorage.setItem("damask-theme", next);
+      localStorage.setItem("astova-theme", next);
     } catch {
       /* storage blocked — the toggle still works for the session */
     }

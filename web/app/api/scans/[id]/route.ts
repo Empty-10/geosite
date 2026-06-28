@@ -1,11 +1,11 @@
 // GET /api/scans/:id  →  a saved scan report (for shareable /report?id= links).
-// Thin proxy to the engine's /scans/{id}. Requires DAMASK_ENGINE_URL + the engine running with
-// DAMASK_DB_PATH (persistence) set — otherwise nothing is saved and ids 404.
+// Thin proxy to the engine's /scans/{id}. Requires ASTOVA_ENGINE_URL + the engine running with
+// ASTOVA_DB_PATH (persistence) set — otherwise nothing is saved and ids 404.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ENGINE_URL = process.env.DAMASK_ENGINE_URL;
+const ENGINE_URL = process.env.ASTOVA_ENGINE_URL;
 const HTTP_TIMEOUT_MS = 20_000;
 
 function json(body: unknown, status = 200): Response {

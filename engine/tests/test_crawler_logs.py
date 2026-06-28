@@ -3,7 +3,7 @@ Offline: operates on fixed log strings."""
 
 from __future__ import annotations
 
-from damask_engine.crawler_logs import analyze_logs, identify_bot
+from astova_engine.crawler_logs import analyze_logs, identify_bot
 
 
 def _line(ua: str, path: str = "/", status: int = 200, ts: str = "10/Oct/2025:13:55:36 +0000") -> str:

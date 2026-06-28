@@ -1,7 +1,7 @@
 """Offline tests — parse fixed HTML, no network. Run with `pytest`."""
 
-from damask_engine import scan_html
-from damask_engine.models import Confidence, Status
+from astova_engine import scan_html
+from astova_engine.models import Confidence, Status
 
 GOOD = """
 <!doctype html><html><head>

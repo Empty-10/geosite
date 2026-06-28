@@ -10,7 +10,7 @@ export function Footer() {
         <div style={{ maxWidth: 280 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
             <Logo size={18} />
-            <span style={{ fontSize: 15, fontWeight: 500 }}>damask</span>
+            <span style={{ fontSize: 15, fontWeight: 500 }}>Astova</span>
           </div>
           <p style={{ fontSize: 13, color: "var(--text-3)", lineHeight: 1.55 }}>
             GEO/AEO readiness, measured honestly. See how AI engines read your site — and fix it.
@@ -35,7 +35,7 @@ export function Footer() {
       </div>
 
       <div style={{ maxWidth: 1100, margin: "28px auto 0", paddingTop: 20, borderTop: "1px solid var(--border)", fontSize: 12.5, color: "var(--text-3)" }}>
-        © 2026 damask · GEO, measured honestly
+        © 2026 Astova · GEO, measured honestly
       </div>
     </footer>
   );

@@ -3,9 +3,9 @@ image dimensions, URL structure. Offline."""
 
 from __future__ import annotations
 
-from damask_engine.models import Status
-from damask_engine.modules.onpage import analyze
-from damask_engine.util import make_soup, visible_text
+from astova_engine.models import Status
+from astova_engine.modules.onpage import analyze
+from astova_engine.util import make_soup, visible_text
 
 
 def run(html: str, url: str = ""):

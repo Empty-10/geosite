@@ -17,7 +17,7 @@ import requests
 
 from .config import get_cloudflare
 
-USER_AGENT = "damaskbot/0.1 (+https://example.com/bot; GEO/SEO scanner)"
+USER_AGENT = "astovabot/0.1 (+https://example.com/bot; GEO/SEO scanner)"
 # OpenAI's documented GPTBot UA — the most widely enforced AI crawler. We probe with it to see
 # what AI answer engines actually receive (WAF/CDN blocks, challenge pages, cloaked content).
 GPTBOT_UA = ("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; "

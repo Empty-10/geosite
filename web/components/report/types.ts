@@ -1,4 +1,4 @@
-// Shared types + helpers for rendering a damask scan report. Used by both the landing
+// Shared types + helpers for rendering a astova scan report. Used by both the landing
 // HeroDemo and the full /report screen so the two never drift.
 
 import { C } from "@/lib/tokens";

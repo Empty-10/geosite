@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "damask": {
+    "astova": {
       "command": "/Users/joshuawalsh/Desktop/Sites/damask/engine/.venv/bin/python",
-      "args": ["-m", "damask_engine.mcp_server"]
+      "args": ["-m", "astova_engine.mcp_server"]
     }
   }
 }

@@ -29,7 +29,7 @@ export function ToolNav({ active }: { active: "report" | "compare" | "site" | "c
     >
       <a href="/" style={{ display: "inline-flex", alignItems: "center", gap: 10, color: "var(--text)" }}>
         <Logo size={20} />
-        <span style={{ fontSize: 15, fontWeight: 500, letterSpacing: "-0.01em" }}>damask</span>
+        <span style={{ fontSize: 15, fontWeight: 500, letterSpacing: "-0.01em" }}>Astova</span>
       </a>
       <nav style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
         {TOOLS.map((t) => {

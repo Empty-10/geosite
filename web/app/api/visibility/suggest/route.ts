@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 20;
 
-const MODEL = process.env.DAMASK_SUGGEST_MODEL || "claude-haiku-4-5";
+const MODEL = process.env.ASTOVA_SUGGEST_MODEL || "claude-haiku-4-5";
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });

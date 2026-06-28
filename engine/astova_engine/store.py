@@ -1,11 +1,11 @@
 """Scan history — a small persistence layer so re-scanning a URL can show what changed.
 
-Backed by SQLite (stdlib, no new dependency). Enabled only when DAMASK_DB_PATH is set; otherwise
+Backed by SQLite (stdlib, no new dependency). Enabled only when ASTOVA_DB_PATH is set; otherwise
 every function is a graceful no-op (save -> None, history -> []), so the engine runs identically
 with or without persistence.
 
 Production note: SQLite on an ephemeral container disk (e.g. Render's default) resets on redeploy.
-For durable history, point DAMASK_DB_PATH at a persistent disk, or swap this module's storage for
+For durable history, point ASTOVA_DB_PATH at a persistent disk, or swap this module's storage for
 Postgres later (the public functions are the seam).
 """
 
@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 
 
 def db_path() -> str | None:
-    return os.environ.get("DAMASK_DB_PATH") or None
+    return os.environ.get("ASTOVA_DB_PATH") or None
 
 
 def is_enabled() -> bool:
@@ -30,7 +30,7 @@ def is_enabled() -> bool:
 def _conn():
     path = db_path()
     if not path:
-        raise RuntimeError("persistence not configured (set DAMASK_DB_PATH)")
+        raise RuntimeError("persistence not configured (set ASTOVA_DB_PATH)")
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     try:

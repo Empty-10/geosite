@@ -1,14 +1,14 @@
-// POST /api/scan  →  runs the real damask engine and returns its JSON Report.
+// POST /api/scan  →  runs the real astova engine and returns its JSON Report.
 //
 // Engine invocation is isolated in runEngine() so it can be swapped without touching
 // callers. Today it shells out to the local Python engine (Approach A in
 // docs/PROJECT-STATUS.md → "Next tasks" #1). For production (web on Vercel, which has no
-// Python runtime), set DAMASK_ENGINE_URL to a deployed engine service and the route will
+// Python runtime), set ASTOVA_ENGINE_URL to a deployed engine service and the route will
 // fetch that instead — a one-env-var swap, no rewrite.
 //
-//   DAMASK_ENGINE_URL  — if set, POST {url} to `${DAMASK_ENGINE_URL}/scan` instead of shelling out.
-//   DAMASK_ENGINE_DIR  — engine working dir (default: ../engine relative to the web app).
-//   DAMASK_PYTHON      — python interpreter (default: <engine>/.venv/bin/python).
+//   ASTOVA_ENGINE_URL  — if set, POST {url} to `${ASTOVA_ENGINE_URL}/scan` instead of shelling out.
+//   ASTOVA_ENGINE_DIR  — engine working dir (default: ../engine relative to the web app).
+//   ASTOVA_PYTHON      — python interpreter (default: <engine>/.venv/bin/python).
 
 import { spawn } from "node:child_process";
 import path from "node:path";
@@ -24,10 +24,10 @@ const SCAN_TIMEOUT_MS = 25_000; // local shell-out path
 const ENGINE_HTTP_TIMEOUT_MS = 55_000; // HTTP path — tolerate free-tier cold starts
 
 const ENGINE_DIR =
-  process.env.DAMASK_ENGINE_DIR || path.resolve(process.cwd(), "..", "engine");
+  process.env.ASTOVA_ENGINE_DIR || path.resolve(process.cwd(), "..", "engine");
 const PYTHON =
-  process.env.DAMASK_PYTHON || path.join(ENGINE_DIR, ".venv", "bin", "python");
-const ENGINE_URL = process.env.DAMASK_ENGINE_URL;
+  process.env.ASTOVA_PYTHON || path.join(ENGINE_DIR, ".venv", "bin", "python");
+const ENGINE_URL = process.env.ASTOVA_ENGINE_URL;
 
 type EngineResult =
   | { ok: true; data: unknown }
@@ -85,7 +85,7 @@ function friendlyFetchError(raw: string): string {
   return "Couldn't fetch that page.";
 }
 
-/** Shell out to the local engine: `python -m damask_engine <url> --json`. */
+/** Shell out to the local engine: `python -m astova_engine <url> --json`. */
 function runEngineLocal(target: string): Promise<EngineResult> {
   return new Promise((resolve) => {
     let settled = false;
@@ -96,7 +96,7 @@ function runEngineLocal(target: string): Promise<EngineResult> {
       }
     };
 
-    const proc = spawn(PYTHON, ["-m", "damask_engine", target, "--json", "--fixes"], { cwd: ENGINE_DIR });
+    const proc = spawn(PYTHON, ["-m", "astova_engine", target, "--json", "--fixes"], { cwd: ENGINE_DIR });
     let out = "";
     let err = "";
 
@@ -112,13 +112,13 @@ function runEngineLocal(target: string): Promise<EngineResult> {
       clearTimeout(timer);
       if (e.code === "ENOENT") {
         // No local Python interpreter — typical on serverless (Vercel). The engine is meant
-        // to run as a separate service; point this app at it with DAMASK_ENGINE_URL.
+        // to run as a separate service; point this app at it with ASTOVA_ENGINE_URL.
         done({
           ok: false,
           status: 503,
           error:
             "Live scanning isn't available on this deployment yet — the scan engine runs as a " +
-            "separate service. Set DAMASK_ENGINE_URL to its URL (see web/README.md).",
+            "separate service. Set ASTOVA_ENGINE_URL to its URL (see web/README.md).",
         });
         return;
       }

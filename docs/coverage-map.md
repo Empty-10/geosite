@@ -1,17 +1,17 @@
 # Coverage map & checks to add
 
-Maps a competitor's 20-row "AI retrievability" LLM-prompt auditor against damask's engine,
+Maps a competitor's 20-row "AI retrievability" LLM-prompt auditor against astova's engine,
 and specifies the deterministic checks worth adding. Implement these in the engine
 (Claude in VS Code) following the existing conventions — see "Implementation notes" below.
 
 > Framing: the competitor's tool is an *LLM told to score HTML deterministically*. It can't
-> truly be reproducible (an LLM drifts). damask does the same job in real parser code, which
+> truly be reproducible (an LLM drifts). astova does the same job in real parser code, which
 > genuinely is reproducible. So we mine their checklist for **coverage**, not architecture —
 > and we deliberately reject two of their ideas (see "Do NOT adopt").
 
-## Their 20 rows + overlay vs damask
+## Their 20 rows + overlay vs astova
 
-| Their row | damask status | Where / note |
+| Their row | astova status | Where / note |
 |---|---|---|
 | 1. Page identity & intent clarity | 🟡 partial | title+h1 exist; no explicit coherence check |
 | 2. Title tag quality | ✅ | `onpage` |

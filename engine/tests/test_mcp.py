@@ -7,9 +7,9 @@ import pytest
 
 pytest.importorskip("mcp")
 
-from damask_engine import scan_html  # noqa: E402
-from damask_engine.models import Report  # noqa: E402
-import damask_engine.mcp_server as srv  # noqa: E402
+from astova_engine import scan_html  # noqa: E402
+from astova_engine.models import Report  # noqa: E402
+import astova_engine.mcp_server as srv  # noqa: E402
 
 HTML = """<!doctype html><html lang="en"><head>
 <title>How to brew pour-over coffee: a complete guide for beginners</title>
@@ -100,7 +100,7 @@ def test_audit_project_bad_path():
 
 def test_audit_project_multipage_crawl(tmp_path, monkeypatch):
     (tmp_path / "index.html").write_text("<html></html>")
-    from damask_engine.models import PageSummary, SiteReport
+    from astova_engine.models import PageSummary, SiteReport
 
     site = SiteReport(
         url="http://localhost:3000", overall_score=72,

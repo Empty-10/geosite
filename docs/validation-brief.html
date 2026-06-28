@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Astova — Technical Validation Brief</title>
+<style>
+  :root { --accent:#0E8A52; --ink:#1a1d21; --muted:#5b636d; --line:#e2e6ea; --bg-soft:#f5f7f9; }
+  * { box-sizing:border-box; }
+  html { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+         color:var(--ink); line-height:1.55; font-size:11pt; margin:0; }
+  .page { padding:46px 54px; max-width:860px; margin:0 auto; }
+  h1 { font-size:26pt; letter-spacing:-0.02em; margin:0 0 4px; }
+  h2 { font-size:15pt; letter-spacing:-0.01em; margin:30px 0 10px; padding-bottom:6px;
+       border-bottom:2px solid var(--accent); color:#0b0d10; }
+  h3 { font-size:12pt; margin:18px 0 6px; color:#0b0d10; }
+  p { margin:0 0 9px; }
+  ul { margin:0 0 10px; padding-left:20px; }
+  li { margin:2px 0; }
+  .sub { color:var(--muted); font-size:10.5pt; }
+  .tag { display:inline-block; font-size:8.5pt; font-weight:600; letter-spacing:0.03em;
+         text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle; }
+  .verified { background:#e3f3ea; color:#0E8A52; }
+  .measured { background:#e6effd; color:#2f6fd6; }
+  .gap { background:#fdeceb; color:#c0392b; }
+  .plan { background:#fef4e4; color:#b9831c; }
+  table { width:100%; border-collapse:collapse; margin:8px 0 14px; font-size:10pt; }
+  th,td { text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { background:var(--bg-soft); font-size:9pt; text-transform:uppercase; letter-spacing:0.03em; color:var(--muted); }
+  code { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:9.5pt; background:var(--bg-soft);
+         padding:1px 5px; border-radius:4px; }
+  .lead { font-size:11.5pt; color:#33383e; margin:10px 0 4px; }
+  .meta { color:var(--muted); font-size:10pt; margin-top:2px; }
+  .box { background:var(--bg-soft); border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:12px 0; }
+  .accent { color:var(--accent); }
+  .small { font-size:9.5pt; color:var(--muted); }
+  h2 { break-after:avoid; }
+  h3 { break-after:avoid; }
+  table, ul { break-inside:avoid; }
+  .pb { break-before:page; }
+  @page { margin:14mm 0; }
+  .footer { margin-top:28px; padding-top:10px; border-top:1px solid var(--line); color:var(--muted); font-size:9pt; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Astova <span class="accent">—</span> Technical Validation Brief</h1>
+  <div class="meta">GEO / AEO / SEO scanning platform &nbsp;·&nbsp; prepared for independent technical validation &nbsp;·&nbsp; 28 June 2026</div>
+
+  <p class="lead">Astova scans a website the way AI answer engines do and reports, with explicit
+  confidence, what helps or hurts its chances of being <em>retrieved and cited</em> — then hands
+  over the fix. The core promise is <strong>determinism</strong>: the technical audit is read
+  straight from the live HTML with real parsers and reproduces identically on re-run, so a finding
+  is a verifiable fact, not an LLM's guess.</p>
+
+  <div class="box">
+    <strong>How to read this document.</strong> Section 1 is <em>what</em> it checks today.
+    Section 2 is <em>how</em> (methodology + why it's trustworthy). Section 3 is an honest account
+    of <em>accuracy and limitations</em>. Section 4 is <em>what's missing</em>, and Section 5 is
+    <em>how we plan to close those gaps</em>. The intent is to make the system easy to scrutinise.
+  </div>
+
+  <h2>The accuracy principle (the design constraint everything obeys)</h2>
+  <p>Every finding carries a confidence label, enforced in the data model:</p>
+  <table>
+    <tr><th>Label</th><th>Meaning</th><th>Example</th></tr>
+    <tr><td><span class="tag verified">Verified</span></td><td>Deterministic — read directly from the page or an authoritative API. Re-running reproduces it exactly.</td><td>Title, schema, robots directives, headings, status codes, SSL.</td></tr>
+    <tr><td><span class="tag measured">Measured</span></td><td>Sampled from AI engines on a date; always shown with a confidence band + sample size.</td><td>AI citation / share-of-voice (needs engine API keys).</td></tr>
+    <tr><td><span class="tag plan">Estimated</span></td><td>Modelled/inferred; flagged as directional.</td><td>Reserved for inferred signals.</td></tr>
+  </table>
+  <p class="small">This split is deliberate and is the brand: we never present an estimate as a fact.</p>
+
+  <h2>1. What Astova checks today</h2>
+  <p>The deterministic engine (Python) runs pure modules; each returns findings with status,
+  severity, <strong>evidence</strong> (the exact value/line it read) and a plain-English
+  recommendation. ~60 checks across the areas below — all <span class="tag verified">Verified</span>
+  unless noted.</p>
+
+  <h3>On-page (content &amp; markup)</h3>
+  <ul>
+    <li>Title tag (presence, length), meta description (presence, length)</li>
+    <li>H1 (missing / multiple / ok), heading hierarchy + heading order</li>
+    <li>Canonical correctness, robots meta (index/noindex), snippet directives (<code>max-image-preview</code> etc.)</li>
+    <li>Open Graph + Twitter card completeness</li>
+    <li>JSON-LD schema: presence, types, required-property validation</li>
+    <li>Image alt coverage + dimensions; internal/external link ratio; anchor-text quality; crawlable anchors; link attributes (rel/noopener); jump links; outbound authority links</li>
+    <li>Language attribute, form labels, hreflang, URL structure</li>
+  </ul>
+
+  <h3>Technical (crawlability &amp; delivery)</h3>
+  <ul>
+    <li>HTTPS, status codes, redirect chains, HSTS, TLS certificate, mixed content, viewport</li>
+    <li><code>robots.txt</code> parse — including <strong>AI-crawler directives</strong> (GPTBot, ClaudeBot, PerplexityBot, Google-Extended)</li>
+    <li>Sitemap validity + freshness; <code>noindex</code>-in-sitemap conflict</li>
+    <li>Response headers: <code>X-Robots-Tag</code>, compression, security headers; resource hints; <code>llms.txt</code> presence</li>
+  </ul>
+
+  <h3>GEO-readiness (the AEO factors — why a page does or doesn't get cited)</h3>
+  <ul>
+    <li><strong>Up-front answer block (AEO core)</strong> — locates the first self-contained answer paragraph and how far down the page it sits</li>
+    <li>Front-loaded opening (a real answer sentence in the first ~150 words), definitive vs hedged language</li>
+    <li>Extractable structure (content lists/tables — navigation menus excluded), summary bullets near the top, chunking (vs walls of text)</li>
+    <li>Quotable-data density (figures, %, currency, dates, measurements), question-style headings, FAQ section (schema or Q&amp;A pairs)</li>
+    <li>Content depth / thin-content, Authority &amp; E-E-A-T signals (author, dates, About/Contact, entity <code>sameAs</code>)</li>
+    <li><strong>JavaScript-dependency</strong> — how much content only exists after JS runs (which non-rendering AI crawlers miss)</li>
+    <li><strong>Empty-page collapse</strong> — a near-empty (SPA-shell) page reduces to one clear root-cause finding</li>
+  </ul>
+
+  <h3>“What the AI bot saw” (crawler-access reconciliation)</h3>
+  <ul>
+    <li>Fetches the page <strong>as GPTBot</strong> and compares with a normal browser fetch — catching WAF/CDN blocks and cloaking that <code>robots.txt</code> parsing alone can't reveal (e.g. Cloudflare's “Block AI bots”). A hard block is treated as critical and leads the verdict.</li>
+  </ul>
+
+  <h3>Local-AEO (conditional — activates only on local-business pages)</h3>
+  <ul>
+    <li><code>LocalBusiness</code> schema + subtypes, NAP (name/address/phone) consistency, opening hours, geo coordinates / map embed, Google Business Profile link via <code>sameAs</code>. Skipped entirely on non-local pages so a SaaS page is never penalised.</li>
+  </ul>
+
+  <h3>Performance (authoritative API, on-demand)</h3>
+  <ul>
+    <li>Core Web Vitals + Lighthouse via Google PageSpeed Insights (LCP, CLS, TBT, FCP, Speed Index; lab + CrUX field). Run on demand because it is slow.</li>
+  </ul>
+
+  <h3>AI visibility <span class="tag measured">Measured</span> (probabilistic, needs engine API keys)</h3>
+  <ul>
+    <li>Multi-engine prompt sampling across ChatGPT/Claude, Perplexity and Gemini; citation rate, <strong>share of voice</strong>, cited-source intelligence and sentiment — each shown with a Wilson 95% confidence interval and sample size. Inactive until API keys are configured.</li>
+  </ul>
+
+  <h3>Cross-cutting outputs</h3>
+  <ul>
+    <li><strong>20-row scorecard</strong> with a single headline “AI Retrievability” score, three critical gates, a hybrid bonus overlay, a plain-English verdict, per-row impact, and a citation-readiness read.</li>
+    <li><strong>Competitor benchmark</strong> — your page vs up to 3 rivals, row-by-row leader + where you lead/trail.</li>
+    <li><strong>Crawler-log analytics</strong> — verified evidence (uploaded logs or Cloudflare) of which AI crawlers hit which pages, and what errored.</li>
+    <li><strong>Fixes, not findings</strong> — deterministic ready-to-apply artifacts (schema, <code>robots.txt</code>, <code>llms.txt</code>, meta, LocalBusiness) plus AI-drafted rewrites for judgment-dependent issues.</li>
+    <li><strong>MCP server</strong> — exposes the engine to AI assistants (ChatGPT / Claude / Cursor): <code>audit_url</code>, <code>scan_url</code>, <code>fix_plan</code> (agent-actionable remediation) and <code>audit_project</code> (pre-deploy audit of a local project + optional localhost crawl, source never leaving the machine).</li>
+  </ul>
+
+  <h2 class="pb">2. How it works (and why it's trustworthy)</h2>
+  <h3>Deterministic, reproducible engine</h3>
+  <p>Modules are pure functions: parsed HTML in, a list of findings out. No module reaches into
+  another, and parsing works on an HTML string, so the whole engine is offline-testable. The same
+  input always yields the same output — re-running a scan reproduces every number. This is the key
+  difference from “paste your HTML into an LLM and ask for a score”: there is no sampling variance.</p>
+
+  <h3>Rendering</h3>
+  <p>Pages are fetched raw and, when they look like a client-rendered shell, rendered headlessly
+  (Cloudflare Browser Rendering) so the engine scans what a JS-executing crawler sees — while still
+  reporting how much content was JS-dependent (what non-rendering AI crawlers miss).</p>
+
+  <h3>Scoring</h3>
+  <p>Findings aggregate into a 20-row scorecard mapped to a recognised GEO/AEO/SEO audit structure.
+  Each row scores from the status of its checks; three <strong>critical gates</strong> (no up-front
+  answer → 0; promotional intro → capped; navigation-only “summary” → capped) prevent a page from
+  scoring well while failing the things that actually govern citation. A small all-or-nothing bonus
+  overlay rewards combinations (schema breadth, root files, delivery). The headline is explicitly a
+  <em>readiness</em> composite, labelled as such.</p>
+
+  <h3>Independent validation built in</h3>
+  <p>An accuracy benchmark harness compares Astova's deterministic checks against Google Lighthouse
+  on the same pages. It has already caught and fixed real bugs (e.g. an alt-text false positive, a
+  link-text rule that didn't scale). The technical/on-page reads match Lighthouse on the hard,
+  unambiguous signals. The test suite is <strong>216 automated tests, all green</strong>; linting is
+  clean.</p>
+
+  <h3>Architecture</h3>
+  <table>
+    <tr><th>Layer</th><th>Tech</th><th>Role</th></tr>
+    <tr><td>Engine</td><td>Python (pure modules, dataclasses)</td><td>Deterministic scan, scoring, fixes — no LLM, no secrets</td></tr>
+    <tr><td>Service</td><td>FastAPI on a container host (Render)</td><td>HTTP API + remote MCP endpoint</td></tr>
+    <tr><td>Web</td><td>Next.js 16 / React 19 (Vercel)</td><td>Marketing site + report/compare/crawler/visibility UI; holds all AI calls</td></tr>
+    <tr><td>MCP</td><td>stdio (local) + Streamable HTTP (remote)</td><td>Audit from inside ChatGPT / Claude / Cursor</td></tr>
+    <tr><td>Storage</td><td>SQLite (Postgres-ready seam)</td><td>Scan history + diffs + shareable reports</td></tr>
+  </table>
+  <p class="small">Hard rule: the engine is 100% deterministic and LLM-free; every AI/probabilistic
+  feature lives in the web layer and is clearly labelled <span class="tag measured">Measured</span>.
+  No API keys are committed.</p>
+
+  <h2>3. Accuracy &amp; honest limitations</h2>
+  <p>For a validator, the important nuance is the difference between <em>measurement correctness</em>
+  and <em>predictive validity</em>:</p>
+  <ul>
+    <li><strong>Measurement correctness — strong.</strong> Every deterministic check reads the live
+    HTML and reproduces exactly. This part is verifiable and solid.</li>
+    <li><strong>Predictive validity — directional, not yet proven.</strong> The GEO-readiness checks
+    are grounded in 2026 GEO research, but the headline score has <em>not</em> been calibrated against
+    real citation outcomes. It is presented as a readiness proxy, not a measured probability — by design.</li>
+  </ul>
+  <table>
+    <tr><th>Strong checks</th><th>Heuristic checks (known error margin)</th></tr>
+    <tr><td>Up-front answer block; quotable-data density; bot-access; JS-dependency; schema/FAQ; HTTPS/SSL/status; robots/sitemap.</td><td>E-E-A-T (partly CSS-class inference); promotional-intro wordlist; hedged-language ratio; the 220/350-word answer thresholds.</td></tr>
+  </table>
+  <p>Other current limitations: AI-visibility sampling needs engine API keys to run and currently
+  covers three engines; persistence/shareable links require the production database path to be set;
+  the public remote MCP endpoint is unauthenticated; the engine itself lacks an SSRF guard (the web
+  route has one); and the web layer has no automated tests yet (the engine has 216).</p>
+
+  <h2 class="pb">4. What's missing</h2>
+  <table>
+    <tr><th>Area</th><th>Status</th><th>Detail</th></tr>
+    <tr><td>Accounts, billing, multi-tenant</td><td><span class="tag gap">Not built</span></td><td>No way to charge yet — the largest gap to being a business.</td></tr>
+    <tr><td>Monitoring + alerts</td><td><span class="tag plan">Planned</span></td><td>Re-scan on a cadence, diff, alert on regressions (incl. AI-crawler-access loss). The recurring-revenue hook. Design written.</td></tr>
+    <tr><td>AI-referral attribution</td><td><span class="tag gap">Not built</span></td><td>Connect cited → AI referral traffic → conversion (GA4 + server logs).</td></tr>
+    <tr><td>Citation-sampling depth</td><td><span class="tag plan">Partial</span></td><td>3 engines, needs keys; no ChatGPT-direct / AI Overviews / Copilot yet; entity authority thin.</td></tr>
+    <tr><td>WordPress plugin</td><td><span class="tag plan">Spec'd</span></td><td>One-click fixes + distribution surface; design written, not built.</td></tr>
+    <tr><td>Production hardening</td><td><span class="tag gap">Partial</span></td><td>Engine SSRF guard, remote-MCP auth, web tests, set the prod DB path, cold-start/render reliability.</td></tr>
+    <tr><td>Deliverables / polish</td><td><span class="tag plan">Partial</span></td><td>Real branded PDF export, a multi-scan dashboard, tracking-over-time trends UI.</td></tr>
+    <tr><td>Local API layer</td><td><span class="tag plan">Planned</span></td><td>Google Places / Business Profile (reviews, ratings) — the probabilistic half of local.</td></tr>
+    <tr><td>Smaller deterministic checks</td><td><span class="tag plan">Planned</span></td><td>Readability, content freshness, near-duplicate detection, Wikidata/entity presence.</td></tr>
+  </table>
+
+  <h2>5. How we plan to close the gaps</h2>
+  <h3>Sequencing</h3>
+  <ol>
+    <li><strong>Business layer first.</strong> Accounts + Stripe billing + multi-tenant, so the tool can be sold. Set the production database path so persistence and shareable reports go live.</li>
+    <li><strong>Monitoring + alerts.</strong> An external scheduler triggers a “run-due” endpoint that re-scans tracked URLs, diffs against the last scan (the diff engine already exists), and emails regressions — flagship alert being <em>AI-crawler access lost</em>. Deterministic and near-zero cost; gated as the paid recurring feature.</li>
+    <li><strong>Hardening.</strong> SSRF guard on the engine, a token on the remote MCP, and a web-layer test suite — required before promoting the public surfaces.</li>
+    <li><strong>Closed loop.</strong> AI-referral attribution (GA4 + log join), then deeper citation sampling (more engines) once keys/budget are in place.</li>
+    <li><strong>Distribution.</strong> Publish the MCP (npm/pip) and a WordPress plugin once the brand/name is finalised; an AEO content/guides layer that also dogfoods the product.</li>
+  </ol>
+  <p>Cost posture: the deterministic engine makes no paid API calls, so scanning, the competitor
+  benchmark, and developer/localhost audits are effectively free to run; the only metered costs are
+  optional headless rendering and the (opt-in) AI-visibility sampling. For developers, the local MCP
+  runs the engine on their own machine, so that compute is theirs and their source never leaves it.</p>
+
+  <div class="footer">
+    Astova — Technical Validation Brief · deterministic GEO/AEO/SEO engine + web app + MCP ·
+    216 engine tests green · prepared 28 June 2026. Working codename; brand/domain not yet finalised.
+  </div>
+
+</div>
+</body>
+</html>

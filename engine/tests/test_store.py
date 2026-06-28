@@ -1,15 +1,15 @@
-"""Tests for the SQLite scan-history store + report diffing. Uses a temp DB via DAMASK_DB_PATH."""
+"""Tests for the SQLite scan-history store + report diffing. Uses a temp DB via ASTOVA_DB_PATH."""
 
 from __future__ import annotations
 
 import pytest
 
-from damask_engine import store
+from astova_engine import store
 
 
 @pytest.fixture
 def db(tmp_path, monkeypatch):
-    monkeypatch.setenv("DAMASK_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("ASTOVA_DB_PATH", str(tmp_path / "test.db"))
     return store
 
 
@@ -31,7 +31,7 @@ def _f(fid, status, title="t"):
 # --- enablement --------------------------------------------------------------------------
 
 def test_disabled_when_env_unset(monkeypatch):
-    monkeypatch.delenv("DAMASK_DB_PATH", raising=False)
+    monkeypatch.delenv("ASTOVA_DB_PATH", raising=False)
     assert store.is_enabled() is False
     assert store.save(_report()) is None
     assert store.history("https://x.test") == []

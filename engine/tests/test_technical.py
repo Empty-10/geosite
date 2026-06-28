@@ -3,16 +3,16 @@ TLS findings. All offline: the module is pure, so we feed it text and a NetInput
 
 from __future__ import annotations
 
-from damask_engine import scan_html
-from damask_engine.models import Status
-from damask_engine.modules.technical import (
+from astova_engine import scan_html
+from astova_engine.models import Status
+from astova_engine.modules.technical import (
     NetInputs,
     SITEMAP_STALE_DAYS,
     analyze,
     parse_robots,
     parse_sitemap,
 )
-from damask_engine.util import make_soup
+from astova_engine.util import make_soup
 
 HTML = "<html><head><meta name='viewport' content='width=device-width'></head><body><h1>Hi</h1></body></html>"
 

@@ -3,9 +3,9 @@ the +8 overlay. Built on real scan_html output so the mapping stays honest."""
 
 from __future__ import annotations
 
-from damask_engine import scan_html
-from damask_engine.models import Finding, Pillar, Report, Status
-from damask_engine.scorecard import build_scorecard
+from astova_engine import scan_html
+from astova_engine.models import Finding, Pillar, Report, Status
+from astova_engine.scorecard import build_scorecard
 
 
 def _card(html: str, url: str = "https://example.com/page") -> dict:

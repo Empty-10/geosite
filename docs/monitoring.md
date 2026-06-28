@@ -20,13 +20,13 @@ calls; email is pennies). No LLM in the loop.
 
 ## What already exists (build on this, don't rebuild)
 
-- `store.py` — SQLite, gated by `DAMASK_DB_PATH`. `save()`, `history()`, `get()`, `previous()`,
+- `store.py` — SQLite, gated by `ASTOVA_DB_PATH`. `save()`, `history()`, `get()`, `previous()`,
   and **`diff_reports(old, new)`** which already returns `score_delta`, `pillar_deltas`,
   `regressed`, `resolved`, `new_issues`. The `scans` table is the history table.
 - `/scan` already auto-saves + attaches `meta.diff` when persistence is on.
 - The engine is a single stateful Render instance — fine for SQLite + a monitors table.
 
-**Prerequisite:** set `DAMASK_DB_PATH` on a Render **persistent disk** (currently unset, so nothing
+**Prerequisite:** set `ASTOVA_DB_PATH` on a Render **persistent disk** (currently unset, so nothing
 persists in prod). Monitoring can't exist without durable storage.
 
 ## Architecture
@@ -131,7 +131,7 @@ A monitor that cries wolf is worse than none. Guards:
 
 | Phase | Scope | New deps | Ships value |
 |---|---|---|---|
-| **M0 — core** ✅ | **Built.** `monitors`/`alerts` tables + CRUD (`store.py`); pure alert rules with anti-noise (`monitoring.py`); `POST /monitors` + `GET /monitors` + `DELETE` + `GET /monitors/{id}/alerts` + `POST /monitors/run-due` (cron-secret guarded). Offline-tested. Still to do operationally: set `DAMASK_DB_PATH` on Render. | none | engine watches + records (no delivery yet) |
+| **M0 — core** ✅ | **Built.** `monitors`/`alerts` tables + CRUD (`store.py`); pure alert rules with anti-noise (`monitoring.py`); `POST /monitors` + `GET /monitors` + `DELETE` + `GET /monitors/{id}/alerts` + `POST /monitors/run-due` (cron-secret guarded). Offline-tested. Still to do operationally: set `ASTOVA_DB_PATH` on Render. | none | engine watches + records (no delivery yet) |
 | **M1 — schedule** | External cron → `/monitors/run-due` with a shared secret. | Vercel Cron | runs automatically |
 | **M2 — alerts** | The 5 rules + debounce/anti-noise + email delivery (Resend). | Resend | real notifications |
 | **M3 — surfaces** | `/monitors` UI: add/list/pause, sparkline, alert log, per-monitor trend. | none | self-serve + "tracking over time" |

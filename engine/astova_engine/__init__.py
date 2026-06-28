@@ -1,4 +1,4 @@
-"""damask scan engine — URL in, scored GEO/SEO report out."""
+"""astova scan engine — URL in, scored GEO/SEO report out."""
 
 from .scanner import scan, scan_html
 from .models import Report, Finding, Confidence, Severity, Status, Pillar

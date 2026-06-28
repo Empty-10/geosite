@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
-from damask_engine import monitoring, store
-from damask_engine.service import app
+from astova_engine import monitoring, store
+from astova_engine.service import app
 
 client = TestClient(app)
 
@@ -61,7 +61,7 @@ def test_first_scan_no_baseline_no_alerts():
 # --- store CRUD ----------------------------------------------------------------------------
 
 def _db(monkeypatch, tmp_path):
-    monkeypatch.setenv("DAMASK_DB_PATH", str(tmp_path / "m.db"))
+    monkeypatch.setenv("ASTOVA_DB_PATH", str(tmp_path / "m.db"))
 
 
 def test_monitor_crud_and_due(monkeypatch, tmp_path):
@@ -101,14 +101,14 @@ def test_record_and_list_alerts(monkeypatch, tmp_path):
 
 def test_run_due_endpoint(monkeypatch, tmp_path):
     _db(monkeypatch, tmp_path)
-    from damask_engine.models import Report
+    from astova_engine.models import Report
     store.add_monitor("https://ex.test")
-    monkeypatch.setattr("damask_engine.service.scan",
+    monkeypatch.setattr("astova_engine.service.scan",
                         lambda url, fixes=False: Report(url=url, overall_score=80, meta={"status_code": 200}))
     body = client.post("/monitors/run-due").json()
     assert body["ran"] == 1 and body["results"][0]["ok"] is True
 
 
 def test_run_due_requires_persistence(monkeypatch):
-    monkeypatch.delenv("DAMASK_DB_PATH", raising=False)
+    monkeypatch.delenv("ASTOVA_DB_PATH", raising=False)
     assert client.post("/monitors/run-due").status_code == 503

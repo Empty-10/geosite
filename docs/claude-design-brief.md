@@ -1,14 +1,14 @@
-# damask — Claude Design brief
+# astova — Claude Design brief
 
 Paste this into Claude Design to start from a real spec. It defines the product, the
 design principles, the exact palette (light + dark), typography, motion, components, and
-the screens to design. Codename **damask** (placeholder).
+the screens to design. Codename **astova** (placeholder).
 
 ---
 
 ## 1. What the product is
 
-damask is a website-scanning platform that produces high-accuracy **GEO** (Generative
+astova is a website-scanning platform that produces high-accuracy **GEO** (Generative
 Engine Optimization) reports — how well a site is positioned to be cited by AI answer
 engines (ChatGPT, Google AI Overviews, Perplexity, Gemini, Claude) — backed by a
 deterministic technical/SEO engine.

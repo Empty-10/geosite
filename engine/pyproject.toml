@@ -1,5 +1,5 @@
 [project]
-name = "damask-engine"
+name = "astova-engine"
 version = "0.0.1"
 description = "GEO/SEO scan engine — URL in, scored report out."
 requires-python = ">=3.10"
@@ -17,7 +17,7 @@ render = ["playwright>=1.44"]
 mcp = ["mcp>=1.2"]
 
 [project.scripts]
-damask = "damask_engine.cli:main"
+astova = "astova_engine.cli:main"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -25,7 +25,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["damask_engine*"]
+include = ["astova_engine*"]
 
 [tool.ruff]
 line-length = 100

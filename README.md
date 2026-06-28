@@ -1,9 +1,9 @@
-# damask
+# Astova
 
 GEO-first website intelligence platform — high-accuracy GEO (Generative Engine
 Optimization) reports backed by a deterministic technical/SEO engine.
 
-> Codename `damask` is a placeholder. See `CLAUDE.md` for the full vision, architecture,
+> Codename `Astova` is a placeholder. See `CLAUDE.md` for the full vision, architecture,
 > strategy, and build roadmap — read that first.
 
 ## What's here now
@@ -19,8 +19,8 @@ cd engine
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 
-python -m damask_engine https://example.com          # human-readable report
-python -m damask_engine https://example.com --json    # JSON
+python -m astova_engine https://example.com          # human-readable report
+python -m astova_engine https://example.com --json    # JSON
 pytest                                                # run offline tests
 ```
 

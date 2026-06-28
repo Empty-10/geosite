@@ -1,4 +1,4 @@
-"""damask MCP server — exposes the deterministic audit engine as Model Context Protocol tools,
+"""astova MCP server — exposes the deterministic audit engine as Model Context Protocol tools,
 so an AI assistant (ChatGPT, Claude Desktop, Claude Code) can audit a URL by *calling the engine*
 instead of pasting HTML and asking the model to eyeball a score.
 
@@ -6,10 +6,10 @@ This is the wedge: the assistant gets a reproducible scorecard from real HTML pa
 LLM guess. Run it over stdio:
 
     pip install -e ".[mcp]"
-    python -m damask_engine.mcp_server
+    python -m astova_engine.mcp_server
 
 Client config (Claude Desktop / Claude Code / ChatGPT desktop):
-    {"mcpServers": {"damask": {"command": "python", "args": ["-m", "damask_engine.mcp_server"]}}}
+    {"mcpServers": {"astova": {"command": "python", "args": ["-m", "astova_engine.mcp_server"]}}}
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from .crawl import crawl
 from .fixes import build_fix_plan
 from .scanner import scan
 
-mcp = FastMCP("damask")
+mcp = FastMCP("astova")
 
 _SEV_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 _MAX_ISSUES = 10
@@ -88,7 +88,7 @@ def fix_plan(url: str) -> dict:
     rewrite_content / review), a `target` location hint, the exact `content` to apply (for
     deterministic fixes), and a plain-English `instruction`. Deterministic fixes (schema,
     robots.txt, llms.txt, meta) come ready to paste; judgment-dependent ones are flagged
-    `ai_draftable` for you to write the edit. damask diagnoses; you apply the fix to the files.
+    `ai_draftable` for you to write the edit. astova diagnoses; you apply the fix to the files.
 
     Use this after audit_url when the user wants to actually fix the issues, not just see them.
 
@@ -107,7 +107,7 @@ def fix_plan(url: str) -> dict:
         "fixes": build_fix_plan(report),
         "confidence": "verified",
         "note": "Deterministic audit. Apply each fix to your source files (you have them); "
-                "damask supplies the exact remediation. Re-run to confirm the score rose.",
+                "astova supplies the exact remediation. Re-run to confirm the score rose.",
     }
 
 

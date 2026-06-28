@@ -4,7 +4,7 @@
 //
 // Unlike /api/scan, a crawl runs long (many pages), so the engine runs it as a background job
 // and the client polls. There's no serverless shell-out path for a long crawl, so this requires
-// the engine HTTP service: set DAMASK_ENGINE_URL (locally, run the engine via uvicorn).
+// the engine HTTP service: set ASTOVA_ENGINE_URL (locally, run the engine via uvicorn).
 
 import { normalizeUrl, ssrfReason } from "@/lib/scanUrl";
 
@@ -12,12 +12,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const ENGINE_URL = process.env.DAMASK_ENGINE_URL;
+const ENGINE_URL = process.env.ASTOVA_ENGINE_URL;
 const HTTP_TIMEOUT_MS = 55_000;
 
 const NO_ENGINE =
   "Site crawl isn't available on this deployment yet — it runs on the scan engine service. " +
-  "Set DAMASK_ENGINE_URL to its URL (see web/README.md).";
+  "Set ASTOVA_ENGINE_URL to its URL (see web/README.md).";
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });

@@ -3,9 +3,9 @@ Offline — feed crafted HTML straight to the module."""
 
 from __future__ import annotations
 
-from damask_engine.models import Status
-from damask_engine.modules.geo_readiness import AEO_GOOD_MAX, analyze
-from damask_engine.util import make_soup, visible_text
+from astova_engine.models import Status
+from astova_engine.modules.geo_readiness import AEO_GOOD_MAX, analyze
+from astova_engine.util import make_soup, visible_text
 
 
 def run(html: str):
@@ -276,7 +276,7 @@ def test_normal_page_keeps_granular_checks():
 # --------------------------------------------------------------- freshness, entity, answer preview
 
 from datetime import datetime, timezone  # noqa: E402
-from damask_engine.modules.geo_readiness import _entity, _freshness  # noqa: E402
+from astova_engine.modules.geo_readiness import _entity, _freshness  # noqa: E402
 
 NOW = datetime(2026, 6, 28, tzinfo=timezone.utc)
 

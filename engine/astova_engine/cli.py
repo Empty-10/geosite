@@ -1,4 +1,4 @@
-"""Command line entry point: `python -m damask_engine <url> [--json]`."""
+"""Command line entry point: `python -m astova_engine <url> [--json]`."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ def _print_human(report: Report) -> None:
         print(f"Could not scan {report.url}: {report.meta['error']}")
         return
 
-    print(f"\n  damask scan — {report.url}")
+    print(f"\n  astova scan — {report.url}")
     print(f"  overall: {report.overall_score}/100   "
           f"words: {report.meta.get('word_count', '?')}   "
           f"status: {report.meta.get('status_code', '?')}\n")
@@ -56,7 +56,7 @@ def _print_site(site: SiteReport) -> None:
         return
 
     m = site.meta
-    print(f"\n  damask site scan — {site.url}")
+    print(f"\n  astova site scan — {site.url}")
     print(f"  site score: {site.overall_score}/100   "
           f"pages: {m.get('pages_crawled', '?')}   "
           f"broken: {m.get('broken', 0)}   "
@@ -84,7 +84,7 @@ def _print_site(site: SiteReport) -> None:
 def _print_logs(report) -> None:
     m = report.meta
     dr = m.get("date_range") or [None, None]
-    print(f"\n  damask crawler-log analysis — {report.source}")
+    print(f"\n  astova crawler-log analysis — {report.source}")
     print(f"  {m.get('ai_requests', 0)} AI-crawler requests of {m.get('lines_parsed', 0)} "
           f"parsed lines   range: {dr[0] or '?'} → {dr[1] or '?'}\n")
 
@@ -108,7 +108,7 @@ def _print_logs(report) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(prog="damask", description="GEO/SEO scan engine.")
+    ap = argparse.ArgumentParser(prog="astova", description="GEO/SEO scan engine.")
     ap.add_argument("url", nargs="?", help="URL to scan, e.g. https://example.com")
     ap.add_argument("--json", action="store_true", help="output machine-readable JSON")
     ap.add_argument("--render", action="store_true",

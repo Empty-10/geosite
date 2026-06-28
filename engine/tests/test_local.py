@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from damask_engine.models import Status
-from damask_engine.modules.local import analyze
-from damask_engine.util import make_soup, visible_text
+from astova_engine.models import Status
+from astova_engine.modules.local import analyze
+from astova_engine.util import make_soup, visible_text
 
 
 def run(html: str, url: str = "https://acme.test"):

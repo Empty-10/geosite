@@ -1,18 +1,18 @@
 // POST /api/cloudflare-logs  { domain, days? }  → pull AI-crawler activity for a domain from
 // Cloudflare analytics (no log upload). Thin proxy to the engine, which holds the CF token.
 // Cloudflare-side errors come back as 200 with meta.error (the engine never raises); the client
-// inspects that. Requires DAMASK_ENGINE_URL.
+// inspects that. Requires ASTOVA_ENGINE_URL.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 45;
 
-const ENGINE_URL = process.env.DAMASK_ENGINE_URL;
+const ENGINE_URL = process.env.ASTOVA_ENGINE_URL;
 const HTTP_TIMEOUT_MS = 40_000;
 
 const NO_ENGINE =
   "Cloudflare connect isn't available on this deployment yet — it runs on the scan engine " +
-  "service. Set DAMASK_ENGINE_URL to its URL (see web/README.md).";
+  "service. Set ASTOVA_ENGINE_URL to its URL (see web/README.md).";
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });

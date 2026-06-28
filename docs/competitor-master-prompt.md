@@ -1,10 +1,10 @@
 # Competitor reference — deterministic GEO/AEO/SEO auditor prompt
 
 A competitor's LLM-prompt-based auditor, shared for reference. Kept here as the benchmark
-that `docs/coverage-map.md` maps damask's engine against.
+that `docs/coverage-map.md` maps astova's engine against.
 
 > Key distinction: this is an LLM *instructed* to behave deterministically (it can drift
-> between runs). damask does the same checks in real parser code, which is genuinely
+> between runs). astova does the same checks in real parser code, which is genuinely
 > reproducible. We mine this for **coverage** (the 20 rows + overlay), and deliberately
 > reject its invented per-engine weighting and single hidden headline. See coverage-map.md.
 

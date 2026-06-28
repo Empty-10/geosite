@@ -30,7 +30,7 @@ export async function classifySentiment(brand: string, passages: string[]): Prom
   if (!apiKey || passages.length === 0) return null;
   try {
     const msg = await new Anthropic({ apiKey }).messages.create({
-      model: process.env.DAMASK_SENTIMENT_MODEL || "claude-haiku-4-5",
+      model: process.env.ASTOVA_SENTIMENT_MODEL || "claude-haiku-4-5",
       max_tokens: 300,
       system:
         `For each numbered passage, classify how the brand "${brand}" is portrayed: positive, ` +
@@ -51,7 +51,7 @@ export async function classifySentiment(brand: string, passages: string[]): Prom
 }
 
 async function sampleClaude(prompt: string, apiKey: string): Promise<Sample | null> {
-  const model = process.env.DAMASK_VISIBILITY_MODEL || "claude-sonnet-4-6";
+  const model = process.env.ASTOVA_VISIBILITY_MODEL || "claude-sonnet-4-6";
   try {
     const msg = await new Anthropic({ apiKey }).messages.create({
       model,
@@ -78,7 +78,7 @@ async function sampleClaude(prompt: string, apiKey: string): Promise<Sample | nu
 }
 
 async function samplePerplexity(prompt: string, apiKey: string): Promise<Sample | null> {
-  const model = process.env.DAMASK_PERPLEXITY_MODEL || "sonar";
+  const model = process.env.ASTOVA_PERPLEXITY_MODEL || "sonar";
   try {
     const r = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
@@ -101,7 +101,7 @@ async function samplePerplexity(prompt: string, apiKey: string): Promise<Sample 
 }
 
 async function sampleGemini(prompt: string, apiKey: string): Promise<Sample | null> {
-  const model = process.env.DAMASK_GEMINI_MODEL || "gemini-2.0-flash";
+  const model = process.env.ASTOVA_GEMINI_MODEL || "gemini-2.0-flash";
   try {
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,

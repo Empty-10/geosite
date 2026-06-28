@@ -9,7 +9,7 @@ export function Manifesto() {
   return (
     <section style={{ padding: "76px 32px", borderTop: "1px solid var(--border)" }}>
       <div style={{ maxWidth: 780, margin: "0 auto", textAlign: "center" }}>
-        <span style={{ fontSize: 13, color: "var(--accent)" }}>Why damask</span>
+        <span style={{ fontSize: 13, color: "var(--accent)" }}>Why Astova</span>
         <p
           style={{
             fontSize: 26,
@@ -20,7 +20,7 @@ export function Manifesto() {
             textWrap: "balance",
           }}
         >
-          Most AI-search tools just <I>track</I> what&apos;s happening. damask is built on{" "}
+          Most AI-search tools just <I>track</I> what&apos;s happening. Astova is built on{" "}
           <I>determinism</I> — it reads your pages the way AI crawlers do, shows you exactly what&apos;s
           wrong, and hands you the <I>fix</I>. Verified, not estimated. <I>Reproducible</I>, not guessed.
         </p>

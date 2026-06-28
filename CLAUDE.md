@@ -1,6 +1,6 @@
-# damask — GEO/SEO intelligence platform
+# Astova — GEO/SEO intelligence platform
 
-> Working codename: **damask** (placeholder, rename when the real `.ai` domain is locked).
+> Working codename: **Astova** (placeholder, rename when the real `.ai` domain is locked).
 > This file is the source of truth for anyone (human or AI) working in this repo. Read it first.
 
 ## What we're building
@@ -83,8 +83,8 @@ pillars we have (on-page, technical, GEO-readiness) and renormalize weights.
 
 ```
 engine/                 Python scan engine — BUILT, runnable, pytest green
-  damask_engine/
-    cli.py              `python -m damask_engine <url>` → scored report (--json for JSON)
+  astova_engine/
+    cli.py              `python -m astova_engine <url>` → scored report (--json for JSON)
     scanner.py          orchestrates modules; scan(url) and scan_html(url, html)
     fetch.py            HTTP fetch (Playwright render still to come)
     models.py           Finding / Report / enums (Confidence, Severity, Status, Pillar)
@@ -122,8 +122,8 @@ docs/                   architecture doc, claude-design-brief.md, PROJECT-STATUS
 cd engine
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
-python -m damask_engine https://example.com           # live scan
-python -m damask_engine https://example.com --json     # machine-readable
+python -m astova_engine https://example.com           # live scan
+python -m astova_engine https://example.com --json     # machine-readable
 pytest                                                 # offline tests
 ```
 
@@ -148,7 +148,7 @@ The highest-value next step is connecting the two halves that already exist — 
 scan demo on the landing page is mocked; make it call the real engine.
 
 1. **`/api/scan` route** in `web/` — accept a URL, run the engine, return its JSON report.
-   Two options: (a) a Next route handler that shells out to `python -m damask_engine <url>
+   Two options: (a) a Next route handler that shells out to `python -m astova_engine <url>
    --json`, or (b) expose the engine as a small FastAPI service and have the route fetch it.
    Wire `HeroDemo.tsx` to call it instead of the mocked data.
 2. **Engine depth** — flesh out `modules/technical.py` (real robots.txt + sitemap parse,

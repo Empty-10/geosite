@@ -27,7 +27,7 @@ export function Nav() {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <Logo />
-        <span style={{ fontSize: 17, fontWeight: 500, letterSpacing: "-0.01em" }}>damask</span>
+        <span style={{ fontSize: 17, fontWeight: 500, letterSpacing: "-0.01em" }}>Astova</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
         <a style={linkStyle} href="/#product">Product</a>

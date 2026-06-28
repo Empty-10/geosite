@@ -3,8 +3,8 @@ monkeypatched mini-crawl (no network)."""
 
 from __future__ import annotations
 
-import damask_engine.crawl as crawl_mod
-from damask_engine.crawl import (
+import astova_engine.crawl as crawl_mod
+from astova_engine.crawl import (
     _dupes,
     _internal_links,
     _is_asset,
@@ -12,8 +12,8 @@ from damask_engine.crawl import (
     _site_findings,
     crawl,
 )
-from damask_engine.models import PageSummary, Status
-from damask_engine.util import make_soup
+from astova_engine.models import PageSummary, Status
+from astova_engine.util import make_soup
 
 
 # --- URL helpers -------------------------------------------------------------------------

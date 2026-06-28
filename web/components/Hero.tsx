@@ -60,7 +60,7 @@ export function Hero() {
             <RotatingWord words={ENGINES} />.
           </h1>
           <p style={{ fontSize: 17, color: "var(--text-2)", maxWidth: 540, margin: "0 auto", textWrap: "pretty" }}>
-            damask reads your pages the way AI answer engines do — separating verified fact from measured estimate —
+            Astova reads your pages the way AI answer engines do — separating verified fact from measured estimate —
             then hands you the fix, not just the finding.
           </p>
         </div>

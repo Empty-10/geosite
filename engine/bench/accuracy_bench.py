@@ -17,8 +17,8 @@ from collections import defaultdict
 
 import requests
 
-from damask_engine.config import get_pagespeed_key
-from damask_engine.scanner import scan
+from astova_engine.config import get_pagespeed_key
+from astova_engine.scanner import scan
 
 PSI = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 

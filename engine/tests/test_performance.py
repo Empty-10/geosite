@@ -3,9 +3,9 @@ the module parses a trimmed PageSpeed Insights JSON; no network or API key neede
 
 from __future__ import annotations
 
-from damask_engine.models import Pillar, Status
-from damask_engine.modules.performance import analyze, pillar_score
-from damask_engine.scoring import build_report
+from astova_engine.models import Pillar, Status
+from astova_engine.modules.performance import analyze, pillar_score
+from astova_engine.scoring import build_report
 
 
 def psi(score=0.75, lcp=3200, cls=0.05, tbt=150, fcp=1500, si=3000, field="AVERAGE"):

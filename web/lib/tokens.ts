@@ -1,4 +1,4 @@
-// damask design tokens (dark-mode-first). See docs/claude-design-brief.md.
+// astova design tokens (dark-mode-first). See docs/claude-design-brief.md.
 // JS-accessible copies for inline/dynamic styling (e.g. the live scan demo).
 
 export const C = {

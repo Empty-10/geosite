@@ -2,11 +2,11 @@
 
 Lets the web app reach the engine over HTTP instead of spawning a Python process — the
 production path (web on Vercel, which has no Python runtime; engine on a container host).
-The web route uses this when DAMASK_ENGINE_URL is set; otherwise it shells out locally.
+The web route uses this when ASTOVA_ENGINE_URL is set; otherwise it shells out locally.
 See docs/PROJECT-STATUS.md → "Next tasks" #1.
 
 Install:  pip install -e ".[service]"
-Run:      uvicorn damask_engine.service:app --host 0.0.0.0 --port 8000
+Run:      uvicorn astova_engine.service:app --host 0.0.0.0 --port 8000
 
 Contract (mirrors the CLI's --json output so the route handles both paths identically):
   POST /scan  {"url": "..."}  ->  200 + Report.to_dict()
@@ -67,7 +67,7 @@ except Exception:  # noqa: BLE001 — [mcp] not installed; REST API runs without
     _mcp_app = None
     _LIFESPAN = None
 
-app = FastAPI(title="damask engine", version="1", description="GEO/SEO scan engine.",
+app = FastAPI(title="astova engine", version="1", description="GEO/SEO scan engine.",
               lifespan=_LIFESPAN)
 
 # In-memory crawl jobs. Fine for the single Render instance; evicted oldest-first past a cap.
@@ -121,7 +121,7 @@ def health() -> dict:
 def scan_endpoint(req: ScanRequest) -> dict:
     """Run a full scan and return the report dict. Failures surface in meta.error.
 
-    When persistence is enabled (DAMASK_DB_PATH), the scan is saved and the response carries
+    When persistence is enabled (ASTOVA_DB_PATH), the scan is saved and the response carries
     meta.scan_id plus meta.diff (vs the previous scan of the same URL) for change tracking.
     """
     report = scan(req.url, fixes=True).to_dict()
@@ -160,7 +160,7 @@ def compare_endpoint(req: CompareRequest) -> dict:
 
 def _require_persistence() -> None:
     if not store.is_enabled():
-        raise HTTPException(status_code=503, detail="Persistence is off — set DAMASK_DB_PATH.")
+        raise HTTPException(status_code=503, detail="Persistence is off — set ASTOVA_DB_PATH.")
 
 
 @app.post("/monitors")
@@ -190,14 +190,14 @@ def monitor_alerts_endpoint(monitor_id: int, limit: int = 50) -> dict:
 
 
 @app.post("/monitors/run-due")
-def run_due_endpoint(x_damask_cron: str | None = Header(default=None)) -> dict:
+def run_due_endpoint(x_astova_cron: str | None = Header(default=None)) -> dict:
     """Scan every monitor whose next run is due, diff vs the previous scan, evaluate the alert
     rules (with anti-noise) and record any alerts. Triggered by an external cron.
 
-    Guarded by a shared secret when DAMASK_CRON_SECRET is set (the X-Damask-Cron header).
+    Guarded by a shared secret when ASTOVA_CRON_SECRET is set (the X-Astova-Cron header).
     """
-    secret = os.environ.get("DAMASK_CRON_SECRET")
-    if secret and x_damask_cron != secret:
+    secret = os.environ.get("ASTOVA_CRON_SECRET")
+    if secret and x_astova_cron != secret:
         raise HTTPException(status_code=401, detail="bad or missing cron secret")
     _require_persistence()
 

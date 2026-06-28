@@ -1,4 +1,4 @@
-# damask MCP server
+# astova MCP server
 
 Exposes the deterministic audit engine as [Model Context Protocol](https://modelcontextprotocol.io)
 tools, so an AI assistant audits a URL by **calling the engine** instead of pasting HTML and
@@ -12,7 +12,7 @@ into ChatGPT and score it" workflow.
 |---|---|
 | `audit_url(url)` | AI Retrievability scorecard — headline 0–100, the 20-row breakdown, category scores, the +8 overlay, and the top prioritised issues with fix recommendations. |
 | `scan_url(url)`  | Full report — every finding (on-page / technical / GEO-readiness) with status, severity, evidence, recommendation, plus pillar scores and the scorecard. |
-| `fix_plan(url)`  | A complete, **agent-actionable** remediation plan, ordered by severity. Each item: the `finding_id` it resolves, an `action` (`create_file` / `add_to_head` / `rewrite_content` / `review`), a `target` location hint, the exact `content` to apply (deterministic fixes), a plain-English `instruction`, `source` (`deterministic` \| `advisory`) and `ai_draftable`. **damask diagnoses; the dev's coding agent applies the fix to the files** — so "audit my project and fix everything" becomes a loop: `fix_plan` → apply → `audit_url` to confirm. |
+| `fix_plan(url)`  | A complete, **agent-actionable** remediation plan, ordered by severity. Each item: the `finding_id` it resolves, an `action` (`create_file` / `add_to_head` / `rewrite_content` / `review`), a `target` location hint, the exact `content` to apply (deterministic fixes), a plain-English `instruction`, `source` (`deterministic` \| `advisory`) and `ai_draftable`. **astova diagnoses; the dev's coding agent applies the fix to the files** — so "audit my project and fix everything" becomes a loop: `fix_plan` → apply → `audit_url` to confirm. |
 | `audit_project(path, base_url?)` | **Pre-deploy, project-aware** audit (local MCP only). Reads the project's static root files (`robots.txt`, `llms.txt`, `sitemap.xml`) from disk, detects the framework (Next.js / Astro / Gatsby / WordPress / static), and returns fixes with **real, layout-aware file paths** (e.g. `public/robots.txt`). Pass `base_url` (your running dev server, e.g. `http://localhost:3000`) to also render-audit the page and include its full `fix_plan`. The project's source never leaves the machine. |
 
 ### Dev workflow (the "audit my project and fix everything" loop)
@@ -21,14 +21,14 @@ With the **local** MCP added to Claude Code / Cursor / Claude Desktop, run your 
 
 > *"Audit my project at . with base_url http://localhost:3000 and fix the issues."*
 
-The agent calls `audit_project` → gets file fixes (with concrete paths) + the rendered page's fix plan → **applies them to your source** → calls `audit_project` again to confirm the score rose. damask supplies the fixes; your agent edits the files.
+The agent calls `audit_project` → gets file fixes (with concrete paths) + the rendered page's fix plan → **applies them to your source** → calls `audit_project` again to confirm the score rose. astova supplies the fixes; your agent edits the files.
 
 ## Run
 
 ```bash
 cd engine
 pip install -e ".[mcp]"
-python -m damask_engine.mcp_server     # speaks MCP over stdio
+python -m astova_engine.mcp_server     # speaks MCP over stdio
 ```
 
 ## Connect a client
@@ -39,9 +39,9 @@ Add to the client's MCP config (Claude Desktop: `claude_desktop_config.json`; Cl
 ```json
 {
   "mcpServers": {
-    "damask": {
+    "astova": {
       "command": "python",
-      "args": ["-m", "damask_engine.mcp_server"]
+      "args": ["-m", "astova_engine.mcp_server"]
     }
   }
 }
@@ -68,7 +68,7 @@ Verified handshake:
     curl -X POST https://<host>/mcp/ -H 'content-type: application/json' \
       -H 'accept: application/json, text/event-stream' \
       -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
-    # → 200, serverInfo {"name":"damask"}
+    # → 200, serverInfo {"name":"astova"}
 
 > ⚠️ The remote endpoint is **public** — anyone with the URL can run scans against the engine
 > (compute cost; and the engine's scan path has no SSRF guard yet). Before promoting it widely,

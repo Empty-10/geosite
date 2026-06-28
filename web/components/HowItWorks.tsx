@@ -4,7 +4,7 @@ const STEPS = [
   {
     n: "01",
     title: "Scan any URL",
-    body: "Paste a page — or your whole site. damask fetches it, renders JavaScript, and reads it the way an AI crawler does.",
+    body: "Paste a page — or your whole site. astova fetches it, renders JavaScript, and reads it the way an AI crawler does.",
   },
   {
     n: "02",

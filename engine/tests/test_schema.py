@@ -8,8 +8,8 @@ SCHEMA_VERSION and update this test in the same commit.
 
 from __future__ import annotations
 
-from damask_engine import scan_html
-from damask_engine.models import SCHEMA_VERSION
+from astova_engine import scan_html
+from astova_engine.models import SCHEMA_VERSION
 
 HTML = """<!doctype html><html><head>
 <title>A clear, useful page title for testing the schema</title>

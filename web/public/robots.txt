@@ -1,4 +1,4 @@
-# damask marketing site
+# Astova marketing site
 User-agent: *
 Allow: /
 

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 
-from damask_engine import scan_html
-from damask_engine.fixes import Fix, generate_fixes
-from damask_engine.util import make_soup
+from astova_engine import scan_html
+from astova_engine.fixes import Fix, generate_fixes
+from astova_engine.util import make_soup
 
 
 def fixes_for(html: str, url: str = "https://example.com/page") -> dict[str, Fix]:
@@ -58,7 +58,7 @@ def test_faq_fix_from_qa_pairs():
 
 def test_llms_fix_when_absent():
     # technical module emits tech.llms_txt(value=False) when llms_status is provided as 404
-    from damask_engine.modules.technical import NetInputs
+    from astova_engine.modules.technical import NetInputs
     report = scan_html("https://example.com/", "<html><body><p>hi there friends here</p></body></html>",
                        online=False, final_url="https://example.com/",
                        net=NetInputs(llms_status=404, llms_txt=""), fixes=True)
@@ -93,7 +93,7 @@ def test_canonical_and_viewport_fixes_when_missing():
 
 
 def test_robots_fix_when_missing():
-    from damask_engine.modules.technical import NetInputs
+    from astova_engine.modules.technical import NetInputs
     report = scan_html("https://example.com/", "<html><body><h1>h</h1><p>some words here for body</p></body></html>",
                        online=False, final_url="https://example.com/",
                        net=NetInputs(robots_status=404, robots_txt=""), fixes=True)
@@ -115,7 +115,7 @@ def test_generate_fixes_is_pure_listable():
 # --- agent-actionable fix plan (build_fix_plan) ---------------------------------------------
 
 def _plan(html: str, url: str = "https://example.com/page") -> list[dict]:
-    from damask_engine.fixes import build_fix_plan
+    from astova_engine.fixes import build_fix_plan
     report = scan_html(url, html, online=False, final_url=url, fixes=True)
     return build_fix_plan(report)
 

@@ -1,8 +1,8 @@
 // POST /api/compare  →  scans 2–4 pages via the engine and returns a deterministic benchmark.
 //
 // The comparison is a server-side multi-scan, so it runs against the engine HTTP service
-// (DAMASK_ENGINE_URL). There's no local shell-out path: point at a running engine service
-// (locally: `uvicorn damask_engine.service:app` + DAMASK_ENGINE_URL=http://localhost:8000).
+// (ASTOVA_ENGINE_URL). There's no local shell-out path: point at a running engine service
+// (locally: `uvicorn astova_engine.service:app` + ASTOVA_ENGINE_URL=http://localhost:8000).
 
 import { normalizeUrl, ssrfReason } from "@/lib/urlGuard";
 
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const ENGINE_URL = process.env.DAMASK_ENGINE_URL;
+const ENGINE_URL = process.env.ASTOVA_ENGINE_URL;
 const ENGINE_HTTP_TIMEOUT_MS = 58_000; // N concurrent scans + a possible cold start
 const MAX_URLS = 4;
 
@@ -49,7 +49,7 @@ export async function POST(req: Request): Promise<Response> {
 
   if (!ENGINE_URL) {
     return json(
-      { error: "Comparison needs the engine service — set DAMASK_ENGINE_URL to its URL." },
+      { error: "Comparison needs the engine service — set ASTOVA_ENGINE_URL to its URL." },
       503,
     );
   }
