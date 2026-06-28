@@ -29,7 +29,9 @@ from typing import Any
 #     readiness; geo.bot_access — "what the AI bot saw" (fetch-as-GPTBot WAF/cloaking check).
 # v11: local-AEO module (conditional) — local.business_schema / local.nap / local.hours /
 #     local.geo / local.gbp for local-business pages; LocalBusiness schema fix.
-SCHEMA_VERSION = "11"
+# v12: geo.freshness (dated/recent content), geo.entity (entity grounding via sameAs), and the
+#     extracted answer-preview snippet on geo.aeo.
+SCHEMA_VERSION = "12"
 
 
 class Confidence(str, Enum):

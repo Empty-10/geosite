@@ -271,3 +271,55 @@ def test_normal_page_keeps_granular_checks():
     html = "<body><h1>Guide</h1><p>" + ("word " * 60) + "</p></body>"
     out = {f.id for f in analyze(make_soup(html), "word " * 60)}
     assert "geo.no_content" not in out and "geo.frontload" in out
+
+
+# --------------------------------------------------------------- freshness, entity, answer preview
+
+from datetime import datetime, timezone  # noqa: E402
+from damask_engine.modules.geo_readiness import _entity, _freshness  # noqa: E402
+
+NOW = datetime(2026, 6, 28, tzinfo=timezone.utc)
+
+
+def test_freshness_missing_is_info_suggestion():
+    f = _freshness(make_soup("<body><p>no dates here at all</p></body>"), NOW)
+    assert f.status == Status.INFO and f.value["latest"] is None
+    assert f.recommendation
+
+
+def test_freshness_recent_passes():
+    html = '<body><time datetime="2026-05-01">May</time><p>fresh</p></body>'
+    f = _freshness(make_soup(html), NOW)
+    assert f.status == Status.PASS and f.value["latest"] == "2026-05-01"
+
+
+def test_freshness_stale_warns():
+    html = '<head><meta property="article:modified_time" content="2020-01-01T00:00:00Z"></head><body><p>old</p></body>'
+    f = _freshness(make_soup(html), NOW)
+    assert f.status == Status.WARN and f.value["age_days"] > 540
+
+
+def test_entity_grounded_via_knowledge_base():
+    html = ('<head><script type="application/ld+json">'
+            '{"@type":"Organization","name":"Acme","sameAs":["https://en.wikipedia.org/wiki/Acme"]}'
+            '</script></head><body><p>x</p></body>')
+    assert _entity(make_soup(html)).status == Status.PASS
+
+
+def test_entity_present_but_weak_is_suggestion():
+    html = ('<head><script type="application/ld+json">'
+            '{"@type":"Organization","name":"Acme","sameAs":["https://acme.example/blog"]}'
+            '</script></head><body><p>x</p></body>')
+    f = _entity(make_soup(html))
+    assert f.status == Status.INFO and f.value["entity"] is True
+
+
+def test_entity_absent_suggests_adding():
+    f = _entity(make_soup("<body><p>no schema</p></body>"))
+    assert f.status == Status.INFO and f.value["entity"] is False
+
+
+def test_aeo_exposes_answer_snippet():
+    html = "<body><h1>How to brew</h1><p>Pour-over coffee uses a one to sixteen ratio of grounds to water.</p></body>"
+    f = run(html)["geo.aeo"]
+    assert f.value.get("snippet")  # the likely-cited passage is exposed

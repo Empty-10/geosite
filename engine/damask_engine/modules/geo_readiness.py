@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 
@@ -17,6 +18,14 @@ from ..models import Confidence, Finding, Pillar, Severity, Status
 
 P = Pillar.GEO
 C = Confidence.VERIFIED
+
+# Content older than this (days) reads as stale to AI engines that favour fresh, maintained pages.
+FRESH_STALE_DAYS = 540  # ~18 months
+
+# sameAs targets that ground an entity for LLMs (knowledge bases weigh most).
+_KNOWLEDGE_BASES = ("wikipedia.org", "wikidata.org")
+_AUTH_PROFILES = ("linkedin.com", "crunchbase.com", "twitter.com", "x.com", "facebook.com",
+                  "instagram.com", "youtube.com", "github.com")
 
 # Hedging language gets passed over by AI; definitive language is ~2x more likely cited.
 HEDGE_WORDS = {
@@ -164,6 +173,8 @@ def analyze(soup: BeautifulSoup, text: str, render_delta: dict | None = None) ->
     out.append(_data_density(text))      # quotable stats / concrete-figure density
     out.append(_faq(soup))
     out.append(_trust(soup))
+    out.append(_freshness(soup, datetime.now(timezone.utc)))  # dated/recent content
+    out.append(_entity(soup))            # entity grounding (sameAs to knowledge bases)
 
     # --- JavaScript-dependent content (only when a render was captured via --render) ---
     if render_delta is not None:
@@ -317,10 +328,12 @@ def _aeo(soup: BeautifulSoup) -> Finding:
     offset, snippet = _first_answer_offset(soup)
     snip = (snippet[:120] + "…") if len(snippet) > 120 else snippet
 
+    # `snippet` is the passage an answer engine would most likely extract — expose it ("answer
+    # preview") so the report/MCP can show "this is what AI will probably cite."
     if offset is None or offset >= AEO_WINDOW:
         return Finding(
             "geo.aeo", P, "Up-front answer block", Status.FAIL, Severity.HIGH, C,
-            value={"answer_word_offset": offset},
+            value={"answer_word_offset": offset, "snippet": None},
             evidence=f"No self-contained answer paragraph in the first {AEO_WINDOW} visible words.",
             recommendation="Lead with a direct, self-contained answer (a full sentence or two) "
             "high on the page — AI answer engines extract from the top.",
@@ -328,14 +341,15 @@ def _aeo(soup: BeautifulSoup) -> Finding:
     if offset > AEO_GOOD_MAX:
         return Finding(
             "geo.aeo", P, "Up-front answer block", Status.WARN, Severity.HIGH, C,
-            value={"answer_word_offset": offset},
+            value={"answer_word_offset": offset, "snippet": snip},
             evidence=f"first answer ~{offset} words in: “{snip}”",
             recommendation=f"The up-front answer starts ~{offset} words down; move it into the "
             "first ~150 words so it's the first thing engines read.",
         )
     return Finding(
         "geo.aeo", P, "Up-front answer block", Status.PASS, Severity.INFO, C,
-        value={"answer_word_offset": offset}, evidence=f"answer ~{offset} words in: “{snip}”",
+        value={"answer_word_offset": offset, "snippet": snip},
+        evidence=f"answer ~{offset} words in: “{snip}”",
     )
 
 
@@ -591,4 +605,96 @@ def _trust(soup: BeautifulSoup) -> Finding:
         "Add author/E-E-A-T signals: a visible author byline, a published/updated date (a <time "
         "datetime> or Article JSON-LD with datePublished), About + Contact links, and "
         "Organization/Person JSON-LD with sameAs — strong citation-trust factors.",
+    )
+
+
+# ------------------------------------------------------------------------- freshness + entity
+
+
+def _collect_dates(soup: BeautifulSoup) -> list[str]:
+    out: list[str] = []
+    for node in _jsonld_objects(soup):
+        for k in ("dateModified", "datePublished"):
+            v = node.get(k)
+            if isinstance(v, str):
+                out.append(v)
+    for prop in ("article:modified_time", "article:published_time"):
+        m = soup.find("meta", attrs={"property": prop})
+        if m and m.get("content"):
+            out.append(m["content"])
+    for t in soup.find_all("time"):
+        if t.get("datetime"):
+            out.append(t["datetime"])
+    return out
+
+
+def _parse_date(s: str) -> datetime | None:
+    m = re.match(r"\s*(\d{4})-(\d{2})-(\d{2})", s)
+    if not m:
+        return None
+    try:
+        return datetime(int(m[1]), int(m[2]), int(m[3]), tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _freshness(soup: BeautifulSoup, now: datetime) -> Finding:
+    """Is the content dated and recent? AI engines favour fresh, maintained pages."""
+    dates = [d for d in (_parse_date(x) for x in _collect_dates(soup)) if d]
+    if not dates:
+        return Finding(
+            "geo.freshness", P, "Content freshness", Status.INFO, Severity.LOW, C,
+            value={"latest": None}, evidence="no published/updated date found",
+            recommendation="Add a visible published/updated date and datePublished/dateModified to "
+            "your schema — AI engines and search favour fresh, dated content.",
+        )
+    latest = max(dates)
+    age = (now - latest).days
+    value = {"latest": latest.date().isoformat(), "age_days": age}
+    if age <= FRESH_STALE_DAYS:
+        return Finding(
+            "geo.freshness", P, "Content freshness", Status.PASS, Severity.INFO, C, value=value,
+            evidence=f"last dated {latest.date().isoformat()} ({age} days ago)",
+        )
+    return Finding(
+        "geo.freshness", P, "Content freshness", Status.WARN, Severity.MEDIUM, C, value=value,
+        evidence=f"last dated {latest.date().isoformat()} ({age} days ago)",
+        recommendation="The latest date is over 18 months old. Refresh and re-date the content — "
+        "AI engines and search demote stale pages.",
+    )
+
+
+def _entity(soup: BeautifulSoup) -> Finding:
+    """Entity grounding — Organization/Person schema with sameAs to knowledge bases (Wikipedia /
+    Wikidata) or several authoritative profiles, so LLMs can disambiguate the brand."""
+    nodes = [n for n in _jsonld_objects(soup) if _types_of(n) & {"organization", "person"}]
+    if not nodes:
+        return Finding(
+            "geo.entity", P, "Entity grounding", Status.INFO, Severity.LOW, C,
+            value={"entity": False},
+            evidence="no Organization or Person schema",
+            recommendation="Add Organization (or Person) JSON-LD with sameAs links to Wikipedia, "
+            "Wikidata, LinkedIn and your social profiles — it grounds your brand as an entity AI "
+            "models recognise.",
+        )
+    sameas: list[str] = []
+    for n in nodes:
+        sa = n.get("sameAs")
+        sameas += [sa] if isinstance(sa, str) else (sa if isinstance(sa, list) else [])
+    sameas = [s.lower() for s in sameas if isinstance(s, str)]
+    knowledge = any(any(k in s for k in _KNOWLEDGE_BASES) for s in sameas)
+    auth = sum(1 for s in sameas if any(a in s for a in _AUTH_PROFILES))
+    if knowledge or auth >= 2:
+        return Finding(
+            "geo.entity", P, "Entity grounding", Status.PASS, Severity.INFO, C,
+            value={"entity": True, "knowledge_base": knowledge, "sameas": len(sameas)},
+            evidence=("linked to a knowledge base (Wikipedia/Wikidata)" if knowledge
+                      else f"{auth} authoritative sameAs links"),
+        )
+    return Finding(
+        "geo.entity", P, "Entity grounding", Status.INFO, Severity.LOW, C,
+        value={"entity": True, "knowledge_base": False, "sameas": len(sameas)},
+        evidence="entity schema present but weak sameAs",
+        recommendation="Strengthen entity grounding: add sameAs to Wikipedia/Wikidata (and "
+        "LinkedIn/Crunchbase) on your Organization/Person schema so AI models can disambiguate you.",
     )

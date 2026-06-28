@@ -40,7 +40,7 @@ ROWS: list[tuple[int, str, list[str]]] = [
     (17, "Performance & Delivery", ["tech.resource_hints", "tech.compression", "perf.score",
                                     "perf.lcp", "perf.cls", "perf.tbt", "perf.fcp", "perf.si",
                                     "perf.field"]),
-    (18, "Authority, Trust & E-E-A-T", ["geo.trust", "geo.no_content", "local.nap"]),
+    (18, "Authority, Trust & E-E-A-T", ["geo.trust", "geo.no_content", "local.nap", "geo.freshness"]),
     (19, "Indexability & Technical SEO Sanity", ["tech.https", "tech.status", "tech.redirect",
                                                  "tech.redirect.chain", "tech.hsts", "tech.tls",
                                                  "tech.mixed_content", "tech.mixed_content.ok",
