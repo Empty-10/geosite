@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 
+import { QA } from "@/lib/faq";
 import { SITE_URL } from "@/lib/site";
 import { Nav } from "@/components/Nav";
 import { Hero } from "@/components/Hero";
+import { SummaryPoints } from "@/components/SummaryPoints";
 import { AiEngines } from "@/components/AiEngines";
 import { Manifesto } from "@/components/Manifesto";
 import { Features } from "@/components/Features";
@@ -39,6 +41,15 @@ const JSON_LD = {
       url: `${SITE_URL}/`,
       publisher: { "@id": `${SITE_URL}/#org` },
     },
+    {
+      "@type": "FAQPage",
+      "@id": `${SITE_URL}/#faq`,
+      mainEntity: QA.map(({ q, a }) => ({
+        "@type": "Question",
+        name: q,
+        acceptedAnswer: { "@type": "Answer", text: a },
+      })),
+    },
   ],
 };
 
@@ -49,6 +60,7 @@ export default function Home() {
       <Nav />
       <Hero />
       <AiEngines />
+      <SummaryPoints />
       <McpSpotlight />
       <Manifesto />
       <Features />
