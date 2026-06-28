@@ -5,7 +5,7 @@ const ENGINES = ["ChatGPT", "Perplexity", "Gemini", "Google AI Overviews", "Copi
 
 export function AiEngines() {
   return (
-    <section style={{ padding: "4px 32px 40px" }}>
+    <section style={{ padding: "28px 32px 44px" }}>
       <div style={{ maxWidth: 1000, margin: "0 auto", textAlign: "center" }}>
         <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 18, letterSpacing: "0.02em" }}>
           How your site shows up across the engines people actually ask

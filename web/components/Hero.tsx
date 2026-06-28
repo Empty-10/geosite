@@ -7,7 +7,7 @@ export function Hero() {
   return (
     <section
       style={{
-        padding: "72px 32px 40px",
+        padding: "72px 32px 80px",
         display: "flex",
         justifyContent: "center",
         position: "relative",

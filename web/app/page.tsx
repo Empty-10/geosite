@@ -18,10 +18,10 @@ export default function Home() {
       <Nav />
       <Hero />
       <AiEngines />
+      <McpSpotlight />
       <Manifesto />
       <Features />
       <HowItWorks />
-      <McpSpotlight />
       <WhoItsFor />
       <Confidence />
       <Pricing />
