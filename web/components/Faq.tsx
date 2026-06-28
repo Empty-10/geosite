@@ -32,7 +32,7 @@ const QA = [
 export function Faq() {
   const [open, setOpen] = useState<number | null>(0);
   return (
-    <section style={{ padding: "80px 32px", borderTop: "1px solid var(--border)" }}>
+    <section id="faq" style={{ padding: "80px 32px", borderTop: "1px solid var(--border)", scrollMarginTop: 72 }}>
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <span style={{ fontSize: 13, color: "var(--accent)" }}>FAQ</span>

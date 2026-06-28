@@ -5,10 +5,11 @@ import { Manifesto } from "@/components/Manifesto";
 import { Features } from "@/components/Features";
 import { HowItWorks } from "@/components/HowItWorks";
 import { McpSpotlight } from "@/components/McpSpotlight";
+import { WhoItsFor } from "@/components/WhoItsFor";
 import { Confidence } from "@/components/Confidence";
 import { Pricing } from "@/components/Pricing";
 import { Faq } from "@/components/Faq";
-import { AgencyCta } from "@/components/AgencyCta";
+import { FinalCta } from "@/components/FinalCta";
 import { Footer } from "@/components/Footer";
 
 export default function Home() {
@@ -21,10 +22,11 @@ export default function Home() {
       <Features />
       <HowItWorks />
       <McpSpotlight />
+      <WhoItsFor />
       <Confidence />
       <Pricing />
       <Faq />
-      <AgencyCta />
+      <FinalCta />
       <Footer />
     </main>
   );
