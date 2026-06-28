@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -105,9 +106,21 @@ def _ensure_schema(db: _DB) -> None:
             url TEXT NOT NULL,
             created_at TEXT NOT NULL,
             score INTEGER,
-            report TEXT NOT NULL
+            report TEXT NOT NULL,
+            token TEXT
         )""")
     db.execute("CREATE INDEX IF NOT EXISTS idx_scans_url_kind ON scans(url, kind, id)")
+    # scans.token = unguessable capability id for shareable report links (not enumerable,
+    # unlike the integer id). Present in the CREATE above for fresh installs; ALTER in for
+    # tables created before this column existed. Idempotent on every startup.
+    if db.dialect == "postgres":
+        db.execute("ALTER TABLE scans ADD COLUMN IF NOT EXISTS token TEXT")
+    else:
+        try:
+            db.execute("ALTER TABLE scans ADD COLUMN token TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already exists
+    db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_scans_token ON scans(token)")
     db.execute(f"""CREATE TABLE IF NOT EXISTS monitors (
             {pk},
             url TEXT NOT NULL,
@@ -140,10 +153,15 @@ def save(report: dict) -> int | None:
     url = report.get("url") or report.get("source") or ""
     created_at = report.get("fetched_at") or datetime.now(timezone.utc).isoformat()
     score = report.get("overall_score")
+    # Capability token for shareable links — stamped into the report itself so a fetched copy
+    # carries its own token (re-shareable), and links are unguessable rather than enumerable.
+    token = secrets.token_urlsafe(16)
+    report.setdefault("meta", {})["scan_token"] = token
     with _conn() as db:
         return db.insert(
-            "INSERT INTO scans (kind, url, created_at, score, report) VALUES (?, ?, ?, ?, ?)",
-            (kind, url, created_at, score, json.dumps(report)),
+            "INSERT INTO scans (kind, url, created_at, score, report, token) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (kind, url, created_at, score, json.dumps(report), token),
         )
 
 
@@ -163,11 +181,22 @@ def history(url: str, *, kind: str | None = None, limit: int = 20) -> list[dict]
 
 
 def get(scan_id: int) -> dict | None:
-    """Full stored report for an id, or None."""
+    """Full stored report for an integer id, or None. Internal use only — never exposed in a
+    URL (it's enumerable). Public/shareable lookups go through get_by_token()."""
     if not is_enabled():
         return None
     with _conn() as db:
         row = db.execute("SELECT report FROM scans WHERE id = ?", (scan_id,)).fetchone()
+        return json.loads(row["report"]) if row else None
+
+
+def get_by_token(token: str) -> dict | None:
+    """Full stored report for a share token, or None. Tokens are unguessable, so this is the
+    only lookup path safe to expose in a public URL."""
+    if not is_enabled() or not token:
+        return None
+    with _conn() as db:
+        row = db.execute("SELECT report FROM scans WHERE token = ?", (token,)).fetchone()
         return json.loads(row["report"]) if row else None
 
 

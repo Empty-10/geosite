@@ -1,6 +1,6 @@
-// GET /api/scans/:id  →  a saved scan report (for shareable /report?id= links).
-// Thin proxy to the engine's /scans/{id}. Requires ASTOVA_ENGINE_URL + the engine running with
-// ASTOVA_DB_PATH (persistence) set — otherwise nothing is saved and ids 404.
+// GET /api/scans/:token  →  a saved scan report (for shareable /report?id=<token> links).
+// Thin proxy to the engine's /scans/{token}. The path value is an unguessable capability token
+// (not an enumerable row id). Requires ASTOVA_ENGINE_URL + the engine running with persistence.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,10 +15,11 @@ function json(body: unknown, status = 200): Response {
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }): Promise<Response> {
   if (!ENGINE_URL) return json({ error: "Saved reports aren't available on this deployment." }, 503);
   const { id } = await ctx.params;
-  if (!/^\d+$/.test(id)) return json({ error: "Invalid report id." }, 400);
+  // Share tokens are URL-safe base64 (secrets.token_urlsafe): letters, digits, - and _.
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(id)) return json({ error: "Invalid report link." }, 400);
 
   try {
-    const res = await fetch(`${ENGINE_URL.replace(/\/$/, "")}/scans/${id}`, {
+    const res = await fetch(`${ENGINE_URL.replace(/\/$/, "")}/scans/${encodeURIComponent(id)}`, {
       signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
     });
     if (res.status === 404) return json({ error: "That report no longer exists." }, 404);

@@ -264,7 +264,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
             {finalUrl}
           </h1>
           <div style={{ marginLeft: "auto", display: "flex", gap: 14, alignItems: "baseline" }}>
-            {report.meta?.scan_id != null && <ShareButton scanId={report.meta.scan_id as number} />}
+            {report.meta?.scan_token != null && <ShareButton token={report.meta.scan_token as string} />}
             <a href={`/compare?url=${encodeURIComponent(finalUrl)}`} style={{ fontSize: 12.5, color: C.accent, whiteSpace: "nowrap" }}>
               Compare vs competitors →
             </a>
@@ -376,10 +376,11 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500, marginBottom: 10 }}>{children}</div>;
 }
 
-function ShareButton({ scanId }: { scanId: number }) {
+function ShareButton({ token }: { token: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
-    const url = `${window.location.origin}/report?id=${scanId}`;
+    // Unguessable capability link — the token (not the enumerable row id) grants access.
+    const url = `${window.location.origin}/report?id=${token}`;
     try {
       await navigator.clipboard.writeText(url);
     } catch {

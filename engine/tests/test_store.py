@@ -72,6 +72,25 @@ def test_save_and_get_roundtrip(db):
     assert got["overall_score"] == 72
 
 
+def test_save_stamps_token_and_get_by_token(db):
+    report = _report(score=72)
+    db.save(report)  # save() mutates the dict in place, stamping meta.scan_token
+    token = report["meta"]["scan_token"]
+    assert isinstance(token, str) and len(token) >= 16
+    got = db.get_by_token(token)
+    assert got is not None and got["overall_score"] == 72
+    # The stored copy carries its own token (re-shareable) and unknown tokens return None.
+    assert got["meta"]["scan_token"] == token
+    assert db.get_by_token("not-a-real-token") is None
+
+
+def test_tokens_are_unique_per_save(db):
+    r1, r2 = _report(score=1), _report(score=2)
+    db.save(r1)
+    db.save(r2)
+    assert r1["meta"]["scan_token"] != r2["meta"]["scan_token"]
+
+
 def test_history_newest_first(db):
     db.save(_report(score=60, created="2026-06-01T00:00:00+00:00"))
     db.save(_report(score=70, created="2026-06-02T00:00:00+00:00"))

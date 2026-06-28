@@ -225,10 +225,11 @@ def history_endpoint(url: str, kind: str = "page", limit: int = 20) -> dict:
     return {"url": url, "kind": kind, "scans": store.history(url, kind=kind, limit=max(1, min(limit, 100)))}
 
 
-@app.get("/scans/{scan_id}")
-def get_scan_endpoint(scan_id: int) -> dict:
-    """Fetch a stored report by id."""
-    report = store.get(scan_id)
+@app.get("/scans/{token}")
+def get_scan_endpoint(token: str) -> dict:
+    """Fetch a stored report by its share token. Tokens are unguessable capability ids; the
+    integer row id is deliberately NOT a lookup path here, so saved reports can't be enumerated."""
+    report = store.get_by_token(token)
     if report is None:
         raise HTTPException(status_code=404, detail="scan not found")
     return report
