@@ -61,6 +61,7 @@ export function HeroDemo() {
           >
             <span style={{ fontSize: 14, color: "var(--text-3)", fontFamily: "var(--mono)" }}>https://</span>
             <input
+              aria-label="Website URL to scan"
               value={url.replace(/^https?:\/\//i, "")}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && scan()}
