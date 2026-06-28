@@ -12,10 +12,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install the engine + the FastAPI service extra + the MCP extra (so /mcp is served too).
+# Install the engine + the FastAPI service extra + the MCP extra (so /mcp is served too) +
+# the postgres extra (psycopg) so durable scan/monitor history works when ASTOVA_DATABASE_URL is set.
 COPY pyproject.toml ./
 COPY astova_engine ./astova_engine
-RUN pip install --no-cache-dir -e ".[service,mcp]"
+RUN pip install --no-cache-dir -e ".[service,mcp,postgres]"
 
 # Hosts (Render/Railway/Fly) inject $PORT; default to 8000 locally.
 ENV PORT=8000

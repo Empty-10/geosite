@@ -181,4 +181,11 @@ crawler logs, fix generation), then accounts/billing. Full arc in `CLAUDE.md` �
   still needs to be containerized and hosted.
 - Deploy note: the app lives in `web/`, not the repo root — set the host's **root
   directory to `web/`** (e.g. on Vercel).
+- Persistence (`engine/astova_engine/store.py`) now has a **Postgres backend** behind the same
+  seam, selected by `ASTOVA_DATABASE_URL` (e.g. a Supabase connection string; needs the
+  `postgres` extra). SQLite (`ASTOVA_DB_PATH`) remains the local-dev fallback; neither set = no-op.
+  Schema auto-creates on first connect. This makes monitors/alerts durable across redeploys.
+  Postgres path is covered by `test_store.py` when `ASTOVA_TEST_DATABASE_URL` points at a scratch
+  DB (skipped otherwise). **Still to do for prod:** set `ASTOVA_DATABASE_URL` on the engine
+  service to the Supabase DB and confirm the Postgres tests pass against it once.
 - Secrets (Google API key, future AI-engine keys) go in `.env` files — never commit them.

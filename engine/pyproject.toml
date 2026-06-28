@@ -15,6 +15,7 @@ dev = ["pytest>=8.0", "ruff>=0.5", "black>=24.0", "httpx>=0.27"]
 service = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 render = ["playwright>=1.44"]
 mcp = ["mcp>=1.2"]
+postgres = ["psycopg[binary]>=3.1"]
 
 [project.scripts]
 astova = "astova_engine.cli:main"

@@ -1,12 +1,18 @@
 """Scan history — a small persistence layer so re-scanning a URL can show what changed.
 
-Backed by SQLite (stdlib, no new dependency). Enabled only when ASTOVA_DB_PATH is set; otherwise
-every function is a graceful no-op (save -> None, history -> []), so the engine runs identically
-with or without persistence.
+Two interchangeable backends sit behind the same public functions (the seam):
 
-Production note: SQLite on an ephemeral container disk (e.g. Render's default) resets on redeploy.
-For durable history, point ASTOVA_DB_PATH at a persistent disk, or swap this module's storage for
-Postgres later (the public functions are the seam).
+- **Postgres** when ``ASTOVA_DATABASE_URL`` is set (e.g. a Supabase connection string).
+  Requires the ``postgres`` extra (``pip install -e ".[postgres]"`` → psycopg 3). Durable —
+  survives container redeploys, shared across workers. This is the production path.
+- **SQLite** when only ``ASTOVA_DB_PATH`` is set (stdlib, no dependency). Good for local dev.
+  Note: SQLite on an ephemeral container disk resets on redeploy — use Postgres in production.
+- **Disabled** when neither is set: every function is a graceful no-op (save -> None,
+  history -> []), so the engine runs identically with or without persistence.
+
+Postgres wins if both env vars are set. The two schemas differ only in the id column
+(autoincrement vs identity); everything else (TEXT columns, JSON-as-text) is identical so the
+diff/compare logic above the seam is backend-agnostic.
 """
 
 from __future__ import annotations
@@ -18,44 +24,92 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 
+def database_url() -> str | None:
+    return os.environ.get("ASTOVA_DATABASE_URL") or None
+
+
 def db_path() -> str | None:
     return os.environ.get("ASTOVA_DB_PATH") or None
 
 
+def _backend() -> str | None:
+    """Which storage backend is active: 'postgres', 'sqlite', or None (disabled)."""
+    if database_url():
+        return "postgres"
+    if db_path():
+        return "sqlite"
+    return None
+
+
 def is_enabled() -> bool:
-    return db_path() is not None
+    return _backend() is not None
+
+
+def _ph(sql: str, dialect: str) -> str:
+    """Translate the canonical '?' placeholder style to the backend's. SQL here never
+    contains a literal '?' in a string value, so a blunt replace is safe."""
+    return sql.replace("?", "%s") if dialect == "postgres" else sql
+
+
+class _DB:
+    """Thin dialect-aware wrapper so call sites write one SQL string for both backends."""
+
+    def __init__(self, conn, dialect: str):
+        self._conn = conn
+        self.dialect = dialect
+
+    def execute(self, sql: str, params: tuple | list = ()):  # returns a cursor
+        return self._conn.execute(_ph(sql, self.dialect), params)
+
+    def insert(self, sql: str, params: tuple | list = ()) -> int:
+        """Run an INSERT and return the new row's id (handles RETURNING vs lastrowid)."""
+        if self.dialect == "postgres":
+            cur = self._conn.execute(_ph(sql, self.dialect) + " RETURNING id", params)
+            return cur.fetchone()["id"]
+        cur = self._conn.execute(sql, params)
+        return cur.lastrowid
 
 
 @contextmanager
 def _conn():
-    path = db_path()
-    if not path:
-        raise RuntimeError("persistence not configured (set ASTOVA_DB_PATH)")
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
+    backend = _backend()
+    if backend == "postgres":
+        import psycopg
+        from psycopg.rows import dict_row
+
+        conn = psycopg.connect(database_url(), row_factory=dict_row)
+    elif backend == "sqlite":
+        conn = sqlite3.connect(db_path())
+        conn.row_factory = sqlite3.Row
+    else:
+        raise RuntimeError("persistence not configured (set ASTOVA_DATABASE_URL or ASTOVA_DB_PATH)")
+    db = _DB(conn, backend)
     try:
-        _ensure_schema(conn)
-        yield conn
+        _ensure_schema(db)
+        yield db
         conn.commit()
     finally:
         conn.close()
 
 
-def _ensure_schema(conn: sqlite3.Connection) -> None:
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS scans (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+def _ensure_schema(db: _DB) -> None:
+    # The only cross-dialect difference is the auto-incrementing primary key.
+    pk = (
+        "id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY"
+        if db.dialect == "postgres"
+        else "id INTEGER PRIMARY KEY AUTOINCREMENT"
+    )
+    db.execute(f"""CREATE TABLE IF NOT EXISTS scans (
+            {pk},
             kind TEXT NOT NULL,
             url TEXT NOT NULL,
             created_at TEXT NOT NULL,
             score INTEGER,
             report TEXT NOT NULL
-        )"""
-    )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_url_kind ON scans(url, kind, id)")
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS monitors (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_scans_url_kind ON scans(url, kind, id)")
+    db.execute(f"""CREATE TABLE IF NOT EXISTS monitors (
+            {pk},
             url TEXT NOT NULL,
             cadence TEXT NOT NULL DEFAULT 'daily',
             email TEXT,
@@ -64,11 +118,9 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL,
             last_run_at TEXT,
             next_run_at TEXT
-        )"""
-    )
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        )""")
+    db.execute(f"""CREATE TABLE IF NOT EXISTS alerts (
+            {pk},
             monitor_id INTEGER NOT NULL,
             scan_id INTEGER,
             type TEXT NOT NULL,
@@ -76,9 +128,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             summary TEXT NOT NULL,
             detail TEXT,
             created_at TEXT NOT NULL
-        )"""
-    )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_monitor ON alerts(monitor_id, id)")
+        )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_alerts_monitor ON alerts(monitor_id, id)")
 
 
 def save(report: dict) -> int | None:
@@ -89,12 +140,11 @@ def save(report: dict) -> int | None:
     url = report.get("url") or report.get("source") or ""
     created_at = report.get("fetched_at") or datetime.now(timezone.utc).isoformat()
     score = report.get("overall_score")
-    with _conn() as conn:
-        cur = conn.execute(
+    with _conn() as db:
+        return db.insert(
             "INSERT INTO scans (kind, url, created_at, score, report) VALUES (?, ?, ?, ?, ?)",
             (kind, url, created_at, score, json.dumps(report)),
         )
-        return cur.lastrowid
 
 
 def history(url: str, *, kind: str | None = None, limit: int = 20) -> list[dict]:
@@ -108,16 +158,16 @@ def history(url: str, *, kind: str | None = None, limit: int = 20) -> list[dict]
         args.append(kind)
     q += " ORDER BY id DESC LIMIT ?"
     args.append(limit)
-    with _conn() as conn:
-        return [dict(r) for r in conn.execute(q, args).fetchall()]
+    with _conn() as db:
+        return [dict(r) for r in db.execute(q, args).fetchall()]
 
 
 def get(scan_id: int) -> dict | None:
     """Full stored report for an id, or None."""
     if not is_enabled():
         return None
-    with _conn() as conn:
-        row = conn.execute("SELECT report FROM scans WHERE id = ?", (scan_id,)).fetchone()
+    with _conn() as db:
+        row = db.execute("SELECT report FROM scans WHERE id = ?", (scan_id,)).fetchone()
         return json.loads(row["report"]) if row else None
 
 
@@ -125,8 +175,8 @@ def previous(url: str, *, kind: str, before_id: int) -> dict | None:
     """The most recent prior report for the same url+kind (id < before_id), or None."""
     if not is_enabled():
         return None
-    with _conn() as conn:
-        row = conn.execute(
+    with _conn() as db:
+        row = db.execute(
             "SELECT report FROM scans WHERE url = ? AND kind = ? AND id < ? ORDER BY id DESC LIMIT 1",
             (url, kind, before_id),
         ).fetchone()
@@ -139,6 +189,7 @@ def diff_reports(old: dict, new: dict) -> dict:
     A finding "regresses" when it goes from pass/info to fail/warn, "resolves" the other way
     (or disappears), and is "new" when it appears already failing/warning.
     """
+
     def is_issue(status: str) -> bool:
         return status in ("fail", "warn")
 
@@ -190,37 +241,36 @@ def add_monitor(url: str, *, cadence: str = "daily", email: str | None = None) -
         return None
     cadence = cadence if cadence in _CADENCE_DAYS else "daily"
     now = datetime.now(timezone.utc).isoformat()
-    with _conn() as conn:
-        cur = conn.execute(
+    with _conn() as db:
+        return db.insert(
             "INSERT INTO monitors (url, cadence, email, active, consecutive_failures, created_at, "
             "next_run_at) VALUES (?, ?, ?, 1, 0, ?, ?)",
             (url, cadence, email, now, now),
         )
-        return cur.lastrowid
 
 
 def list_monitors(*, active_only: bool = False) -> list[dict]:
     if not is_enabled():
         return []
     q = "SELECT * FROM monitors" + (" WHERE active = 1" if active_only else "") + " ORDER BY id"
-    with _conn() as conn:
-        return [dict(r) for r in conn.execute(q).fetchall()]
+    with _conn() as db:
+        return [dict(r) for r in db.execute(q).fetchall()]
 
 
 def get_monitor(monitor_id: int) -> dict | None:
     if not is_enabled():
         return None
-    with _conn() as conn:
-        r = conn.execute("SELECT * FROM monitors WHERE id = ?", (monitor_id,)).fetchone()
+    with _conn() as db:
+        r = db.execute("SELECT * FROM monitors WHERE id = ?", (monitor_id,)).fetchone()
         return dict(r) if r else None
 
 
 def delete_monitor(monitor_id: int) -> bool:
     if not is_enabled():
         return False
-    with _conn() as conn:
-        cur = conn.execute("DELETE FROM monitors WHERE id = ?", (monitor_id,))
-        conn.execute("DELETE FROM alerts WHERE monitor_id = ?", (monitor_id,))
+    with _conn() as db:
+        cur = db.execute("DELETE FROM monitors WHERE id = ?", (monitor_id,))
+        db.execute("DELETE FROM alerts WHERE monitor_id = ?", (monitor_id,))
         return cur.rowcount > 0
 
 
@@ -229,11 +279,15 @@ def due_monitors(now: datetime | None = None) -> list[dict]:
     if not is_enabled():
         return []
     ts = (now or datetime.now(timezone.utc)).isoformat()
-    with _conn() as conn:
-        return [dict(r) for r in conn.execute(
-            "SELECT * FROM monitors WHERE active = 1 AND (next_run_at IS NULL OR next_run_at <= ?) "
-            "ORDER BY id", (ts,),
-        ).fetchall()]
+    with _conn() as db:
+        return [
+            dict(r)
+            for r in db.execute(
+                "SELECT * FROM monitors WHERE active = 1 AND (next_run_at IS NULL OR next_run_at <= ?) "
+                "ORDER BY id",
+                (ts,),
+            ).fetchall()
+        ]
 
 
 def mark_run(monitor_id: int, *, ok: bool, now: datetime | None = None) -> None:
@@ -241,13 +295,14 @@ def mark_run(monitor_id: int, *, ok: bool, now: datetime | None = None) -> None:
     if not is_enabled():
         return
     now = now or datetime.now(timezone.utc)
-    with _conn() as conn:
-        r = conn.execute("SELECT cadence, consecutive_failures FROM monitors WHERE id = ?",
-                         (monitor_id,)).fetchone()
+    with _conn() as db:
+        r = db.execute(
+            "SELECT cadence, consecutive_failures FROM monitors WHERE id = ?", (monitor_id,)
+        ).fetchone()
         if not r:
             return
         failures = 0 if ok else (r["consecutive_failures"] + 1)
-        conn.execute(
+        db.execute(
             "UPDATE monitors SET last_run_at = ?, next_run_at = ?, consecutive_failures = ? WHERE id = ?",
             (now.isoformat(), _next_run(now, r["cadence"]), failures, monitor_id),
         )
@@ -257,14 +312,20 @@ def record_alert(monitor_id: int, scan_id: int | None, alert: dict) -> int | Non
     if not is_enabled():
         return None
     now = datetime.now(timezone.utc).isoformat()
-    with _conn() as conn:
-        cur = conn.execute(
+    with _conn() as db:
+        return db.insert(
             "INSERT INTO alerts (monitor_id, scan_id, type, severity, summary, detail, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (monitor_id, scan_id, alert["type"], alert["severity"], alert["summary"],
-             json.dumps(alert.get("detail")), now),
+            (
+                monitor_id,
+                scan_id,
+                alert["type"],
+                alert["severity"],
+                alert["summary"],
+                json.dumps(alert.get("detail")),
+                now,
+            ),
         )
-        return cur.lastrowid
 
 
 def list_alerts(monitor_id: int | None = None, *, limit: int = 50) -> list[dict]:
@@ -276,8 +337,8 @@ def list_alerts(monitor_id: int | None = None, *, limit: int = 50) -> list[dict]
         args.append(monitor_id)
     q += " ORDER BY id DESC LIMIT ?"
     args.append(max(1, min(limit, 200)))
-    with _conn() as conn:
-        rows = [dict(r) for r in conn.execute(q, args).fetchall()]
+    with _conn() as db:
+        rows = [dict(r) for r in db.execute(q, args).fetchall()]
     for r in rows:
         if r.get("detail"):
             try:

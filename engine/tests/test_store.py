@@ -1,15 +1,35 @@
-"""Tests for the SQLite scan-history store + report diffing. Uses a temp DB via ASTOVA_DB_PATH."""
+"""Tests for the scan-history store + report diffing.
+
+Runs against both backends behind the store seam:
+- **SQLite** always (temp DB via ASTOVA_DB_PATH).
+- **Postgres** only when ASTOVA_TEST_DATABASE_URL is set (e.g. a throwaway Supabase/Postgres);
+  otherwise those params skip. The Postgres variant truncates the three tables before each test,
+  so point it at a scratch database, never production.
+"""
 
 from __future__ import annotations
+
+import os
 
 import pytest
 
 from astova_engine import store
 
 
-@pytest.fixture
-def db(tmp_path, monkeypatch):
-    monkeypatch.setenv("ASTOVA_DB_PATH", str(tmp_path / "test.db"))
+@pytest.fixture(params=["sqlite", "postgres"])
+def db(request, tmp_path, monkeypatch):
+    monkeypatch.delenv("ASTOVA_DATABASE_URL", raising=False)
+    monkeypatch.delenv("ASTOVA_DB_PATH", raising=False)
+    if request.param == "postgres":
+        url = os.environ.get("ASTOVA_TEST_DATABASE_URL")
+        if not url:
+            pytest.skip("set ASTOVA_TEST_DATABASE_URL to run the Postgres store tests")
+        monkeypatch.setenv("ASTOVA_DATABASE_URL", url)
+        with store._conn() as d:  # clean slate; _conn() auto-creates the schema on first use
+            for t in ("alerts", "monitors", "scans"):
+                d.execute(f"TRUNCATE TABLE {t} RESTART IDENTITY CASCADE")
+    else:
+        monkeypatch.setenv("ASTOVA_DB_PATH", str(tmp_path / "test.db"))
     return store
 
 
@@ -30,15 +50,20 @@ def _f(fid, status, title="t"):
 
 # --- enablement --------------------------------------------------------------------------
 
+
 def test_disabled_when_env_unset(monkeypatch):
     monkeypatch.delenv("ASTOVA_DB_PATH", raising=False)
+    monkeypatch.delenv("ASTOVA_DATABASE_URL", raising=False)
     assert store.is_enabled() is False
     assert store.save(_report()) is None
     assert store.history("https://x.test") == []
     assert store.get(1) is None
+    assert store.add_monitor("https://x.test") is None
+    assert store.list_monitors() == []
 
 
 # --- save / get / history ----------------------------------------------------------------
+
 
 def test_save_and_get_roundtrip(db):
     scan_id = db.save(_report(score=72))
@@ -71,7 +96,51 @@ def test_previous_returns_prior_same_url(db):
     assert db.previous("https://x.test", kind="page", before_id=first) is None
 
 
-# --- diffing -----------------------------------------------------------------------------
+# --- monitors + alerts -------------------------------------------------------------------
+
+
+def test_monitor_lifecycle(db):
+    mid = db.add_monitor("https://m.test", cadence="weekly", email="a@b.test")
+    assert isinstance(mid, int)
+    m = db.get_monitor(mid)
+    assert m["url"] == "https://m.test" and m["cadence"] == "weekly"
+    assert [x["id"] for x in db.list_monitors()] == [mid]
+    assert db.delete_monitor(mid) is True
+    assert db.get_monitor(mid) is None
+
+
+def test_due_and_mark_run(db):
+    mid = db.add_monitor("https://m.test")  # created due immediately
+    assert mid in [m["id"] for m in db.due_monitors()]
+    db.mark_run(mid, ok=True)
+    assert mid not in [m["id"] for m in db.due_monitors()]  # next_run advanced past now
+    assert db.get_monitor(mid)["consecutive_failures"] == 0
+    db.mark_run(mid, ok=False)
+    assert db.get_monitor(mid)["consecutive_failures"] == 1
+
+
+def test_alerts_roundtrip_and_detail_json(db):
+    mid = db.add_monitor("https://m.test")
+    aid = db.record_alert(
+        mid,
+        None,
+        {
+            "type": "score_drop",
+            "severity": "critical",
+            "summary": "down 20",
+            "detail": {"from": 80, "to": 60},
+        },
+    )
+    assert isinstance(aid, int)
+    alerts = db.list_alerts(mid)
+    assert len(alerts) == 1
+    assert alerts[0]["detail"] == {"from": 80, "to": 60}  # round-tripped from JSON text
+    db.delete_monitor(mid)
+    assert db.list_alerts(mid) == []  # alerts cascade-deleted
+
+
+# --- diffing (pure, backend-independent) -------------------------------------------------
+
 
 def test_diff_score_and_pillar_delta():
     old = _report(score=70)
@@ -86,6 +155,6 @@ def test_diff_resolved_regressed_and_new():
     old = _report(findings=[_f("a", "fail", "A"), _f("b", "pass", "B"), _f("c", "warn", "C")])
     new = _report(findings=[_f("a", "pass", "A"), _f("b", "fail", "B"), _f("d", "fail", "D")])
     d = store.diff_reports(old, new)
-    assert {x["id"] for x in d["resolved"]} == {"a", "c"}   # a fixed; c vanished while an issue
-    assert {x["id"] for x in d["regressed"]} == {"b"}        # b pass -> fail
-    assert {x["id"] for x in d["new_issues"]} == {"d"}       # d appeared failing
+    assert {x["id"] for x in d["resolved"]} == {"a", "c"}  # a fixed; c vanished while an issue
+    assert {x["id"] for x in d["regressed"]} == {"b"}  # b pass -> fail
+    assert {x["id"] for x in d["new_issues"]} == {"d"}  # d appeared failing

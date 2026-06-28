@@ -2,7 +2,14 @@
   "mcpServers": {
     "astova": {
       "command": "/Users/joshuawalsh/Desktop/Sites/damask/engine/.venv/bin/python",
-      "args": ["-m", "astova_engine.mcp_server"]
+      "args": [
+        "-m",
+        "astova_engine.mcp_server"
+      ]
+    },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp"
     }
   }
 }
