@@ -14,8 +14,11 @@ Client config (Claude Desktop / Claude Code / ChatGPT desktop):
 
 from __future__ import annotations
 
+import os
+
 from mcp.server.fastmcp import FastMCP
 
+from . import project as project_mod
 from .fixes import build_fix_plan
 from .scanner import scan
 
@@ -117,6 +120,81 @@ def scan_url(url: str) -> dict:
         url: The page URL to scan.
     """
     return scan(url, fixes=False).to_dict()
+
+
+def _read(path: str) -> str | None:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def _first_existing(*paths: str) -> str | None:
+    for p in paths:
+        content = _read(p)
+        if content is not None:
+            return content
+    return None
+
+
+@mcp.tool()
+def audit_project(path: str, base_url: str | None = None) -> dict:
+    """Audit a local project BEFORE deploy — reads its static root files (robots.txt, llms.txt,
+    sitemap.xml) from disk and returns fixes with real, layout-aware file paths the coding agent
+    can apply directly. Detects the framework (Next.js / Astro / Gatsby / WordPress / static) to
+    target the right directory (e.g. public/).
+
+    Pass base_url (your running dev server, e.g. http://localhost:3000) to ALSO run the full
+    deterministic page audit on the rendered page and include its fix plan — the complete
+    "audit my project and fix everything" loop. The project's source never leaves the machine.
+
+    Args:
+        path: Path to the project root (the folder with package.json / wp-config.php / etc.).
+        base_url: Optional URL of the running app to render-audit (typically http://localhost:PORT).
+    """
+    path = os.path.expanduser(path)
+    if not os.path.isdir(path):
+        return {"error": f"Not a directory: {path}"}
+
+    try:
+        markers = set(os.listdir(path))
+    except OSError as exc:
+        return {"error": f"Cannot read {path}: {exc}"}
+
+    framework, public_dir = project_mod.detect_framework(markers)
+    pub = path if public_dir == "." else os.path.join(path, public_dir)
+    files = project_mod.analyze_files(
+        robots_txt=_first_existing(os.path.join(pub, "robots.txt"), os.path.join(path, "robots.txt")),
+        llms_txt=_first_existing(os.path.join(pub, "llms.txt"), os.path.join(path, "llms.txt")),
+        sitemap_xml=_first_existing(os.path.join(pub, "sitemap.xml"), os.path.join(path, "sitemap.xml")),
+        public_dir=public_dir,
+    )
+
+    out: dict = {
+        "project": {"path": path, "framework": framework, "public_dir": public_dir},
+        "file_status": files["status"],
+        "file_fixes": files["fixes"],
+        "confidence": "verified",
+        "note": "Pre-deploy checks on your project files (source never leaves the machine). Apply "
+                "the file_fixes at the paths shown. Pass base_url=http://localhost:PORT (your dev "
+                "server) to also render-audit the page and get its full fix plan.",
+    }
+
+    if base_url:
+        report = scan(base_url, fixes=True)
+        d = report.to_dict()
+        if d["meta"].get("error"):
+            out["page_audit_error"] = d["meta"]["error"]
+        else:
+            sc = d.get("scorecard") or {}
+            out["page_audit"] = {
+                "url": d["meta"].get("final_url", base_url),
+                "ai_retrievability": sc.get("headline_score"),
+                "verdict": (sc.get("summary") or {}).get("verdict"),
+                "fixes": build_fix_plan(report),
+            }
+    return out
 
 
 def main() -> None:

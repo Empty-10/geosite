@@ -49,7 +49,7 @@ def test_tools_are_registered():
 
     tools = anyio.run(srv.mcp.list_tools)
     names = {t.name for t in tools}
-    assert {"audit_url", "scan_url", "fix_plan"} <= names
+    assert {"audit_url", "scan_url", "fix_plan", "audit_project"} <= names
 
 
 def test_fix_plan_is_agent_actionable(monkeypatch):
@@ -67,3 +67,32 @@ def test_fix_plan_surfaces_error(monkeypatch):
     bad = Report(url="https://x.test", meta={"error": "could not resolve host"})
     monkeypatch.setattr(srv, "scan", lambda url, fixes=False: bad)
     assert srv.fix_plan("https://x.test")["error"] == "could not resolve host"
+
+
+def test_audit_project_reads_files_and_targets_paths(tmp_path):
+    # a Next.js-shaped project with an AI-blocking robots.txt and no llms.txt
+    (tmp_path / "next.config.js").write_text("module.exports = {}")
+    pub = tmp_path / "public"
+    pub.mkdir()
+    (pub / "robots.txt").write_text("User-agent: GPTBot\nDisallow: /\n")
+
+    out = srv.audit_project(str(tmp_path))
+    assert out["project"]["framework"] == "nextjs"
+    assert out["file_status"]["robots"] == "blocks_ai"
+    assert out["file_status"]["llms"] == "missing"
+    by = {f["finding_id"]: f for f in out["file_fixes"]}
+    assert by["project.llms_missing"]["target"] == "public/llms.txt"
+    assert "page_audit" not in out  # no base_url given
+
+
+def test_audit_project_with_base_url_includes_page_audit(tmp_path, monkeypatch):
+    (tmp_path / "index.html").write_text("<html></html>")
+    monkeypatch.setattr(srv, "scan", lambda url, fixes=False: scan_html(url, HTML, online=False, fixes=fixes))
+    out = srv.audit_project(str(tmp_path), base_url="http://localhost:3000")
+    assert "page_audit" in out
+    assert isinstance(out["page_audit"]["ai_retrievability"], (int, float))
+    assert isinstance(out["page_audit"]["fixes"], list)
+
+
+def test_audit_project_bad_path():
+    assert "error" in srv.audit_project("/no/such/dir/here")
