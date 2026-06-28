@@ -588,18 +588,13 @@ def _schema_validation(soup: BeautifulSoup) -> Finding | None:
 
 
 def _jsonld_types(soup: BeautifulSoup) -> set[str]:
+    # Reuse the @graph-aware node walker so multi-entity JSON-LD (the standard @graph form)
+    # is detected, not just top-level @type. Original casing is kept for the evidence display.
     types: set[str] = set()
-    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
-        raw = script.string or script.get_text() or ""
-        try:
-            data = json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            continue
-        for node in data if isinstance(data, list) else [data]:
-            if isinstance(node, dict):
-                t = node.get("@type")
-                if isinstance(t, list):
-                    types.update(str(x) for x in t)
-                elif t:
-                    types.add(str(t))
+    for node in _jsonld_nodes(soup):
+        t = node.get("@type")
+        if isinstance(t, list):
+            types.update(str(x) for x in t)
+        elif t:
+            types.add(str(t))
     return types

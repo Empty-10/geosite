@@ -155,6 +155,19 @@ def test_schema_validation_absent_for_unknown_types():
     assert "schema.validation" not in run(html)
 
 
+def test_jsonld_types_detected_inside_graph():
+    # @graph is the standard multi-entity form; its @types must be detected, not mis-flagged
+    # as "missing" (regression: detection used to read only top-level @type).
+    html = ('<body><script type="application/ld+json">'
+            '{"@context":"https://schema.org","@graph":['
+            '{"@type":"Organization","name":"Astova"},{"@type":"FAQPage"}]}'
+            '</script></body>')
+    out = run(html)
+    assert "schema.jsonld" in out and out["schema.jsonld"].status == Status.PASS
+    assert "schema.missing" not in out
+    assert "Organization" in out["schema.jsonld"].evidence
+
+
 # ------------------------------------------------------------------------- canonical correctness
 
 def test_canonical_self_referencing_passes():
