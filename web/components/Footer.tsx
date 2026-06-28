@@ -20,10 +20,11 @@ export function Footer() {
         <span style={{ fontSize: 14, color: "var(--text-2)" }}>damask</span>
         <span style={{ fontSize: 13, color: "var(--text-3)", marginLeft: 8 }}>© 2026 · GEO, measured honestly</span>
       </div>
-      <div style={{ display: "flex", gap: 24 }}>
-        <a style={linkStyle}>Privacy</a>
-        <a style={linkStyle}>Terms</a>
-        <a style={linkStyle}>Status</a>
+      <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+        <a style={linkStyle} href="/report">Scan a page</a>
+        <a style={linkStyle} href="/compare">Compare</a>
+        <a style={linkStyle} href="/crawlers">Crawler logs</a>
+        <a style={linkStyle} href="/visibility">AI visibility</a>
       </div>
     </footer>
   );

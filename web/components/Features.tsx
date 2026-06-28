@@ -18,7 +18,7 @@ const features = [
 
 export function Features() {
   return (
-    <section style={{ padding: "80px 32px", borderTop: "1px solid var(--border)" }}>
+    <section id="product" style={{ padding: "80px 32px", borderTop: "1px solid var(--border)", scrollMarginTop: 72 }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ maxWidth: 620, marginBottom: 44 }}>
           <span style={{ fontSize: 13, color: "var(--accent)" }}>The closed loop</span>

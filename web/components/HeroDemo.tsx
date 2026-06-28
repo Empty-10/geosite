@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { C } from "@/lib/tokens";
+import { HeroScanDemo } from "./HeroScanDemo";
 
 // Landing-page scan entry. Enter a URL → Scan → routes to the /report scan page, which shows the
 // animated "scanning…" state then the score + full breakdown. (One scan, one place.)
@@ -94,46 +95,9 @@ export function HeroDemo() {
           </button>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 10,
-            height: 300,
-            border: "1px dashed var(--border)",
-            borderRadius: 12,
-            textAlign: "center",
-            padding: 24,
-          }}
-        >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              border: "1.5px solid var(--border-strong)",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <div
-              style={{
-                width: 14,
-                height: 14,
-                border: "1.5px solid var(--text-3)",
-                borderRadius: "50%",
-                borderTopColor: "transparent",
-                transform: "rotate(45deg)",
-              }}
-            />
-          </div>
-          <span style={{ fontSize: 14, color: "var(--text-2)" }}>Enter a URL and run a deterministic GEO/SEO scan</span>
-          <span style={{ fontSize: 12.5, color: "var(--text-3)", maxWidth: 300 }}>
-            Verified results in seconds — score, 20-row scorecard, and every fix.
-          </span>
+        <HeroScanDemo />
+        <div style={{ textAlign: "center", fontSize: 12, color: "var(--text-3)", marginTop: 12 }}>
+          Live preview · run your own scan above — verified score, 20-row scorecard, and every fix.
         </div>
       </div>
     </div>

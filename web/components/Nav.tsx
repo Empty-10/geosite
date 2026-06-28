@@ -29,10 +29,9 @@ export function Nav() {
         <span style={{ fontSize: 17, fontWeight: 500, letterSpacing: "-0.01em" }}>damask</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-        <a style={linkStyle}>Product</a>
-        <a style={linkStyle}>Pricing</a>
-        <a style={linkStyle}>Agencies</a>
-        <a style={linkStyle}>Docs</a>
+        <a style={linkStyle} href="/#product">Product</a>
+        <a style={linkStyle} href="/#pricing">Pricing</a>
+        <a style={linkStyle} href="/#agencies">Agencies</a>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <ThemeToggle />

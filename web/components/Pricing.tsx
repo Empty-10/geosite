@@ -68,7 +68,7 @@ function Tile({
 
 export function Pricing() {
   return (
-    <section style={{ padding: "80px 32px", borderTop: "1px solid var(--border)", background: "var(--ink)" }}>
+    <section id="pricing" style={{ padding: "80px 32px", borderTop: "1px solid var(--border)", background: "var(--ink)", scrollMarginTop: 72 }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ textAlign: "center", maxWidth: 560, margin: "0 auto 44px" }}>
           <span style={{ fontSize: 13, color: "var(--accent)" }}>Pricing</span>
@@ -80,8 +80,8 @@ export function Pricing() {
           </p>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, maxWidth: 880, margin: "0 auto" }}>
-          <Tile name="Free" price="$0" note="One full scan, one site." cta="Run a scan" />
-          <Tile name="Pro" price="$49" per="/mo" note="10 sites, weekly monitoring, fixes." cta="Start free trial" primary featured />
+          <Tile name="Free" price="$0" note="One full single-page scan." cta="Run a scan" />
+          <Tile name="Pro" price="$49" per="/mo" note="Full-site crawl, competitor benchmarks, all fixes." cta="Start free trial" primary featured />
           <Tile name="Agency" price="$199" per="/mo" note="Unlimited sites, white-label reports." cta="Talk to sales" />
         </div>
       </div>

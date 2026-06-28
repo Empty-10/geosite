@@ -1,6 +1,6 @@
 export function AgencyCta() {
   return (
-    <section style={{ padding: "48px 32px 90px", borderTop: "1px solid var(--border)" }}>
+    <section id="agencies" style={{ padding: "48px 32px 90px", borderTop: "1px solid var(--border)", scrollMarginTop: 72 }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div
           style={{
@@ -26,16 +26,18 @@ export function AgencyCta() {
             </p>
           </div>
           <div style={{ display: "flex", gap: 12 }}>
-            <button
-              style={{ fontSize: 14, fontWeight: 500, color: "var(--on-accent)", background: "var(--accent)", border: "none", padding: "11px 18px", borderRadius: 9, cursor: "pointer" }}
+            <a
+              href="/#pricing"
+              style={{ fontSize: 14, fontWeight: 500, color: "var(--on-accent)", background: "var(--accent)", border: "none", padding: "11px 18px", borderRadius: 9, cursor: "pointer", textDecoration: "none", display: "inline-block" }}
             >
-              Book a demo
-            </button>
-            <button
-              style={{ fontSize: 14, color: "var(--text)", background: "transparent", border: "1px solid var(--border-strong)", padding: "11px 18px", borderRadius: 9, cursor: "pointer" }}
+              See plans
+            </a>
+            <a
+              href="/report?url=https://stripe.com"
+              style={{ fontSize: 14, color: "var(--text)", background: "transparent", border: "1px solid var(--border-strong)", padding: "11px 18px", borderRadius: 9, cursor: "pointer", textDecoration: "none", display: "inline-block" }}
             >
               See a sample report
-            </button>
+            </a>
           </div>
         </div>
       </div>
