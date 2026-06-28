@@ -32,3 +32,6 @@ screenshots/
 
 # TS build info
 *.tsbuildinfo
+
+# Local working docs (personal notes, updated ad hoc — not for the repo)
+Astova-validation-brief.pdf
