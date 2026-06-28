@@ -1,5 +1,7 @@
 import { Nav } from "@/components/Nav";
 import { Hero } from "@/components/Hero";
+import { AiEngines } from "@/components/AiEngines";
+import { Manifesto } from "@/components/Manifesto";
 import { Confidence } from "@/components/Confidence";
 import { Features } from "@/components/Features";
 import { Pricing } from "@/components/Pricing";
@@ -11,8 +13,10 @@ export default function Home() {
     <main style={{ minHeight: "100vh" }}>
       <Nav />
       <Hero />
-      <Confidence />
+      <AiEngines />
+      <Manifesto />
       <Features />
+      <Confidence />
       <Pricing />
       <AgencyCta />
       <Footer />

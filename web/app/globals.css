@@ -79,6 +79,16 @@ input { font-family: inherit; }
   * { animation: none !important; }
 }
 
+/* Bento feature grid — intentional mixed sizes on desktop, single column on mobile. */
+.bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+.bento .b2 { grid-column: span 2; }
+.bento .b3 { grid-column: span 3; }
+.bento .b4 { grid-column: span 4; }
+@media (max-width: 880px) {
+  .bento { grid-template-columns: 1fr; }
+  .bento .b2, .bento .b3, .bento .b4 { grid-column: auto; }
+}
+
 /* Hero backdrop: faint grid fading into a soft vignette. */
 .hero-bg {
   position: absolute;
