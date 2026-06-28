@@ -343,7 +343,7 @@ function SiteRow({ m, first, onRemove }: { m: Monitor; first: boolean; onRemove:
 
       {/* Site + meta */}
       <a
-        href={`/report?url=${encodeURIComponent(m.url)}`}
+        href={`/dashboard/site?url=${encodeURIComponent(m.url)}`}
         style={{ flex: "1 1 200px", minWidth: 0, textDecoration: "none", color: "var(--text)" }}
       >
         <div

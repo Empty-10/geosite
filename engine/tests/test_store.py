@@ -158,6 +158,28 @@ def test_alerts_roundtrip_and_detail_json(db):
     assert db.list_alerts(mid) == []  # alerts cascade-deleted
 
 
+# --- notes + history-token ---------------------------------------------------------------
+
+
+def test_history_rows_carry_token(db):
+    report = _report(score=70)
+    db.save(report)
+    rows = db.history("https://x.test")
+    assert rows[0]["token"] == report["meta"]["scan_token"]  # past scans are linkable by token
+
+
+def test_notes_roundtrip(db):
+    assert db.add_note("https://n.test", "   ") is None  # blank ignored
+    n1 = db.add_note("https://n.test", "rewrote intros")
+    n2 = db.add_note("https://n.test", "added FAQ schema")
+    assert isinstance(n1, int) and isinstance(n2, int)
+    notes = db.list_notes("https://n.test")
+    assert [x["body"] for x in notes] == ["added FAQ schema", "rewrote intros"]  # newest first
+    assert db.list_notes("https://other.test") == []  # scoped by url
+    assert db.delete_note(n1) is True
+    assert [x["id"] for x in db.list_notes("https://n.test")] == [n2]
+
+
 # --- diffing (pure, backend-independent) -------------------------------------------------
 
 

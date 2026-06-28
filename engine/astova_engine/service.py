@@ -97,6 +97,11 @@ class MonitorCreate(BaseModel):
     email: str | None = None
 
 
+class NoteCreate(BaseModel):
+    url: str
+    body: str
+
+
 class LogsRequest(BaseModel):
     text: str
     source: str = "uploaded log"
@@ -223,6 +228,29 @@ def run_due_endpoint(x_astova_cron: str | None = Header(default=None)) -> dict:
 def history_endpoint(url: str, kind: str = "page", limit: int = 20) -> dict:
     """List recent saved scans for a URL (newest first). Empty when persistence is off."""
     return {"url": url, "kind": kind, "scans": store.history(url, kind=kind, limit=max(1, min(limit, 100)))}
+
+
+@app.get("/notes")
+def list_notes_endpoint(url: str) -> dict:
+    """A site's running note log, newest first. Empty when persistence is off."""
+    return {"url": url, "notes": store.list_notes(url)}
+
+
+@app.post("/notes")
+def create_note_endpoint(req: NoteCreate) -> dict:
+    """Add a note to a site's log."""
+    _require_persistence()
+    note_id = store.add_note(req.url, req.body)
+    if note_id is None:
+        raise HTTPException(status_code=400, detail="note body is empty")
+    return {"id": note_id, "url": req.url}
+
+
+@app.delete("/notes/{note_id}")
+def delete_note_endpoint(note_id: int) -> dict:
+    """Delete a note."""
+    _require_persistence()
+    return {"deleted": note_id if store.delete_note(note_id) else None}
 
 
 @app.get("/scans/{token}")

@@ -143,6 +143,13 @@ def _ensure_schema(db: _DB) -> None:
             created_at TEXT NOT NULL
         )""")
     db.execute("CREATE INDEX IF NOT EXISTS idx_alerts_monitor ON alerts(monitor_id, id)")
+    db.execute(f"""CREATE TABLE IF NOT EXISTS notes (
+            {pk},
+            url TEXT NOT NULL,
+            body TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )""")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_notes_url ON notes(url, id)")
 
 
 def save(report: dict) -> int | None:
@@ -169,7 +176,7 @@ def history(url: str, *, kind: str | None = None, limit: int = 20) -> list[dict]
     """Recent scans for a URL (newest first), as lightweight rows (no full report)."""
     if not is_enabled():
         return []
-    q = "SELECT id, kind, url, created_at, score FROM scans WHERE url = ?"
+    q = "SELECT id, kind, url, created_at, score, token FROM scans WHERE url = ?"
     args: list = [url]
     if kind:
         q += " AND kind = ?"
@@ -375,3 +382,43 @@ def list_alerts(monitor_id: int | None = None, *, limit: int = 50) -> list[dict]
             except (json.JSONDecodeError, TypeError):
                 pass
     return rows
+
+
+# --- notes -------------------------------------------------------------------------------
+# A per-site running log the user keeps alongside a URL's scan history ("rewrote intros 28 Jun").
+
+
+def add_note(url: str, body: str) -> int | None:
+    """Add a note to a site's log; return its id (or None when disabled / body empty)."""
+    if not is_enabled():
+        return None
+    body = (body or "").strip()
+    if not body:
+        return None
+    now = datetime.now(timezone.utc).isoformat()
+    with _conn() as db:
+        return db.insert(
+            "INSERT INTO notes (url, body, created_at) VALUES (?, ?, ?)", (url, body, now)
+        )
+
+
+def list_notes(url: str, *, limit: int = 200) -> list[dict]:
+    """Notes for a URL, newest first."""
+    if not is_enabled():
+        return []
+    with _conn() as db:
+        return [
+            dict(r)
+            for r in db.execute(
+                "SELECT id, url, body, created_at FROM notes WHERE url = ? ORDER BY id DESC LIMIT ?",
+                (url, max(1, min(limit, 500))),
+            ).fetchall()
+        ]
+
+
+def delete_note(note_id: int) -> bool:
+    """Delete a note; True if a row was removed."""
+    if not is_enabled():
+        return False
+    with _conn() as db:
+        return db.execute("DELETE FROM notes WHERE id = ?", (note_id,)).rowcount > 0
