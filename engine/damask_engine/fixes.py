@@ -136,6 +136,8 @@ def generate_fixes(soup: BeautifulSoup, report: Report, url: str) -> list[Fix]:
         fixes.append(_fix_robots(url, "tech.robots.ai"))
     elif "geo.bot_access" in ids:
         fixes.append(_fix_robots(url, "geo.bot_access"))
+    if "local.business_schema" in ids:
+        fixes.append(_fix_local_schema(soup, url))
     if "tech.llms_txt" in {f.id for f in report.findings if f.value is False}:
         fixes.append(_fix_llms(soup, url))
 
@@ -311,6 +313,39 @@ def _fix_viewport() -> Fix:
         finding_id="tech.viewport", title="Add a mobile viewport tag", kind="meta", language="html",
         content='<meta name="viewport" content="width=device-width, initial-scale=1">',
         note="Paste into <head> for correct responsive rendering on mobile.",
+    )
+
+
+def _fix_local_schema(soup: BeautifulSoup, url: str) -> Fix:
+    name = _site_name(soup, url)
+    obj = {
+        "@context": "https://schema.org",
+        "@type": "LocalBusiness",
+        "name": name,
+        "url": url,
+        "telephone": "+1-000-000-0000",
+        "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "123 Main St",
+            "addressLocality": "City",
+            "addressRegion": "ST",
+            "postalCode": "00000",
+            "addressCountry": "US",
+        },
+        "geo": {"@type": "GeoCoordinates", "latitude": "0.0", "longitude": "0.0"},
+        "openingHoursSpecification": [{
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+            "opens": "09:00", "closes": "17:00",
+        }],
+        "sameAs": ["https://g.page/your-business"],
+    }
+    body = json.dumps(obj, indent=2)
+    return Fix(
+        finding_id="local.business_schema", title="Add LocalBusiness schema", kind="json-ld",
+        language="html", content=f'<script type="application/ld+json">\n{body}\n</script>',
+        note="Replace the placeholder address, phone, geo coordinates, hours and Google Business "
+        "Profile URL with your real details, then add to the page <head>.",
     )
 
 

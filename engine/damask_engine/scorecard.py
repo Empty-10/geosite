@@ -40,7 +40,7 @@ ROWS: list[tuple[int, str, list[str]]] = [
     (17, "Performance & Delivery", ["tech.resource_hints", "tech.compression", "perf.score",
                                     "perf.lcp", "perf.cls", "perf.tbt", "perf.fcp", "perf.si",
                                     "perf.field"]),
-    (18, "Authority, Trust & E-E-A-T", ["geo.trust", "geo.no_content"]),
+    (18, "Authority, Trust & E-E-A-T", ["geo.trust", "geo.no_content", "local.nap"]),
     (19, "Indexability & Technical SEO Sanity", ["tech.https", "tech.status", "tech.redirect",
                                                  "tech.redirect.chain", "tech.hsts", "tech.tls",
                                                  "tech.mixed_content", "tech.mixed_content.ok",
@@ -52,7 +52,8 @@ ROWS: list[tuple[int, str, list[str]]] = [
                                                  "tech.index_conflict", "onpage.snippet_directives",
                                                  "onpage.hreflang", "geo.js_rendered", "geo.bot_access",
                                                  "tech.llms_txt"]),
-    (20, "Structured Data & Schema", ["schema.jsonld", "schema.missing", "schema.validation"]),
+    (20, "Structured Data & Schema", ["schema.jsonld", "schema.missing", "schema.validation",
+                                      "local.business_schema"]),
 ]
 
 CATEGORIES: list[tuple[str, list[int]]] = [

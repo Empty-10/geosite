@@ -27,7 +27,9 @@ from typing import Any
 #     onpage.crawlable_anchors, onpage.hreflang.
 # v10: scorecard `summary` (verdict + impact-ranked opportunities), per-row `impact`, `citation`
 #     readiness; geo.bot_access — "what the AI bot saw" (fetch-as-GPTBot WAF/cloaking check).
-SCHEMA_VERSION = "10"
+# v11: local-AEO module (conditional) — local.business_schema / local.nap / local.hours /
+#     local.geo / local.gbp for local-business pages; LocalBusiness schema fix.
+SCHEMA_VERSION = "11"
 
 
 class Confidence(str, Enum):

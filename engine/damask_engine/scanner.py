@@ -9,7 +9,7 @@ from .fetch import (BotFetch, FetchResult, fetch, fetch_as_bot, fetch_pagespeed,
                     render_dom_cloudflare, tls_info)
 from .fixes import generate_fixes
 from .models import Pillar, Report
-from .modules import bot_view, geo_readiness, onpage, performance, technical
+from .modules import bot_view, geo_readiness, local, onpage, performance, technical
 from .modules.technical import NetInputs, parse_robots
 from .scorecard import build_scorecard
 from .scoring import build_report
@@ -35,6 +35,7 @@ def scan_html(url: str, html: str, *, online: bool = False,
     findings += onpage.analyze(soup, text, final_url)
     findings += technical.analyze(soup, final_url, status_code, headers, net=net)
     findings += geo_readiness.analyze(soup, text, render_delta=net.render_delta if net else None)
+    findings += local.analyze(soup, text, final_url)
     nrw = normal_raw_words if normal_raw_words is not None else word_count(text)
     findings += bot_view.analyze(status_code, nrw, bot)
 
