@@ -37,6 +37,7 @@ export function Nav() {
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <ThemeToggle />
         <a style={linkStyle} href="/crawlers">Crawler logs</a>
+        <a style={linkStyle} href="/login">Sign in</a>
         <a
           href="/report"
           style={{
