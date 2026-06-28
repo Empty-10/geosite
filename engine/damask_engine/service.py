@@ -22,15 +22,16 @@ thread on this single-instance service and the caller polls.
 
 from __future__ import annotations
 
+import os
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from . import store
+from . import monitoring, store
 from .cloudflare_logs import fetch_cloudflare_logs
 from .compare import compare_reports
 from .config import get_pagespeed_key
@@ -88,6 +89,12 @@ class CrawlRequest(BaseModel):
 
 class CompareRequest(BaseModel):
     urls: list[str]
+
+
+class MonitorCreate(BaseModel):
+    url: str
+    cadence: str = "daily"
+    email: str | None = None
 
 
 class LogsRequest(BaseModel):
@@ -149,6 +156,67 @@ def compare_endpoint(req: CompareRequest) -> dict:
     with ThreadPoolExecutor(max_workers=len(urls)) as ex:
         reports = list(ex.map(_safe_scan, urls))  # map preserves input order
     return {"count": len(urls), "comparison": compare_reports(reports)}
+
+
+def _require_persistence() -> None:
+    if not store.is_enabled():
+        raise HTTPException(status_code=503, detail="Persistence is off — set DAMASK_DB_PATH.")
+
+
+@app.post("/monitors")
+def create_monitor(req: MonitorCreate) -> dict:
+    """Register a URL to monitor on a cadence (daily|weekly)."""
+    _require_persistence()
+    mid = store.add_monitor(req.url, cadence=req.cadence, email=req.email)
+    return {"id": mid, "url": req.url, "cadence": req.cadence}
+
+
+@app.get("/monitors")
+def list_monitors_endpoint() -> dict:
+    return {"monitors": store.list_monitors()}
+
+
+@app.delete("/monitors/{monitor_id}")
+def delete_monitor_endpoint(monitor_id: int) -> dict:
+    _require_persistence()
+    if not store.delete_monitor(monitor_id):
+        raise HTTPException(status_code=404, detail="monitor not found")
+    return {"deleted": monitor_id}
+
+
+@app.get("/monitors/{monitor_id}/alerts")
+def monitor_alerts_endpoint(monitor_id: int, limit: int = 50) -> dict:
+    return {"monitor_id": monitor_id, "alerts": store.list_alerts(monitor_id, limit=limit)}
+
+
+@app.post("/monitors/run-due")
+def run_due_endpoint(x_damask_cron: str | None = Header(default=None)) -> dict:
+    """Scan every monitor whose next run is due, diff vs the previous scan, evaluate the alert
+    rules (with anti-noise) and record any alerts. Triggered by an external cron.
+
+    Guarded by a shared secret when DAMASK_CRON_SECRET is set (the X-Damask-Cron header).
+    """
+    secret = os.environ.get("DAMASK_CRON_SECRET")
+    if secret and x_damask_cron != secret:
+        raise HTTPException(status_code=401, detail="bad or missing cron secret")
+    _require_persistence()
+
+    results = []
+    for m in store.due_monitors():
+        report = scan(m["url"], fixes=False).to_dict()
+        failed = bool(report.get("meta", {}).get("error"))
+        scan_id = store.save(report) if not failed else None
+        prev = store.previous(report.get("url", ""), kind="page", before_id=scan_id) if scan_id else None
+        diff = store.diff_reports(prev, report) if prev else None
+
+        res = monitoring.evaluate(m["url"], report, prev, diff, m["consecutive_failures"])
+        for alert in res["alerts"]:
+            store.record_alert(m["id"], scan_id, alert)
+        store.mark_run(m["id"], ok=res["ok"])
+        results.append({"monitor_id": m["id"], "url": m["url"], "ok": res["ok"],
+                        "alerts": len(res["alerts"])})
+
+    return {"ran": len(results), "results": results}
 
 
 @app.get("/history")

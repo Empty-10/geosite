@@ -1,6 +1,7 @@
 # Monitoring layer — build plan
 
-> Status: **planned** (not built). This is the recurring-revenue layer: re-scan tracked URLs on a
+> Status: **M0 built** (data model + rules + `/monitors/run-due`, offline-tested); M1+ pending.
+> This is the recurring-revenue layer: re-scan tracked URLs on a
 > cadence, diff against the last scan, and alert on meaningful regressions. It's what makes the
 > $29/mo subscription defensible (a one-shot audit is a one-time purchase; "watch my site and
 > tell me when it breaks" is a subscription).
@@ -130,7 +131,7 @@ A monitor that cries wolf is worse than none. Guards:
 
 | Phase | Scope | New deps | Ships value |
 |---|---|---|---|
-| **M0 — core** | `monitors`/`alerts` tables + CRUD; `POST /monitors/run-due` that scans due monitors, saves, diffs, evaluates rules, records alerts (delivery = logged stub). Offline-testable. Set `DAMASK_DB_PATH` on Render. | none | engine watches + records (no delivery yet) |
+| **M0 — core** ✅ | **Built.** `monitors`/`alerts` tables + CRUD (`store.py`); pure alert rules with anti-noise (`monitoring.py`); `POST /monitors` + `GET /monitors` + `DELETE` + `GET /monitors/{id}/alerts` + `POST /monitors/run-due` (cron-secret guarded). Offline-tested. Still to do operationally: set `DAMASK_DB_PATH` on Render. | none | engine watches + records (no delivery yet) |
 | **M1 — schedule** | External cron → `/monitors/run-due` with a shared secret. | Vercel Cron | runs automatically |
 | **M2 — alerts** | The 5 rules + debounce/anti-noise + email delivery (Resend). | Resend | real notifications |
 | **M3 — surfaces** | `/monitors` UI: add/list/pause, sparkline, alert log, per-monitor trend. | none | self-serve + "tracking over time" |

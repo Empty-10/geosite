@@ -15,7 +15,7 @@ import json
 import os
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 
 def db_path() -> str | None:
@@ -53,6 +53,32 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         )"""
     )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_scans_url_kind ON scans(url, kind, id)")
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS monitors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT NOT NULL,
+            cadence TEXT NOT NULL DEFAULT 'daily',
+            email TEXT,
+            active INTEGER NOT NULL DEFAULT 1,
+            consecutive_failures INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            last_run_at TEXT,
+            next_run_at TEXT
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            monitor_id INTEGER NOT NULL,
+            scan_id INTEGER,
+            type TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            detail TEXT,
+            created_at TEXT NOT NULL
+        )"""
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_monitor ON alerts(monitor_id, id)")
 
 
 def save(report: dict) -> int | None:
@@ -147,3 +173,115 @@ def diff_reports(old: dict, new: dict) -> dict:
         "regressed": regressed,
         "new_issues": new_issues,
     }
+
+
+# --------------------------------------------------------------------------- monitors + alerts
+
+_CADENCE_DAYS = {"daily": 1, "weekly": 7}
+
+
+def _next_run(now: datetime, cadence: str) -> str:
+    return (now + timedelta(days=_CADENCE_DAYS.get(cadence, 1))).isoformat()
+
+
+def add_monitor(url: str, *, cadence: str = "daily", email: str | None = None) -> int | None:
+    """Register a URL to monitor (due immediately). Returns its id, or None when persistence off."""
+    if not is_enabled():
+        return None
+    cadence = cadence if cadence in _CADENCE_DAYS else "daily"
+    now = datetime.now(timezone.utc).isoformat()
+    with _conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO monitors (url, cadence, email, active, consecutive_failures, created_at, "
+            "next_run_at) VALUES (?, ?, ?, 1, 0, ?, ?)",
+            (url, cadence, email, now, now),
+        )
+        return cur.lastrowid
+
+
+def list_monitors(*, active_only: bool = False) -> list[dict]:
+    if not is_enabled():
+        return []
+    q = "SELECT * FROM monitors" + (" WHERE active = 1" if active_only else "") + " ORDER BY id"
+    with _conn() as conn:
+        return [dict(r) for r in conn.execute(q).fetchall()]
+
+
+def get_monitor(monitor_id: int) -> dict | None:
+    if not is_enabled():
+        return None
+    with _conn() as conn:
+        r = conn.execute("SELECT * FROM monitors WHERE id = ?", (monitor_id,)).fetchone()
+        return dict(r) if r else None
+
+
+def delete_monitor(monitor_id: int) -> bool:
+    if not is_enabled():
+        return False
+    with _conn() as conn:
+        cur = conn.execute("DELETE FROM monitors WHERE id = ?", (monitor_id,))
+        conn.execute("DELETE FROM alerts WHERE monitor_id = ?", (monitor_id,))
+        return cur.rowcount > 0
+
+
+def due_monitors(now: datetime | None = None) -> list[dict]:
+    """Active monitors whose next_run_at has passed (or is unset)."""
+    if not is_enabled():
+        return []
+    ts = (now or datetime.now(timezone.utc)).isoformat()
+    with _conn() as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM monitors WHERE active = 1 AND (next_run_at IS NULL OR next_run_at <= ?) "
+            "ORDER BY id", (ts,),
+        ).fetchall()]
+
+
+def mark_run(monitor_id: int, *, ok: bool, now: datetime | None = None) -> None:
+    """Record a run: advance next_run_at by cadence; reset failures on success, else increment."""
+    if not is_enabled():
+        return
+    now = now or datetime.now(timezone.utc)
+    with _conn() as conn:
+        r = conn.execute("SELECT cadence, consecutive_failures FROM monitors WHERE id = ?",
+                         (monitor_id,)).fetchone()
+        if not r:
+            return
+        failures = 0 if ok else (r["consecutive_failures"] + 1)
+        conn.execute(
+            "UPDATE monitors SET last_run_at = ?, next_run_at = ?, consecutive_failures = ? WHERE id = ?",
+            (now.isoformat(), _next_run(now, r["cadence"]), failures, monitor_id),
+        )
+
+
+def record_alert(monitor_id: int, scan_id: int | None, alert: dict) -> int | None:
+    if not is_enabled():
+        return None
+    now = datetime.now(timezone.utc).isoformat()
+    with _conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO alerts (monitor_id, scan_id, type, severity, summary, detail, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (monitor_id, scan_id, alert["type"], alert["severity"], alert["summary"],
+             json.dumps(alert.get("detail")), now),
+        )
+        return cur.lastrowid
+
+
+def list_alerts(monitor_id: int | None = None, *, limit: int = 50) -> list[dict]:
+    if not is_enabled():
+        return []
+    q, args = "SELECT * FROM alerts", []
+    if monitor_id is not None:
+        q += " WHERE monitor_id = ?"
+        args.append(monitor_id)
+    q += " ORDER BY id DESC LIMIT ?"
+    args.append(max(1, min(limit, 200)))
+    with _conn() as conn:
+        rows = [dict(r) for r in conn.execute(q, args).fetchall()]
+    for r in rows:
+        if r.get("detail"):
+            try:
+                r["detail"] = json.loads(r["detail"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+    return rows
