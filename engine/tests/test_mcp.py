@@ -96,3 +96,20 @@ def test_audit_project_with_base_url_includes_page_audit(tmp_path, monkeypatch):
 
 def test_audit_project_bad_path():
     assert "error" in srv.audit_project("/no/such/dir/here")
+
+
+def test_audit_project_multipage_crawl(tmp_path, monkeypatch):
+    (tmp_path / "index.html").write_text("<html></html>")
+    from damask_engine.models import PageSummary, SiteReport
+
+    site = SiteReport(
+        url="http://localhost:3000", overall_score=72,
+        pages=[PageSummary(url="http://localhost:3000/", status_code=200, overall_score=80, issues=2),
+               PageSummary(url="http://localhost:3000/about", status_code=200, overall_score=64, issues=5)],
+    )
+    monkeypatch.setattr(srv, "crawl", lambda url, max_pages=25: site)
+    out = srv.audit_project(str(tmp_path), base_url="http://localhost:3000", max_pages=10)
+    assert "site_audit" in out
+    assert out["site_audit"]["overall_score"] == 72
+    assert len(out["site_audit"]["pages"]) == 2
+    assert out["site_audit"]["pages"][1]["score"] == 64

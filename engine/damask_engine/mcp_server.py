@@ -19,6 +19,7 @@ import os
 from mcp.server.fastmcp import FastMCP
 
 from . import project as project_mod
+from .crawl import crawl
 from .fixes import build_fix_plan
 from .scanner import scan
 
@@ -139,19 +140,22 @@ def _first_existing(*paths: str) -> str | None:
 
 
 @mcp.tool()
-def audit_project(path: str, base_url: str | None = None) -> dict:
+def audit_project(path: str, base_url: str | None = None, max_pages: int = 1) -> dict:
     """Audit a local project BEFORE deploy — reads its static root files (robots.txt, llms.txt,
     sitemap.xml) from disk and returns fixes with real, layout-aware file paths the coding agent
     can apply directly. Detects the framework (Next.js / Astro / Gatsby / WordPress / static) to
     target the right directory (e.g. public/).
 
-    Pass base_url (your running dev server, e.g. http://localhost:3000) to ALSO run the full
-    deterministic page audit on the rendered page and include its fix plan — the complete
-    "audit my project and fix everything" loop. The project's source never leaves the machine.
+    Pass base_url (your running dev server, e.g. http://localhost:3000) to ALSO audit the rendered
+    site. With max_pages=1 you get that one page's full fix plan; with max_pages>1 it crawls the
+    running site (up to 50 pages) and returns a per-page + site-wide summary. When run from the
+    LOCAL MCP this all executes on your machine against localhost — the project's source and site
+    never leave the device.
 
     Args:
         path: Path to the project root (the folder with package.json / wp-config.php / etc.).
-        base_url: Optional URL of the running app to render-audit (typically http://localhost:PORT).
+        base_url: Optional URL of the running app to audit (typically http://localhost:PORT).
+        max_pages: How many pages to crawl from base_url (1 = just that page; >1 = crawl the site).
     """
     path = os.path.expanduser(path)
     if not os.path.isdir(path):
@@ -181,7 +185,22 @@ def audit_project(path: str, base_url: str | None = None) -> dict:
                 "server) to also render-audit the page and get its full fix plan.",
     }
 
-    if base_url:
+    if base_url and max_pages > 1:
+        site = crawl(base_url, max_pages=min(max_pages, 50))
+        sd = site.to_dict()
+        if sd["meta"].get("error"):
+            out["page_audit_error"] = sd["meta"]["error"]
+        else:
+            out["site_audit"] = {
+                "url": sd["url"],
+                "overall_score": sd["overall_score"],
+                "pages": [{"url": p["url"], "score": p["overall_score"], "issues": p["issues"]}
+                          for p in sd["pages"]],
+                "site_issues": [{"id": f["id"], "title": f["title"], "severity": f["severity"],
+                                 "evidence": f["evidence"], "recommendation": f["recommendation"]}
+                                for f in sd["site_findings"] if f["status"] in ("fail", "warn")],
+            }
+    elif base_url:
         report = scan(base_url, fixes=True)
         d = report.to_dict()
         if d["meta"].get("error"):
