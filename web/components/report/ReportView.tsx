@@ -16,7 +16,7 @@ import { ScorecardPanel } from "./ScorecardPanel";
 import { ScoreRing } from "./ScoreRing";
 import { RenderTag } from "./RenderTag";
 import { usePerformance } from "./usePerformance";
-import { fixesByFinding, impactByFinding, PILLAR_SECTIONS, priorityFixes, rgba, type Report } from "./types";
+import { buildFixesText, fixesByFinding, impactByFinding, PILLAR_SECTIONS, priorityFixes, rgba, type Finding, type Report } from "./types";
 
 type State =
   | { phase: "empty" }
@@ -263,8 +263,9 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
           <h1 style={{ fontSize: 22, fontWeight: 500, letterSpacing: "-0.02em", marginBottom: 6, wordBreak: "break-all" }}>
             {finalUrl}
           </h1>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 14, alignItems: "baseline" }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 14, alignItems: "baseline", flexWrap: "wrap" }}>
             {report.meta?.scan_token != null && <ShareButton token={report.meta.scan_token as string} />}
+            <FixesExport report={report} url={finalUrl} findings={allFindings} impacts={impacts} />
             <a href={`/compare?url=${encodeURIComponent(finalUrl)}`} style={{ fontSize: 12.5, color: C.accent, whiteSpace: "nowrap" }}>
               Compare vs competitors →
             </a>
@@ -397,5 +398,72 @@ function ShareButton({ token }: { token: string }) {
     >
       {copied ? "✓ Link copied" : "🔗 Share"}
     </button>
+  );
+}
+
+// Deterministic "everything to fix" export — copy or download a plain checklist of every issue
+// + recommendation + ready-made fix. No AI; just compiles what the scan already found.
+function FixesExport({
+  report,
+  url,
+  findings,
+  impacts,
+}: {
+  report: Report;
+  url: string;
+  findings: Finding[];
+  impacts: Record<string, number>;
+}) {
+  const [copied, setCopied] = useState(false);
+  const text = () => buildFixesText(report, url, findings, impacts);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text());
+    } catch {
+      /* clipboard blocked */
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+
+  const download = () => {
+    const host = (() => {
+      try {
+        return new URL(url).hostname.replace(/^www\./, "");
+      } catch {
+        return "site";
+      }
+    })();
+    const blob = new Blob([text()], { type: "text/markdown;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `astova-fixes-${host}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(href);
+  };
+
+  const linkStyle: React.CSSProperties = {
+    fontSize: 12.5,
+    color: C.accent,
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    padding: 0,
+    whiteSpace: "nowrap",
+  };
+
+  return (
+    <>
+      <button onClick={copy} title="Copy every fix as a checklist" style={{ ...linkStyle, color: copied ? C.accent : "var(--text-2)" }}>
+        {copied ? "✓ Copied" : "Copy fixes"}
+      </button>
+      <button onClick={download} title="Download every fix as a Markdown file" style={linkStyle}>
+        Export fixes ↓
+      </button>
+    </>
   );
 }
