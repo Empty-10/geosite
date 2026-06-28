@@ -20,8 +20,9 @@ export function Nav() {
         justifyContent: "space-between",
         padding: "16px 32px",
         borderBottom: "1px solid var(--border)",
-        background: "rgba(13,15,18,0.72)",
+        background: "var(--nav-bg)",
         backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

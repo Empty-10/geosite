@@ -16,6 +16,7 @@
   --warn: #E0A22B;
   --fail: #E5484D;
   --on-accent: #0D0F12; /* text on the green button — stays dark in BOTH themes */
+  --nav-bg: rgba(13, 15, 18, 0.72); /* translucent sticky-nav backdrop, flips per theme */
   --mono: 'Geist Mono', ui-monospace, monospace;
   color-scheme: dark;
 }
@@ -31,6 +32,7 @@
   --text: #181B20;
   --text-2: #555D67;
   --text-3: #848B95;
+  --nav-bg: rgba(247, 248, 250, 0.72);
   color-scheme: light;
 }
 
