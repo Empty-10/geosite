@@ -13,6 +13,9 @@ const TIMEOUT = 40_000;
 
 export function enabledEngines(): Engine[] {
   const engines: Engine[] = [];
+  // "ChatGPT" = the real OpenAI API with web search, so the label matches the product users mean.
+  const openai = process.env.OPENAI_API_KEY;
+  if (openai) engines.push({ name: "ChatGPT", sample: (p) => sampleOpenAI(p, openai) });
   const anthropic = process.env.ANTHROPIC_API_KEY;
   if (anthropic) engines.push({ name: "Claude", sample: (p) => sampleClaude(p, anthropic) });
   const pplx = process.env.PERPLEXITY_API_KEY;
@@ -45,6 +48,37 @@ export async function classifySentiment(brand: string, passages: string[]): Prom
       const v = String(s).toLowerCase();
       return v.startsWith("pos") ? "positive" : v.startsWith("neg") ? "negative" : "neutral";
     });
+  } catch {
+    return null;
+  }
+}
+
+async function sampleOpenAI(prompt: string, apiKey: string): Promise<Sample | null> {
+  // OpenAI Responses API with the web_search tool — the closest API proxy to ChatGPT's
+  // browsing answer. (If the API rejects the tool name on your account, switch the type to
+  // "web_search_preview".) Pulls answer text + url_citation annotations as cited sources.
+  const model = process.env.ASTOVA_OPENAI_MODEL || "gpt-4o";
+  try {
+    const r = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+      body: JSON.stringify({ model, input: prompt, tools: [{ type: "web_search" }] }),
+      signal: AbortSignal.timeout(TIMEOUT),
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    let text = "";
+    const sources = new Set<string>();
+    for (const item of (d?.output ?? []) as { type?: string; content?: unknown[] }[]) {
+      if (item?.type !== "message" || !Array.isArray(item.content)) continue;
+      for (const c of item.content as { type?: string; text?: string; annotations?: { type?: string; url?: string }[] }[]) {
+        if (c?.type !== "output_text") continue;
+        text += (c.text ?? "") + " ";
+        for (const a of c.annotations ?? []) if (a?.type === "url_citation" && a?.url) sources.add(a.url);
+      }
+    }
+    if (!text && typeof d?.output_text === "string") text = d.output_text;
+    return { text, sources: [...sources] };
   } catch {
     return null;
   }
