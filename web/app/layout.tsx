@@ -6,19 +6,19 @@ import { SITE_URL } from "@/lib/site";
 const THEME_SCRIPT = `(function(){try{if(localStorage.getItem('astova-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();`;
 
 const DESCRIPTION =
-  "Astova scans your site and separates verified fact from measured estimate — then tells you what to fix, not just what's wrong.";
+  "Astova checks whether AI answer engines can read, understand and cite your site, then gives you the exact fixes - or lets your AI agent apply them. Verified, not guessed.";
 
 export const metadata: Metadata = {
   // Absolute base for OG/social/canonical URLs. Swap by setting NEXT_PUBLIC_SITE_URL when the
   // real domain is locked (see lib/site.ts).
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Astova — know exactly how AI engines see your site",
+    default: "Astova - get your site ready for AI search",
     template: "%s · Astova",
   },
   description: DESCRIPTION,
   openGraph: {
-    title: "Astova — know exactly how AI engines see your site",
+    title: "Astova - get your site ready for AI search",
     description: DESCRIPTION,
     type: "website",
     siteName: "Astova",

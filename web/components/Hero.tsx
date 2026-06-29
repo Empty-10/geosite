@@ -1,7 +1,7 @@
 import { HeroDemo } from "./HeroDemo";
 import { RotatingWord } from "./RotatingWord";
 
-const ENGINES = ["ChatGPT", "Perplexity", "Gemini", "AI Overviews", "Copilot"];
+const ENGINES = ["ChatGPT", "Claude", "Perplexity", "Gemini", "AI Overviews"];
 
 export function Hero() {
   return (
@@ -44,7 +44,7 @@ export function Hero() {
             }}
           >
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)" }} />
-            AI search visibility — verified, not estimated
+            Verified AI-readiness · fixes, not findings
           </div>
           <h1
             style={{
@@ -56,12 +56,12 @@ export function Hero() {
               textWrap: "balance",
             }}
           >
-            See your site through the eyes of{" "}
-            <RotatingWord words={ENGINES} />.
+            Is your site ready for{" "}
+            <RotatingWord words={ENGINES} suffix="?" />
           </h1>
-          <p style={{ fontSize: 17, color: "var(--text-2)", maxWidth: 540, margin: "0 auto", textWrap: "pretty" }}>
-            Astova reads your pages the way AI answer engines do — separating verified fact from measured estimate —
-            then hands you the fix, not just the finding.
+          <p style={{ fontSize: 17, color: "var(--text-2)", maxWidth: 560, margin: "0 auto", textWrap: "pretty" }}>
+            Astova reads your pages the way AI answer engines do, scores what&apos;s ready, and gives you the
+            exact fixes - or lets your AI agent apply them. Verified from your live HTML, not guessed.
           </p>
         </div>
 
