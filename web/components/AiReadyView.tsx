@@ -4,7 +4,8 @@
 // Enter a URL -> POST /api/ai-ready -> show score, summary counts, top actions, and a copyable
 // Markdown export. Deliberately simple/functional. No fixes applied, no LLM - just the plan.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { C, scoreColor } from "@/lib/tokens";
 
 type Fix = { supported?: boolean; deterministic?: boolean; suggested_location?: string | null };
@@ -47,14 +48,26 @@ function bucketLabel(it: Item): { text: string; color: string } {
 }
 
 export function AiReadyView() {
-  const [url, setUrl] = useState("stripe.com");
+  const params = useSearchParams();
+  const prefilled = (params.get("url") || "").trim();
+  const [url, setUrl] = useState(prefilled || "stripe.com");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [copied, setCopied] = useState(false);
+  const autoRan = useRef(false);
 
-  async function generate() {
-    const v = url.trim();
+  // Arriving from the homepage CTA with ?url=... prefills the input and runs once automatically.
+  useEffect(() => {
+    if (prefilled && !autoRan.current) {
+      autoRan.current = true;
+      generate(prefilled);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefilled]);
+
+  async function generate(target?: string) {
+    const v = (target ?? url).trim();
     if (!v || loading) return;
     setLoading(true);
     setError(null);
@@ -111,7 +124,7 @@ export function AiReadyView() {
           }}
         />
         <button
-          onClick={generate}
+          onClick={() => generate()}
           disabled={loading}
           style={{
             padding: "12px 18px", borderRadius: 10, border: "none", fontSize: 15, fontWeight: 600,

@@ -1,6 +1,15 @@
 // Shared URL helpers for engine-backed routes: normalize a user-typed target and refuse
 // server-side requests to local/private addresses (basic SSRF guard). Pure, no I/O.
 
+/** Build the AI Ready Action Plan link for a raw user-typed target, scheme-normalized + encoded.
+ *  Returns null for empty input (caller decides what to do). Pure - safe to unit test. */
+export function aiReadyHref(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return null;
+  const withScheme = /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  return `/ai-ready?url=${encodeURIComponent(withScheme)}`;
+}
+
 /** Accept "acme.com" or a full URL; return a normalized http(s) href, or null if unusable. */
 export function normalizeUrl(raw: string): string | null {
   const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;

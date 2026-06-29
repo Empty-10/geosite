@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { AiReadyView } from "@/components/AiReadyView";
 
@@ -10,5 +11,10 @@ export const metadata: Metadata = {
 };
 
 export default function AiReadyPage() {
-  return <AiReadyView />;
+  // useSearchParams (inside AiReadyView, for the ?url= prefill) needs a Suspense boundary.
+  return (
+    <Suspense fallback={null}>
+      <AiReadyView />
+    </Suspense>
+  );
 }

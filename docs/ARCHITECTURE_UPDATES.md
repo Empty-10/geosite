@@ -5,6 +5,54 @@
 
 ---
 
+## 2026-06-29 - Homepage: AI Ready Action Plan as the conversion path
+
+**Objective:** turn the AI Ready Action Plan into a clear homepage conversion path - a visitor enters a URL by
+the hero, clicks "Generate AI Ready plan", and lands on `/ai-ready` with the plan already running.
+
+**What changed:** refactored the existing hero scan input (`HeroDemo`) rather than adding a second one. Its
+primary CTA now generates the action plan (routes to `/ai-ready?url=<encoded>`); the score-only path
+(`/report`) is kept as a secondary link. `/ai-ready` reads `?url=`, prefills the field, and auto-runs once.
+
+**Files changed:**
+- `web/lib/engineTarget.ts` - new pure `aiReadyHref(raw)` (scheme-normalize + encode + build the link).
+- `web/components/HeroDemo.tsx` - primary CTA "Generate AI Ready plan" via `aiReadyHref`; Enter triggers it;
+  secondary "Prefer just the score?" keeps the `/report` path; caption reworded to "action plan".
+- `web/components/AiReadyView.tsx` - reads `?url=` (useSearchParams), prefills, auto-runs once (guarded by a
+  ref so it fires a single time, only when a `url` param is present).
+- `web/app/ai-ready/page.tsx` - wrapped the view in `Suspense` (required once it uses `useSearchParams`).
+- docs updated: CURRENT_CAPABILITIES.md.
+
+**Reuse, not duplication:** no scan/workflow logic was added - the homepage only builds a link, and `/ai-ready`
++ `/api/ai-ready` (and the engine `ai_ready_loop`) do all the work. The single hero input now has two
+destinations (plan / score).
+
+**Auto-run safety:** the scan only auto-fires when the page is reached with an explicit `?url=` (i.e. the user
+already clicked the CTA), and exactly once per mount - no surprise scans, no loops, no cost on a bare `/ai-ready`
+visit (which still defaults the input to a sample and waits for a click).
+
+**Breaking changes:** the hero's primary button changed from "Scan" (-> `/report`) to "Generate AI Ready plan"
+(-> `/ai-ready`); the score view is one click away via the secondary link. Visual style preserved (same card,
+tokens, layout). The held homepage positioning batch (`Hero.tsx` / `RotatingWord.tsx` / `faq.ts` / `layout.tsx`)
+was deliberately NOT touched - this feature lives in `HeroDemo.tsx` (which `Hero` renders) and the `/ai-ready`
+files only.
+
+**Testing note:** the web app has no JS unit-test runner (only `tsc` + `next build`), so verification is a clean
+`tsc --noEmit` and a successful `next build` (the `/ai-ready` page prerenders, `/api/ai-ready` builds). The pure
+`aiReadyHref` helper was factored out specifically so it is unit-testable if/when a runner is added.
+
+**Known limitations:** homepage path is URL-only; auto-run still needs `ASTOVA_ENGINE_URL` configured (else the
+page shows the "engine not configured" message after auto-running); no loading skeleton tuned for the
+arrive-and-run case beyond the existing button state.
+
+**Future opportunities:** a dedicated hero headline/subcopy emphasising "plan, not just a score"; an inline
+mini-result on the homepage before navigating; remember the last target.
+
+**Questions for the Product Architect:** should the homepage lead exclusively with the plan CTA (drop the score
+link), and should the hero copy itself be rewritten to sell the action plan?
+
+---
+
 ## 2026-06-29 - Web: AI Ready Action Plan page + `POST /ai-ready` engine endpoint
 
 **Objective:** give a human the same agent-friendly plan the MCP/CLI expose - enter a URL in the web app and

@@ -3,15 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { C } from "@/lib/tokens";
+import { aiReadyHref } from "@/lib/engineTarget";
 import { HeroScanDemo } from "./HeroScanDemo";
 
-// Landing-page scan entry. Enter a URL → Scan → routes to the /report scan page, which shows the
-// animated "scanning…" state then the score + full breakdown. (One scan, one place.)
+// Landing-page entry. Enter a URL -> Generate AI Ready plan -> routes to /ai-ready (prefilled, auto-runs)
+// for the prioritised "what to fix next" action plan. The score-only path (/report) is kept as a secondary
+// action. One input, two destinations - no scan/workflow logic lives here.
 export function HeroDemo() {
   const [url, setUrl] = useState("stripe.com");
   const router = useRouter();
 
-  const scan = () => {
+  const generatePlan = () => {
+    const href = aiReadyHref(url);
+    if (href) router.push(href);
+  };
+
+  const scanScore = () => {
     const v = url.trim();
     if (!v) return;
     const withScheme = /^https?:\/\//i.test(v) ? v : `https://${v}`;
@@ -61,10 +68,10 @@ export function HeroDemo() {
           >
             <span style={{ fontSize: 14, color: "var(--text-3)", fontFamily: "var(--mono)" }}>https://</span>
             <input
-              aria-label="Website URL to scan"
+              aria-label="Website URL to generate an AI Ready plan for"
               value={url.replace(/^https?:\/\//i, "")}
               onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && scan()}
+              onKeyDown={(e) => e.key === "Enter" && generatePlan()}
               placeholder="your-site.com"
               style={{
                 flex: 1,
@@ -78,10 +85,10 @@ export function HeroDemo() {
             />
           </div>
           <button
-            onClick={scan}
+            onClick={generatePlan}
             style={{
               fontSize: 14,
-              fontWeight: 500,
+              fontWeight: 600,
               border: "none",
               padding: "0 20px",
               height: 46,
@@ -92,13 +99,27 @@ export function HeroDemo() {
               color: C.ink,
             }}
           >
-            Scan
+            Generate AI Ready plan
           </button>
         </div>
 
         <HeroScanDemo />
         <div style={{ textAlign: "center", fontSize: 12, color: "var(--text-3)", marginTop: 12 }}>
-          Live preview · run your own scan above — verified score, 20-row scorecard, and every fix.
+          A prioritised action plan: what to fix, in order, with a verify step for each.{" "}
+          <button
+            onClick={scanScore}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              color: "var(--text-2)",
+              fontSize: 12,
+              textDecoration: "underline",
+            }}
+          >
+            Prefer just the score?
+          </button>
         </div>
       </div>
     </div>
