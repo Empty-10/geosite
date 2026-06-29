@@ -114,6 +114,7 @@ export function ReportDetailView({ reportId, share }: { reportId: string; share:
         onCopyPrompt={() => copy(bundle.agent_prompt, "prompt")}
         onDownload={() => downloadMarkdown(bundle.markdown)}
         planHref={`/ai-ready?url=${encodeURIComponent(target)}`}
+        printHref={`/report/${encodeURIComponent(reportId)}/print?share=${encodeURIComponent(share)}`}
       />
 
       <ExecutiveSummary scorecard={report.scorecard} />
@@ -184,9 +185,10 @@ function Meta({ m }: { m: Metadata }) {
 }
 
 function ActionsBar({
-  copied, onCopyMarkdown, onCopyPrompt, onDownload, planHref,
+  copied, onCopyMarkdown, onCopyPrompt, onDownload, planHref, printHref,
 }: {
-  copied: string; onCopyMarkdown: () => void; onCopyPrompt: () => void; onDownload: () => void; planHref: string;
+  copied: string; onCopyMarkdown: () => void; onCopyPrompt: () => void; onDownload: () => void;
+  planHref: string; printHref: string;
 }) {
   const btn = (primary: boolean): React.CSSProperties => ({
     padding: "9px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
@@ -199,6 +201,7 @@ function ActionsBar({
       <button onClick={onCopyPrompt} style={btn(true)}>{copied === "prompt" ? "Copied" : "Copy agent prompt"}</button>
       <button onClick={onCopyMarkdown} style={btn(false)}>{copied === "md" ? "Copied" : "Copy Markdown"}</button>
       <button onClick={onDownload} style={btn(false)}>Download Markdown</button>
+      <a href={printHref} style={btn(false)}>Print / Save PDF</a>
       <a href={planHref} style={btn(false)}>Open AI Ready Action Plan</a>
     </div>
   );

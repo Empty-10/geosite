@@ -5,6 +5,56 @@
 
 ---
 
+## 2026-06-29 - Web: print-friendly PDF-style report (`/report/[id]/print`)
+
+**Objective:** let users and agencies export a clean, client-friendly report - a print-optimised HTML page
+they save as PDF from the browser. No server-side PDF rendering, no new report logic.
+
+**What changed:** added a server-rendered print page that reuses the existing report bundle, plus a "Print /
+Save PDF" action on the report view. Factored the engine fetch into a shared helper so the print page and the
+API proxy don't duplicate it.
+
+**Files changed:**
+- `web/lib/reportData.ts` (new) - `fetchReportBundle(token)` server helper (engine fetch + token validation)
+  and the shared report/bundle types.
+- `web/app/api/reports/[token]/route.ts` - refactored to use the helper (one source for the fetch).
+- `web/app/report/[id]/print/page.tsx` (new) - server component; fetches the bundle server-side and renders a
+  white/black, print-CSS, page-break-friendly report. No nav, no buttons, no animations, no gradients.
+- `web/components/report/PrintTrigger.tsx` (new) - tiny client component that opens the print dialog on load.
+- `web/components/report/ReportDetailView.tsx` - "Print / Save PDF" link to the print route.
+- docs updated: CURRENT_CAPABILITIES.md.
+
+**Content:** Astova branding, target URL, report date, AI Readiness score, a confidence note, executive
+summary (from the scorecard), readiness breakdown (pillar table), action summary, top findings, the
+deterministic / AI-assisted / manual lists, verification guidance, and a VERIFIED / MEASURED / ESTIMATED
+footer with engine/ruleset/report versions.
+
+**Reuse, not duplication:** the page renders from the same `report_bundle` the engine already computes; the
+buckets/metadata/markdown come straight from it. Server-rendering means the full report is in the DOM before
+print (no loading flash), and the print CSS forces white background + black text regardless of app theme.
+
+**Breaking changes:** none. New route + helper + trigger; the API proxy behaviour is unchanged (same output,
+now via the helper).
+
+**Rules honoured:** reuses the report bundle/export helpers; no LLM; no server-side binary PDF (browser does
+the PDF); no auth (valid share token only); no engine/scoring change (web-only milestone).
+
+**Testing note:** no JS unit runner in web; verified by `tsc --noEmit` (clean) and `next build` (clean -
+`/report/[id]/print` builds as a dynamic server route). The print page reuses the bundle already round-trip-
+tested by the reports milestone.
+
+**Known limitations:** auto-print fires on every load of the /print route (it is the print variant; the
+readable variant is `/report/[id]`); needs `ASTOVA_ENGINE_URL` + persistence; styling is intentionally plain
+(no logo image yet - wordmark text only); page breaks are best-effort via `page-break-inside: avoid`.
+
+**Future opportunities:** a real branded/white-label template (agency logo + accent), a true server-side PDF
+(Playwright/print-to-PDF) if a binary is needed, and a cover page.
+
+**Questions for the Product Architect:** is browser "Save as PDF" enough for agencies, or do we need a
+server-generated branded PDF next?
+
+---
+
 ## 2026-06-29 - AI Readiness Reports: shareable `/report/[id]?share=<token>` (Engine + Web)
 
 **Objective:** turn the action plan into a premium, shareable report a user can save, revisit and send to a
