@@ -1,0 +1,86 @@
+# Astova - Current Capabilities
+
+> Factual record of what Astova can do TODAY. No future ideas, no planned features.
+> Maintained as production code: update whenever meaningful work ships.
+> Last updated: 2026-06-29. Engine report schema: v12.
+
+## Engine
+
+The deterministic audit engine (`engine/astova_engine/`) assesses a single page (or a crawl) by reading the live HTML and reproducing the result on re-run. Every finding is confidence **VERIFIED**. No LLM runs in the engine.
+
+- Fetches the page as a normal client and as **GPTBot** (the "bot view").
+- **Auto-renders** JavaScript-heavy pages via Cloudflare Browser Rendering when the raw HTML looks like an SPA shell; otherwise scans raw HTML.
+- Gathers robots.txt, sitemap.xml, llms.txt, TLS certificate, redirect chain.
+- Runs ~58 checks across five areas:
+  - **On-page (~25):** title, meta description, H1 / heading structure + order, canonical, robots meta, lang / hreflang, Open Graph, JSON-LD presence + validation (@graph-aware), image alt + dimensions, link quality (generic-anchor ratio), link attributes (noopener), crawlable anchors, jump links, form labels, URL quality, snippet directives.
+  - **Technical (~23):** HTTPS, status, redirects, HSTS, TLS expiry, mixed content, viewport, robots.txt + AI-crawler directives, sitemap validity / freshness, index conflict, resource hints, X-Robots-Tag, compression, security headers (>=3 of 5), llms.txt.
+  - **GEO readiness (~18):** front-loaded answer, definitive vs hedged language, content structure (lists/tables), Q&A headings, thin content / depth, AEO answer block, summary bullets, intro quality, chunking / extractability, data density, FAQ, trust / E-E-A-T, freshness, entity grounding (sameAs), JS-rendered gap (raw vs rendered).
+  - **Performance (on-demand only):** Google Lighthouse score + LCP/CLS/TBT/FCP/SI + CrUX field data via PageSpeed Insights. Not run by default.
+  - **Local / GBP (conditional):** LocalBusiness schema, NAP, hours, geo, GBP link - only emitted when a local signal is present.
+- **Bot access:** detects WAF/CDN blocks and cloaking by comparing the normal fetch to the GPTBot fetch.
+- **"How each AI engine sees you":** exposes raw-vs-rendered word counts and flags content (H1, schema) that only appears after JavaScript - the split between non-JS crawlers (ChatGPT/Claude/Perplexity) and JS-rendering ones (Gemini/AI Overviews/Copilot).
+
+Two scoring outputs (known overlap, see PRODUCT_DECISIONS / NEXT_DECISIONS):
+- `overall_score` + `pillar_scores`: severity-penalty model, weights renormalized over present pillars.
+- `scorecard.headline_score` ("AI Retrievability", 0-100): the brand-facing number, from a 20-row credit model + 3 gates + a +8 overlay.
+
+NOT in the engine today: AI citation / visibility sampling (lives in the web layer, see Integrations), attribution, auto-apply of fixes.
+
+## Report
+
+`Report.to_dict()` (schema v12):
+- `schema_version`, `url`, `fetched_at`, `overall_score` (0-100), `pillar_scores` (per present pillar)
+- `meta`: `status_code`, `final_url`, `word_count`, `online_checks`, `rendered` (bool), `render_source` ("cloudflare" / "playwright" / null); when persistence is on: `scan_id`, `scan_token`, `diff`
+- `findings[]`: `{id, pillar, title, status (pass/warn/fail/info), severity, confidence (verified), value, evidence, recommendation}`
+- `fixes[]`: deterministic remediation artifacts (present when scanned with fixes enabled): `{finding_id, title, kind, language, content, note}`
+- `scorecard`: `{confidence:"verified", headline_score, technical_score, overlay{total,max,factors}, rows[20]{n,label,score,status,findings,impact}, categories[5], summary{verdict,...}, citation{...}}`
+
+## MCP
+
+Server: `engine/astova_engine/mcp_server.py` (FastMCP, server name "astova"). Transports: **stdio** (default, local) and **Streamable HTTP** (mounted at `/mcp/` on the FastAPI service). **No authentication on either transport.**
+
+| Tool | Inputs | Output | Current limitations |
+|---|---|---|---|
+| `audit_url` | `url: str` | Compact scorecard (headline, 20 rows, categories, +8 overlay, top 10 issues). Deterministic. | No URL validation; re-fetches every call; SSRF-exposed. |
+| `scan_url` | `url: str` | Full `Report.to_dict()`. Deterministic. | Large / token-heavy, no truncation. |
+| `fix_plan` | `url: str` | Ordered agent-actionable fixes (deterministic content + advisory + `ai_draftable` flags) + verdict. Deterministic. | Re-scans; no scan reuse from a prior `audit_url`. |
+| `audit_project` | `path: str`, `base_url?`, `max_pages=1` | Local file audit (robots/llms/sitemap with framework-aware paths) + optional rendered-page or crawl audit. Deterministic. | stdio-meaningful only (reads local FS); synchronous crawl up to 50 pages blocks the call. |
+
+Shared limitations: no auth, no rate limit, no timeout, no logging, no caching, no scan reuse / context between tools.
+
+## Patch Generation
+
+**Deterministic patches** (ready-to-paste content from template/parser, no LLM):
+- `title.missing`, `meta.description.missing` (only if source text exists), `canonical`, `tech.viewport`, `schema.missing` (Organization + WebPage @graph), `geo.faq` (FAQPage, only if >=2 Q&A pairs), `tech.robots.missing` / `tech.robots.ai` / `geo.bot_access` (robots.txt allowing AI crawlers), `local.business_schema` (LocalBusiness placeholder), `tech.llms_txt`.
+- Project-level (`audit_project`): `robots.txt` missing / blocks-AI, `llms.txt` missing, `sitemap` missing / invalid.
+
+**AI draft requests** (the only LLM path, `web/app/api/fix`, Claude Haiku): `geo.aeo`, `geo.frontload`, `geo.definitive`, `geo.thin_content`. Output labelled "ai_drafted" / "Drafted by Claude - review before publishing".
+
+**Manual / advisory** (recommendation text only, no generated content): every other failing / warning finding.
+
+**No auto-apply exists for any patch.** Intended consumption: an AI coding agent or human applies it, then re-scans.
+
+## Verification
+
+- Re-running a scan on a saved URL produces `meta.diff` vs the previous scan: `resolved`, `regressed`, `new_issues`, `score_delta`, `pillar_deltas`. Requires persistence enabled.
+- There is **no dedicated "verify this fix worked" tool**; verification is "re-scan and read the diff".
+- Monitors can re-scan on a cadence and raise alerts on regressions (anti-noise rules: e.g. availability fires only on the 2nd consecutive failure).
+
+## Framework Support
+
+Framework **DETECTION** (used by `audit_project` to target file paths) - implemented:
+- Next.js (`public/`), Astro (`public/`), Gatsby (`static/`), WordPress (root), generic Node (`public/`), static (root).
+
+Framework **APPLY** (writing fixes into a project) - **NOT implemented for any framework.** Detection only informs the suggested target path in the fix plan.
+
+## Integrations
+
+Implemented:
+- **CLI:** `python -m astova_engine <url> [--json] [--fixes]` (single-page audit to stdout).
+- **HTTP API (FastAPI):** `/scan`, `/compare`, `/crawl` (+poll), `/performance`, `/logs`, `/cloudflare-logs`, `/monitors` (+alerts, run-due), `/history`, `/notes`, `/scans/{token}`, `/health`, plus the `/mcp` mount.
+- **Dashboard (Next.js on Vercel):** marketing site, live scan demo, full report screen, Supabase email/password auth, dashboard (monitored sites with score / trend / change), per-site detail (scan history, re-scan, notes), AI visibility tool.
+- **AI visibility sampling (web layer, not engine):** `/api/visibility` samples ChatGPT (OpenAI, when `OPENAI_API_KEY` set), Claude, Perplexity, Gemini via live web search; returns mention / citation rate, share-of-voice, sentiment, cited sources - confidence **MEASURED**.
+- **Persistence:** Supabase Postgres (scans, monitors, alerts, notes); SQLite fallback for local dev.
+- **MCP:** stdio (local clients) + HTTP (remote connector).
+
+**NOT implemented (do not claim):** GitHub Action/App, WordPress plugin, Vercel/Netlify deploy integration, any framework auto-apply, a standalone CLI binary beyond the python module, public API keys / multi-tenant API auth.
