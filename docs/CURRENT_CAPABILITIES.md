@@ -46,8 +46,9 @@ Server: `engine/astova_engine/mcp_server.py` (FastMCP, server name "astova"). Tr
 | `fix_plan` | `url: str` | Ordered agent-actionable fixes (deterministic content + advisory + `ai_draftable` flags) + verdict. Deterministic. | Re-scans; no scan reuse from a prior `audit_url`. |
 | `audit_project` | `path: str`, `base_url?`, `max_pages=1` | Local file audit (robots/llms/sitemap with framework-aware paths) + optional rendered-page or crawl audit. Deterministic. | stdio-meaningful only (reads local FS); synchronous crawl up to 50 pages blocks the call. |
 | `explain_finding` | `finding_id: str` | Structured fix knowledge for ONE finding (e.g. `geo.aeo`): name, summary, category, can_astova_generate, agent_can_automate, human_review_required, why_it_matters, how_to_fix, agent_guidance, framework_examples, verification, related_findings. Deterministic (from the knowledge registry). | Knowledge is hand-maintained in `knowledge.py` (mirrors docs/KNOWLEDGE_BASE.md); no per-page context. |
+| `generate_fix` | `finding_id: str`, `url?`, `html?` | One deterministic, ready-to-apply fix: `finding_id, deterministic, supported, explanation, generated_content, target_type, suggested_location, verification_method`. No LLM; the fix is NOT applied. | Supports 7 findings only (`schema.missing`, `geo.faq`, `tech.robots.missing`, `tech.robots.ai`, `tech.llms_txt`, `canonical`/`onpage.canonical`, `tech.viewport`); `geo.faq` needs `html` with >=2 Q&A pairs; most need `url`. |
 
-Shared limitations: no auth, no rate limit, no timeout, no logging, no caching, no scan reuse / context between tools. (`explain_finding` is the per-finding lookup an AI agent uses after a scan to remediate a finding safely.)
+Shared limitations: no auth, no rate limit, no timeout, no logging, no caching, no scan reuse / context between tools. (`explain_finding` is the per-finding knowledge lookup; `generate_fix` is the per-finding deterministic content generator - the agent calls `explain_finding` to understand a finding and `generate_fix` to get the exact snippet to apply.)
 
 ## Patch Generation
 
@@ -78,7 +79,7 @@ Framework **APPLY** (writing fixes into a project) - **NOT implemented for any f
 
 Implemented:
 - **CLI:** `python -m astova_engine <url> [--json] [--fixes]` (single-page audit to stdout).
-- **HTTP API (FastAPI):** `/scan`, `/compare`, `/crawl` (+poll), `/performance`, `/logs`, `/cloudflare-logs`, `/monitors` (+alerts, run-due), `/history`, `/notes`, `/scans/{token}`, `/findings` (knowledge index), `/findings/{id}` (explain one finding), `/health`, plus the `/mcp` mount. Mirrored on the web side by `/api/findings` and `/api/findings/[id]`.
+- **HTTP API (FastAPI):** `/scan`, `/compare`, `/crawl` (+poll), `/performance`, `/logs`, `/cloudflare-logs`, `/monitors` (+alerts, run-due), `/history`, `/notes`, `/scans/{token}`, `/findings` (knowledge index), `/findings/{id}` (explain one finding), `/findings/{id}/fix` (POST - deterministic single-finding fix), `/health`, plus the `/mcp` mount. Mirrored on the web side by `/api/findings` and `/api/findings/[id]`.
 - **Dashboard (Next.js on Vercel):** marketing site, live scan demo, full report screen, Supabase email/password auth, dashboard (monitored sites with score / trend / change), per-site detail (scan history, re-scan, notes), AI visibility tool.
 - **AI visibility sampling (web layer, not engine):** `/api/visibility` samples ChatGPT (OpenAI, when `OPENAI_API_KEY` set), Claude, Perplexity, Gemini via live web search; returns mention / citation rate, share-of-voice, sentiment, cited sources - confidence **MEASURED**.
 - **Persistence:** Supabase Postgres (scans, monitors, alerts, notes); SQLite fallback for local dev.

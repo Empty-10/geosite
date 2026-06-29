@@ -5,6 +5,59 @@
 
 ---
 
+## 2026-06-29 - generate_fix: deterministic single-finding fix generation (Engine + API + MCP)
+
+**Objective:** let an AI coding agent ask `generate_fix(finding_id, context)` and get back a structured,
+machine-readable, deterministic fix it can apply itself - completing the loop after `explain_finding` told
+it *how* to fix. No LLM, no apply, no PRs: Astova supplies the exact content; the agent applies it.
+
+**What changed:** added a `generate_fix(finding_id, context)` capability that reuses the existing
+deterministic `_fix_*` generators (no duplicated logic) and returns a consistent 8-key response. Exposed it
+through all three surfaces - the engine library, the HTTP API, and the MCP.
+
+**Files changed:**
+- `engine/astova_engine/fixes.py` - new `generate_fix(finding_id, context)` + helpers
+  (`DETERMINISTIC_FINDINGS`, `SUPPORTED_FIX_FINDINGS`, `_FINDING_ALIASES`, `_fix_response`); dispatches to
+  the existing `_fix_schema/_fix_faq/_fix_robots/_fix_llms/_fix_canonical/_fix_viewport` generators.
+- `engine/astova_engine/service.py` - new `POST /findings/{id}/fix` (with a `FixContext` body: `url`, `html`).
+- `engine/astova_engine/mcp_server.py` - new MCP tool `generate_fix(finding_id, url="", html="")`.
+- `engine/tests/test_fix_generation.py` (new) - 11 tests.
+- docs updated: CURRENT_CAPABILITIES.md, mcp.md.
+
+**Response object (consistent for every finding):** `finding_id`, `deterministic` (bool - a generator exists
+for this finding type), `supported` (bool - a generator exists AND it produced content for this context),
+`explanation`, `generated_content` (the exact snippet/file body, or `null`), `target_type`
+(`head_element` | `file`), `suggested_location`, `verification_method`.
+
+**New capabilities:** an agent can now request a ready-to-paste fix for `schema.missing`, `geo.faq`,
+`tech.robots.missing`, `tech.robots.ai`, `tech.llms_txt`, `canonical` (alias `onpage.canonical`) and
+`tech.viewport`. Most need `url`; `schema.missing` is richer with `html`; `geo.faq` requires `html` with
+>=2 Q&A pairs. Unsupported/insufficient-context findings return `supported: false` with the reason.
+
+**Breaking changes:** none. Purely additive (one MCP tool, one POST endpoint, one new module function).
+
+**Developer experience:** `curl -X POST $ENGINE/findings/canonical/fix -d '{"url":"https://x/p"}'` returns
+the exact `<link rel="canonical">` tag and where to put it. Generators are reused, so a fix matches what
+`fix_plan` would emit for the same finding.
+
+**AI agent experience:** the closing half of the remediation loop - `audit_url` -> `explain_finding`
+(understand) -> `generate_fix` (get the exact content) -> apply -> re-scan. Astova never applies the fix or
+touches source; the agent stays in control.
+
+**Known limitations:** 7 findings only (the deterministic subset); no network fetch - `generated_content`
+quality depends on the `html`/`url` passed in; not wired into the report UI; the supported-finding set is
+maintained by hand alongside the generators.
+
+**Future opportunities:** widen coverage as new deterministic generators land; let `generate_fix` reuse a
+prior scan's parsed HTML (scan-context reuse) instead of re-parsing; surface "generate fix" inline in the
+report UI; a future `verify` primitive that re-checks just the one finding after apply.
+
+**Questions for the Product Architect:** should `generate_fix` accept a `scan_token` to reuse already-parsed
+page HTML rather than re-sending it? Should the supported-finding set be derived from the generator registry
+to prevent drift?
+
+---
+
 ## 2026-06-29 - explain_finding: per-finding knowledge exposed to AI agents (MCP + API)
 
 **Objective:** let an AI coding agent move from "Astova found `geo.aeo`" to "fix it safely" by querying

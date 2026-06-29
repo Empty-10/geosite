@@ -31,7 +31,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from . import knowledge, monitoring, store
+from . import fixes, knowledge, monitoring, store
 from .cloudflare_logs import fetch_cloudflare_logs
 from .compare import compare_reports
 from .config import get_pagespeed_key
@@ -244,6 +244,20 @@ def explain_finding_endpoint(finding_id: str) -> dict:
     if result is None:
         raise HTTPException(status_code=404, detail=f"Unknown finding id '{finding_id}'")
     return result
+
+
+class FixContext(BaseModel):
+    url: str = ""
+    html: str | None = None
+
+
+@app.post("/findings/{finding_id}/fix")
+def generate_fix_endpoint(finding_id: str, ctx: FixContext) -> dict:
+    """Deterministically generate a ready-to-apply fix for a supported finding (no LLM, not applied).
+    Body is the context: {"url": "...", "html"?: "..."}. Returns the consistent fix response object.
+    Supported today: schema.missing, geo.faq, tech.robots.missing, tech.robots.ai, tech.llms_txt,
+    canonical, tech.viewport."""
+    return fixes.generate_fix(finding_id, {"url": ctx.url, "html": ctx.html})
 
 
 @app.get("/notes")

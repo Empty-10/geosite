@@ -242,6 +242,28 @@ def explain_finding(finding_id: str) -> dict:
     return result
 
 
+@mcp.tool()
+def generate_fix(finding_id: str, url: str = "", html: str = "") -> dict:
+    """Generate a DETERMINISTIC, ready-to-apply fix for a single finding. No LLM, and the fix is NOT
+    applied - it returns the exact content for you (the coding agent) to apply, plus where it goes.
+
+    Returns a consistent object: finding_id, deterministic (bool), supported (bool), explanation,
+    generated_content (the exact snippet/file body, or null), target_type ("head_element"|"file"),
+    suggested_location, verification_method.
+
+    Supported findings today: schema.missing, geo.faq, tech.robots.missing, tech.robots.ai,
+    tech.llms_txt, canonical, tech.viewport. For an unsupported finding, supported is false and the
+    explanation says why (use explain_finding for guidance).
+
+    Args:
+        finding_id: the finding to fix, e.g. "schema.missing", "canonical", "tech.robots.ai".
+        url: the page URL (the context; required for most fixes).
+        html: optional page HTML - produces a richer schema/llms.txt fix and is required for an FAQ fix."""
+    from .fixes import generate_fix as _generate_fix
+
+    return _generate_fix(finding_id, {"url": url, "html": html or None})
+
+
 def main() -> None:
     mcp.run()
 

@@ -376,3 +376,117 @@ def _fix_meta(soup: BeautifulSoup) -> Fix | None:
         note="Drafted from the opening paragraph — edit for punchiness and keep it ~120–160 "
         "characters.",
     )
+
+
+# --------------------------------------------------------------- on-demand single-finding fixes
+#
+# generate_fix(finding_id, context) - a deterministic, machine-readable fix for ONE finding,
+# requested directly (e.g. by an AI coding agent) without a full scan. No LLM, no application of
+# the change, no file writes. Reuses the generators above; no duplicated logic.
+
+# Findings that have a deterministic generator in this module (deterministic=True in the response).
+DETERMINISTIC_FINDINGS = {
+    "title.missing", "meta.description.missing", "canonical", "tech.viewport",
+    "schema.missing", "geo.faq", "tech.robots.missing", "tech.robots.ai",
+    "geo.bot_access", "local.business_schema", "tech.llms_txt",
+}
+
+# Findings generate_fix() currently supports (the initial agent-facing set).
+SUPPORTED_FIX_FINDINGS = {
+    "schema.missing", "geo.faq", "tech.robots.missing", "tech.robots.ai",
+    "tech.llms_txt", "canonical", "tech.viewport",
+}
+
+# Accept the alternate id an agent might pass.
+_FINDING_ALIASES = {"onpage.canonical": "canonical"}
+
+# generated Fix.kind -> (target_type, suggested_location) for the response object.
+_TARGET_BY_KIND = {
+    "json-ld": ("head_element", "page <head>"),
+    "meta": ("head_element", "page <head>"),
+    "robots": ("file", "robots.txt (site root)"),
+    "llms-txt": ("file", "llms.txt (site root)"),
+}
+
+# Findings whose generator needs the page URL.
+_NEEDS_URL = {"schema.missing", "tech.robots.missing", "tech.robots.ai", "tech.llms_txt", "canonical"}
+
+
+def _fix_response(finding_id: str, *, deterministic: bool, supported: bool,
+                  explanation: str, fix: "Fix | None" = None) -> dict:
+    target_type = suggested_location = generated_content = None
+    if fix is not None:
+        target_type, suggested_location = _TARGET_BY_KIND.get(fix.kind, ("content", "page content"))
+        generated_content = fix.content
+    return {
+        "finding_id": finding_id,
+        "deterministic": deterministic,
+        "supported": supported,
+        "explanation": explanation,
+        "generated_content": generated_content,
+        "target_type": target_type,
+        "suggested_location": suggested_location,
+        "verification_method": (
+            f"Re-scan the page with Astova; the '{finding_id}' check should report PASS."
+        ),
+    }
+
+
+def generate_fix(finding_id: str, context: dict | None = None) -> dict:
+    """Deterministically generate a structured fix for a single supported finding.
+
+    No LLM, no application of the change, no file writes - it returns the exact content to apply.
+    context carries the page: {"url": str, "html"?: str}. The page HTML is optional but produces a
+    richer schema/llms.txt fix and is required for an FAQ fix. Reuses the module's deterministic
+    generators; no duplicated logic. Always returns the consistent response object.
+    """
+    context = context or {}
+    raw_id = (finding_id or "").strip()
+    fid = _FINDING_ALIASES.get(raw_id, raw_id)
+    deterministic = fid in DETERMINISTIC_FINDINGS
+    url = (context.get("url") or "").strip()
+    soup = BeautifulSoup(context.get("html") or "", "html.parser")
+
+    if fid not in SUPPORTED_FIX_FINDINGS:
+        return _fix_response(
+            raw_id, deterministic=deterministic, supported=False, fix=None,
+            explanation=(
+                "A deterministic fix exists for this finding but generate_fix does not support it yet."
+                if deterministic else
+                "No deterministic fix is available for this finding - it needs an AI-assisted or human "
+                "edit. Call explain_finding for guidance."
+            ),
+        )
+
+    if fid in _NEEDS_URL and not url:
+        return _fix_response(
+            raw_id, deterministic=True, supported=False, fix=None,
+            explanation='Provide the page URL in context, e.g. {"url": "https://example.com/page"}.',
+        )
+
+    if fid == "schema.missing":
+        fix: "Fix | None" = _fix_schema(soup, url)
+    elif fid == "geo.faq":
+        fix = _fix_faq(soup)
+        if fix is None:
+            return _fix_response(
+                raw_id, deterministic=True, supported=False, fix=None,
+                explanation=(
+                    "No FAQPage schema generated. The page HTML must contain at least two question-style "
+                    "headings (h2/h3/h4 ending in '?'), each followed by an answer of 8+ words, and no "
+                    "existing FAQPage schema. Pass the page HTML in context.html."
+                ),
+            )
+    elif fid in ("tech.robots.missing", "tech.robots.ai"):
+        fix = _fix_robots(url, fid)
+    elif fid == "tech.llms_txt":
+        fix = _fix_llms(soup, url)
+    elif fid == "canonical":
+        fix = _fix_canonical(url)
+    else:  # tech.viewport
+        fix = _fix_viewport()
+
+    return _fix_response(
+        raw_id, deterministic=True, supported=True, fix=fix,
+        explanation=f"{fix.title}. {fix.note or ''}".strip(),
+    )
