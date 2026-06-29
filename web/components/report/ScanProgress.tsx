@@ -11,21 +11,28 @@ const MODULES = ["Technical crawl", "On-page structure", "GEO readiness", "Perfo
 const PERF_INDEX = 3;
 
 // status: 0 queued · 1 scanning · 2 done · 3 on-demand (Performance)
+//
+// Honesty: the scan is one request that returns everything at once (no per-module streaming),
+// so we DON'T pretend each module finishes on a fast canned timer. We pace the ticks at a
+// realistic rate and deliberately leave the LAST module "scanning…" — the parent unmounts this
+// component the instant the real result arrives, so progress never claims done before it is.
 export function ScanProgress({ url }: { url?: string }) {
   const [status, setStatus] = useState<number[]>(() => MODULES.map((_, i) => (i === PERF_INDEX ? 3 : 0)));
 
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
-    MODULES.forEach((_, i) => {
-      if (i === PERF_INDEX) return;
-      timers.push(setTimeout(() => setStatus((s) => set(s, i, 1)), 150 + i * 340));
-      timers.push(setTimeout(() => setStatus((s) => set(s, i, 2)), 150 + i * 340 + 300));
+    const real = MODULES.map((_, i) => i).filter((i) => i !== PERF_INDEX);
+    const STEP = 2600; // ms between modules — paced to a real scan, not a 340ms flourish
+    real.forEach((mod, n) => {
+      const isLast = n === real.length - 1;
+      timers.push(setTimeout(() => setStatus((s) => set(s, mod, 1)), 150 + n * STEP));
+      // The final module stays "scanning…" until the result lands (this component unmounts).
+      if (!isLast) {
+        timers.push(setTimeout(() => setStatus((s) => set(s, mod, 2)), 150 + n * STEP + STEP * 0.7));
+      }
     });
     return () => timers.forEach(clearTimeout);
   }, []);
-
-  // Every module (except the on-demand Performance one) has ticked done.
-  const allDone = status.every((s, i) => i === PERF_INDEX || s === 2);
 
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--surface)", padding: 18 }}>
@@ -78,15 +85,12 @@ export function ScanProgress({ url }: { url?: string }) {
           );
         })}
       </div>
-      {allDone && (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginTop: 28, marginBottom: 8, textAlign: "center", animation: "dmFade 0.3s ease both" }}>
-          <span style={{ width: 26, height: 26, borderRadius: "50%", border: "2.5px solid var(--border-strong)", borderTopColor: C.accent, animation: "dmSpin 0.75s linear infinite" }} />
-          <div style={{ fontSize: 15, color: "var(--text)", fontWeight: 500 }}>Compiling your findings…</div>
-          <div style={{ fontSize: 12.5, color: "var(--text-3)", maxWidth: 320 }}>
-            This usually takes 20–30 seconds (longer on the first scan after a quiet period).
-          </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 20, marginBottom: 4, textAlign: "center" }}>
+        <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid var(--border-strong)", borderTopColor: C.accent, animation: "dmSpin 0.75s linear infinite", flexShrink: 0 }} />
+        <div style={{ fontSize: 12.5, color: "var(--text-3)", maxWidth: 360 }}>
+          Reading your live HTML — usually 20–30s (longer on the first scan after a quiet period).
         </div>
-      )}
+      </div>
     </div>
   );
 }
