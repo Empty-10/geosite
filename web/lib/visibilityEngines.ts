@@ -55,14 +55,21 @@ export async function classifySentiment(brand: string, passages: string[]): Prom
 
 async function sampleOpenAI(prompt: string, apiKey: string): Promise<Sample | null> {
   // OpenAI Responses API with the web_search tool — the closest API proxy to ChatGPT's
-  // browsing answer. (If the API rejects the tool name on your account, switch the type to
-  // "web_search_preview".) Pulls answer text + url_citation annotations as cited sources.
-  const model = process.env.ASTOVA_OPENAI_MODEL || "gpt-4o";
+  // browsing answer. tool_choice forces the search: left to "auto", smaller models often answer
+  // from memory and cite nothing, which would understate visibility. (If the API rejects the
+  // tool name on your account, switch the type to "web_search_preview".) gpt-4o-mini is the
+  // cheapest model that supports the tool; override with ASTOVA_OPENAI_MODEL for richer coverage.
+  const model = process.env.ASTOVA_OPENAI_MODEL || "gpt-4o-mini";
   try {
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ model, input: prompt, tools: [{ type: "web_search" }] }),
+      body: JSON.stringify({
+        model,
+        input: prompt,
+        tools: [{ type: "web_search" }],
+        tool_choice: { type: "web_search" },
+      }),
       signal: AbortSignal.timeout(TIMEOUT),
     });
     if (!r.ok) return null;
