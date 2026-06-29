@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-06-29 - CLI: `astova export` - compact Markdown action plan for coding agents
+
+**Objective:** let a human or agent export the loop result as compact Markdown to paste into Claude,
+ChatGPT, Cursor or Windsurf - "here's exactly what to fix," ready to drop into another coding agent.
+
+**What changed:** added `astova export <target> [--output file.md] [--max-items N]`. It auto-detects URL
+vs project (same `_resolve_target` as check/loop), runs `ai_ready_loop`, and renders the result as
+Markdown - to stdout, or to `--output` (the only file write the command makes).
+
+**Files changed:**
+- `engine/astova_engine/export.py` (new) - `loop_to_markdown(resp, generated_at=?)`, a pure formatter
+  over the loop response (no scanning, no I/O).
+- `engine/astova_engine/cli.py` - `_cmd_export` + dispatch.
+- `engine/tests/test_export.py` (new) - 11 tests.
+- docs updated: CURRENT_CAPABILITIES.md, CLAUDE.md.
+
+**Markdown shape:** title + `Target` / `Score` / `Generated`; a `## Summary` with the four counts; a
+`## Top Actions` section, one `### N. <title>` block per item carrying Finding ID, Severity, Status,
+Evidence, Why it matters (from the knowledge card), Recommended fix, Can Astova generate fix, Agent next
+step, and a `Verification:` code span (the `verify_fix(...)` call); then a `Run after fixing:` footer with
+``astova loop <target>``. Items with no knowledge card render `Why it matters: n/a`.
+
+**Design:** the formatter is split out as `export.py` (pure, deterministic - accepts a `generated_at`
+override so tests are stable) rather than living inline in the CLI, so it can be reused later (an MCP
+`export_plan` tool, or the web report's "copy for agents" button) without dragging in argparse.
+
+**Breaking changes:** none. Additive subcommand; legacy forms untouched.
+
+**Developer / agent experience:** `astova export ./site --output PLAN.md` produces a paste-ready brief; a
+human hands it to any agent, or an agent reads it directly. Closes the gap between "Astova found issues" and
+"another tool can act on them" with zero coupling.
+
+**Known limitations:** Markdown only (no JSON variant - that's what `astova loop --json` is for); `Generated`
+is a wall-clock UTC stamp so file output differs run-to-run; `--output` overwrites without prompting;
+inherits `ai_ready_loop`'s limits (live re-fetch for URLs, knowledge-card payload size).
+
+**Future opportunities:** an MCP `export_plan` tool returning the same Markdown; a `--format` flag (json /
+gh-issue / pr-body); group items by pillar; embed the deterministic fix content inline for ready-to-apply
+blocks.
+
+**Questions for the Product Architect:** should export also be an MCP tool / API endpoint, or stay CLI-only?
+Should the deterministic fix `generated_content` be embedded inline in the Markdown (bigger, but apply-ready)?
+
+---
+
 ## 2026-06-29 - CLI: `astova check` and `astova loop` subcommands
 
 **Objective:** let developers and AI agents run Astova from the terminal - no web app, no MCP client - to

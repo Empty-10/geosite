@@ -217,12 +217,40 @@ def _cmd_loop(argv: list[str]) -> int:
     return 0 if not resp.get("error") else 1
 
 
+def _cmd_export(argv: list[str]) -> int:
+    from .ai_ready import ai_ready_loop
+    from .export import loop_to_markdown
+
+    ap = argparse.ArgumentParser(
+        prog="astova export",
+        description="Export a compact Markdown action plan (paste into Claude/ChatGPT/Cursor/Windsurf).")
+    ap.add_argument("target", help="a URL (https://example.com) or a project directory path")
+    ap.add_argument("--output", metavar="FILE", help="write the Markdown to FILE instead of stdout")
+    ap.add_argument("--max-items", type=int, default=10,
+                    help="max findings to include, highest severity first (default 10)")
+    args = ap.parse_args(argv)
+
+    target_type, target = _resolve_target(args.target)
+    resp = ai_ready_loop(target, target_type, args.max_items)
+    markdown = loop_to_markdown(resp)
+
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as fh:
+            fh.write(markdown)
+        print(f"Wrote AI Readiness action plan to {args.output}")
+    else:
+        print(markdown)
+    return 0 if not resp.get("error") else 1
+
+
 def main() -> None:
     argv = sys.argv[1:]
     if argv and argv[0] == "check":
         sys.exit(_cmd_check(argv[1:]))
     if argv and argv[0] == "loop":
         sys.exit(_cmd_loop(argv[1:]))
+    if argv and argv[0] == "export":
+        sys.exit(_cmd_export(argv[1:]))
 
     ap = argparse.ArgumentParser(prog="astova", description="GEO/SEO scan engine.")
     ap.add_argument("url", nargs="?", help="URL to scan, e.g. https://example.com")
