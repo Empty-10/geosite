@@ -1,13 +1,21 @@
-"""Command line entry point: `python -m astova_engine <url> [--json]`."""
+"""Command line entry point.
+
+Subcommands:
+  astova check <target> [--json]   scan a URL or a local project directory -> compact report
+  astova loop  <target> [--json]   the ai_ready_loop "what to fix next" plan for a URL or project
+
+Legacy form (still supported): `astova <url> [--json --render --performance --fixes --crawl --logs]`.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 from .models import Report, SiteReport, Status
-from .scanner import scan
+from .scanner import scan, scan_project
 
 _MARK = {Status.PASS: "[pass]", Status.WARN: "[warn]", Status.FAIL: "[FAIL]", Status.INFO: "[info]"}
 
@@ -17,10 +25,19 @@ def _print_human(report: Report) -> None:
         print(f"Could not scan {report.url}: {report.meta['error']}")
         return
 
-    print(f"\n  astova scan — {report.url}")
-    print(f"  overall: {report.overall_score}/100   "
-          f"words: {report.meta.get('word_count', '?')}   "
-          f"status: {report.meta.get('status_code', '?')}\n")
+    if report.meta.get("scan_type") == "project":
+        files = report.meta.get("files", {})
+        present = [n for n in ("robots_txt", "llms_txt", "sitemap_xml") if files.get(n)]
+        print(f"\n  astova project audit - {report.url}")
+        print(f"  overall: {report.overall_score}/100   "
+              f"framework: {report.meta.get('framework', '?')}   "
+              f"html: {'yes' if report.meta.get('html_analyzed') else 'no'}   "
+              f"files: {', '.join(present) or 'none'}\n")
+    else:
+        print(f"\n  astova scan — {report.url}")
+        print(f"  overall: {report.overall_score}/100   "
+              f"words: {report.meta.get('word_count', '?')}   "
+              f"status: {report.meta.get('status_code', '?')}\n")
 
     by_pillar: dict[str, list] = {}
     for f in report.findings:
@@ -107,7 +124,106 @@ def _print_logs(report) -> None:
     print("  labels: every number above is VERIFIED (read straight from the log).\n")
 
 
+_SEV_TAG = {"critical": "[critical]", "high": "[high]", "medium": "[medium]",
+            "low": "[low]", "info": "[info]"}
+
+
+def _resolve_target(target: str) -> tuple[str, str]:
+    """Classify a CLI target into (target_type, normalized) - URL vs local project directory.
+
+    http(s):// -> url; an existing directory or a path-like string (./ , / , ~, has a separator) ->
+    project; a bare host (e.g. example.com) -> url with https:// prepended.
+    """
+    if target.startswith(("http://", "https://")):
+        return "url", target
+    expanded = os.path.expanduser(target)
+    if os.path.isdir(expanded):
+        return "project", expanded
+    if target.startswith((".", "/", "~")) or os.sep in target:
+        return "project", expanded
+    return "url", "https://" + target
+
+
+def _print_loop_human(resp: dict) -> None:
+    if resp.get("error"):
+        print(f"  {resp['error']}")
+        return
+
+    print(f"\n  astova ai-ready loop - {resp['target']}  ({resp['target_type']})")
+    print(f"  score: {resp['score']}/100   {resp['actionable_count']} actionable"
+          f"   showing {len(resp['items'])}")
+    print(f"  {resp['deterministic_fix_count']} ready fix(es)  ·  "
+          f"{resp['ai_assisted_count']} ai-assisted  ·  {resp['manual_count']} manual\n")
+
+    if not resp["items"]:
+        print("  Nothing to fix - this target looks AI Ready.\n")
+        return
+
+    for i, it in enumerate(resp["items"], 1):
+        fix = it.get("fix") or {}
+        if fix.get("supported"):
+            fixlabel = f"deterministic fix ready → {fix.get('suggested_location') or 'apply'}"
+        elif fix.get("deterministic"):
+            fixlabel = "deterministic fix (not yet generable - see recommendation)"
+        else:
+            fixlabel = "no auto-fix (AI-draft or manual)"
+        print(f"  {i}. {_SEV_TAG.get(it['severity'], '')} {it['finding_id']} - {it['title']}  "
+              f"({it['status']})")
+        if it.get("evidence"):
+            print(f"       evidence: {it['evidence']}")
+        print(f"       fix: {fixlabel}")
+        print(f"       next: {it['agent_next_step']}")
+        print()
+
+    print("  labels: every finding above is VERIFIED (deterministic). Apply a fix, then "
+          "`astova check` (or verify_fix) to confirm.\n")
+
+
+def _cmd_check(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(prog="astova check",
+                                 description="Scan a URL or local project directory.")
+    ap.add_argument("target", help="a URL (https://example.com) or a project directory path")
+    ap.add_argument("--json", action="store_true", help="output the full Report as JSON")
+    args = ap.parse_args(argv)
+
+    target_type, target = _resolve_target(args.target)
+    report = scan_project(target) if target_type == "project" else scan(target)
+
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        _print_human(report)
+    return 0 if not report.meta.get("error") else 1
+
+
+def _cmd_loop(argv: list[str]) -> int:
+    from .ai_ready import ai_ready_loop
+
+    ap = argparse.ArgumentParser(prog="astova loop",
+                                 description="Prioritised 'what to fix next' plan for a URL or project.")
+    ap.add_argument("target", help="a URL (https://example.com) or a project directory path")
+    ap.add_argument("--json", action="store_true", help="output the full loop response as JSON")
+    ap.add_argument("--max-items", type=int, default=10,
+                    help="max findings to return, highest severity first (default 10)")
+    args = ap.parse_args(argv)
+
+    target_type, target = _resolve_target(args.target)
+    resp = ai_ready_loop(target, target_type, args.max_items)
+
+    if args.json:
+        print(json.dumps(resp, indent=2))
+    else:
+        _print_loop_human(resp)
+    return 0 if not resp.get("error") else 1
+
+
 def main() -> None:
+    argv = sys.argv[1:]
+    if argv and argv[0] == "check":
+        sys.exit(_cmd_check(argv[1:]))
+    if argv and argv[0] == "loop":
+        sys.exit(_cmd_loop(argv[1:]))
+
     ap = argparse.ArgumentParser(prog="astova", description="GEO/SEO scan engine.")
     ap.add_argument("url", nargs="?", help="URL to scan, e.g. https://example.com")
     ap.add_argument("--json", action="store_true", help="output machine-readable JSON")

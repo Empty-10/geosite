@@ -80,7 +80,7 @@ Framework **APPLY** (writing fixes into a project) - **NOT implemented for any f
 ## Integrations
 
 Implemented:
-- **CLI:** `python -m astova_engine <url> [--json] [--fixes]` (single-page audit to stdout).
+- **CLI:** installed as the `astova` console script (and `python -m astova_engine`). Subcommands: `astova check <target> [--json]` (scan a URL or local project directory - auto-detected - to a compact report, or full Report JSON) and `astova loop <target> [--json] [--max-items N]` (the `ai_ready_loop` "what to fix next" plan, human-readable or full JSON). Legacy form `astova <url> [--json --render --performance --fixes --crawl --logs]` still works.
 - **HTTP API (FastAPI):** `/scan`, `/project/audit` (POST - audit a project directory, returns a `Report`), `/compare`, `/crawl` (+poll), `/performance`, `/logs`, `/cloudflare-logs`, `/monitors` (+alerts, run-due), `/history`, `/notes`, `/scans/{token}`, `/findings` (knowledge index), `/findings/{id}` (explain one finding), `/findings/{id}/fix` (POST - deterministic single-finding fix), `/findings/{id}/verify` (POST - re-scan and check if a finding is resolved), `/health`, plus the `/mcp` mount. Mirrored on the web side by `/api/findings` and `/api/findings/[id]`.
 - **Dashboard (Next.js on Vercel):** marketing site, live scan demo, full report screen, Supabase email/password auth, dashboard (monitored sites with score / trend / change), per-site detail (scan history, re-scan, notes), AI visibility tool.
 - **AI visibility sampling (web layer, not engine):** `/api/visibility` samples ChatGPT (OpenAI, when `OPENAI_API_KEY` set), Claude, Perplexity, Gemini via live web search; returns mention / citation rate, share-of-voice, sentiment, cited sources - confidence **MEASURED**.

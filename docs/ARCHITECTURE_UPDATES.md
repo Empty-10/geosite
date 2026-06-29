@@ -5,6 +5,48 @@
 
 ---
 
+## 2026-06-29 - CLI: `astova check` and `astova loop` subcommands
+
+**Objective:** let developers and AI agents run Astova from the terminal - no web app, no MCP client - to
+scan a URL or a local project and to get the "what to fix next" plan, in human-readable or JSON form.
+
+**What changed:** added two subcommands to the existing `astova` console script. Pure reuse of the engine
+functions; the CLI only resolves the target and formats output.
+- `astova check <target> [--json]` - auto-detects URL vs local project directory and runs `scan` or
+  `scan_project`; compact per-pillar summary by default, full `Report` JSON with `--json`.
+- `astova loop <target> [--json] [--max-items N]` - runs `ai_ready_loop` (url/project auto-detected);
+  a readable ranked next-action plan by default, the full structured loop response with `--json`.
+
+**Files changed:**
+- `engine/astova_engine/cli.py` - target resolution (`_resolve_target`), the loop printer
+  (`_print_loop_human`), `_cmd_check` / `_cmd_loop`, and subcommand dispatch in `main()`. `_print_human`
+  is now project-aware (framework / files header for project reports).
+- `engine/tests/test_cli.py` (new) - 14 tests.
+- docs updated: CURRENT_CAPABILITIES.md, CLAUDE.md (run section + repo layout).
+
+**Target detection:** `http(s)://` -> url; an existing directory or a path-like string (`./`, `/`, `~`, or
+a separator) -> project; a bare host (e.g. `example.com`) -> url with `https://` prepended.
+
+**Breaking changes:** none. The legacy `astova <url> [flags]` / `python -m astova_engine <url>` form is
+untouched - `main()` dispatches `check`/`loop` first and otherwise falls through to the original parser.
+
+**Developer / agent experience:** `astova check ./my-site` audits a repo before deploy; `astova loop
+https://site --json` gives an agent the same plan the MCP `ai_ready_loop` returns, straight from a shell -
+useful in CI, pre-commit hooks, or any non-MCP automation.
+
+**Known limitations:** url targets fetch live (network); `loop` reuses `ai_ready_loop`'s limitations
+(re-fetch, payload size); no `verify`/`fix` subcommands yet (deliberately - those mutate intent and stay
+behind explicit MCP/API calls); detection of a bare host as a URL could misfire on an oddly named local
+folder that doesn't exist on disk.
+
+**Future opportunities:** `astova verify <target> <finding_id>` and `astova explain <finding_id>` to round
+out the loop in the shell; a `--target-type` override for the ambiguous cases; colourised output.
+
+**Questions for the Product Architect:** should the CLI gain `explain` / `verify` / `fix` subcommands to
+mirror the MCP tools, or stay a thin "assess + plan" surface?
+
+---
+
 ## 2026-06-29 - ai_ready_loop: one-call "tell me exactly what to fix next" workflow (MCP)
 
 **Objective:** the first genuinely impressive AI-agent moment - an agent calls ONE MCP tool and gets the

@@ -84,7 +84,7 @@ pillars we have (on-page, technical, GEO-readiness) and renormalize weights.
 ```
 engine/                 Python scan engine — BUILT, runnable, pytest green
   astova_engine/
-    cli.py              `python -m astova_engine <url>` → scored report (--json for JSON)
+    cli.py              `astova check <target>` (URL/project scan) + `astova loop <target>` (fix plan); `--json` for JSON. Legacy `python -m astova_engine <url>` still works.
     scanner.py          orchestrates modules; scan(url) and scan_html(url, html)
     fetch.py            HTTP fetch (Playwright render still to come)
     models.py           Finding / Report / enums (Confidence, Severity, Status, Pillar)
@@ -122,8 +122,11 @@ docs/                   architecture doc, claude-design-brief.md, PROJECT-STATUS
 cd engine
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
-python -m astova_engine https://example.com           # live scan
-python -m astova_engine https://example.com --json     # machine-readable
+astova check https://example.com                       # scan a URL (compact report)
+astova check ./my-site                                 # scan a local project directory
+astova check https://example.com --json                # full Report JSON
+astova loop https://example.com                        # "what to fix next" plan (URL or project)
+python -m astova_engine https://example.com            # legacy form (same as `astova <url>`)
 pytest                                                 # offline tests
 ```
 
