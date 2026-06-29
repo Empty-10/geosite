@@ -13,6 +13,7 @@ import { PerformancePanel } from "./PerformancePanel";
 import { ScanProgress } from "./ScanProgress";
 import { PillarCards } from "./PillarCards";
 import { ScorecardPanel } from "./ScorecardPanel";
+import { BotView } from "./BotView";
 import { ScoreRing } from "./ScoreRing";
 import { RenderTag } from "./RenderTag";
 import { usePerformance } from "./usePerformance";
@@ -285,6 +286,8 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
       <ExecutiveSummary scorecard={report.scorecard} />
 
       <ScorecardPanel scorecard={report.scorecard} findings={allFindings} />
+
+      <BotView report={report} />
 
       <div style={{ marginBottom: 18 }}>
         <ConfidenceLegend />

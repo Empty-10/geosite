@@ -208,7 +208,13 @@ def _js_render_check(delta: dict) -> Finding:
     rendered = int(delta.get("rendered_words", 0))
     render_only = max(0.0, (rendered - raw) / max(rendered, 1))
     pct = round(render_only * 100)
-    value = {"raw_words": raw, "rendered_words": rendered, "render_only_pct": pct}
+    value = {
+        "raw_words": raw,
+        "rendered_words": rendered,
+        "render_only_pct": pct,
+        "h1_js_only": bool(delta.get("h1_js_only")),
+        "schema_js_only": bool(delta.get("schema_js_only")),
+    }
 
     # Call out the worst cases: H1 / structured data present only after JS.
     js_only = []

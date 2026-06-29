@@ -181,6 +181,8 @@ def test_js_rendered_fail_thin_raw_shell():
 def test_js_rendered_calls_out_js_only_schema_and_h1():
     f = js(18, 410, schema_js_only=True, h1_js_only=True)
     assert "structured data (JSON-LD)" in f.evidence and "the H1" in f.evidence
+    # The booleans are also structured in value (the bot-view panel renders them).
+    assert f.value["h1_js_only"] is True and f.value["schema_js_only"] is True
 
 
 def test_js_rendered_not_run_without_render_delta():
