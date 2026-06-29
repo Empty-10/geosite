@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-06-29 - Web: "Copy agent prompt" on the AI Ready result view
+
+**Objective:** from a generated action plan at `/ai-ready`, let a user copy ONE ready-to-paste prompt that
+tells an AI coding agent how to act on the plan safely - not just the raw Markdown.
+
+**What changed:** added a "Copy agent prompt" button beside the existing "Copy Markdown" button. The prompt
+reuses the Markdown plan already returned by `/api/ai-ready` and wraps it with context (target, score,
+counts) and explicit safety guardrails.
+
+**Files changed:**
+- `web/lib/agentPrompt.ts` (new) - pure `buildAgentPrompt(plan)`; composes the instruction + safety rules +
+  the plan's `markdown`. Testable in isolation, no I/O.
+- `web/components/AiReadyView.tsx` - `copyAgentPrompt()` + the new primary button (accent), keeping the
+  existing Copy Markdown button.
+- docs updated: CURRENT_CAPABILITIES.md.
+
+**Prompt content:** target URL, score, the summary counts, and the full Markdown plan (which already carries
+the top findings), plus the guardrails: apply deterministic fixes as given; draft AI-assisted items only from
+real page content; do NOT invent facts, author names, sameAs links, opening hours, addresses, legal claims,
+local-business details or data points; ask before editing manual / human-review items; re-run Astova to verify.
+
+**Reuse, not duplication:** no engine change and no second scan - the prompt is built client-side from the
+existing response `markdown` + counts. The formatter stays the single source of truth for the plan body.
+
+**Breaking changes:** none. One new button + one pure helper.
+
+**Testing note:** no JS unit-test runner in the web app; verification is `tsc --noEmit` (clean) and `next build`
+(clean). The built prompt was asserted to contain the target, score, counts, every safety rule, and the
+Markdown plan.
+
+**Known limitations:** the prompt embeds the whole plan, so it grows with `max_items`; clipboard needs a
+secure context; English-only copy.
+
+**Future opportunities:** a length/preview toggle; per-agent variants (Claude vs Cursor phrasing); a combined
+"copy prompt + open agent" deep link where supported.
+
+**Questions for the Product Architect:** should the agent prompt be the default/primary copy action (it is the
+accent button now), with raw Markdown secondary?
+
+---
+
 ## 2026-06-29 - Web: `/agents` first-run onboarding for AI coding agents
 
 **Objective:** make it trivial for a developer to start using Astova from Claude / Cursor / ChatGPT /

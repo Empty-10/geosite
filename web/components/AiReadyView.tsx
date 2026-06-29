@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { C, scoreColor } from "@/lib/tokens";
+import { buildAgentPrompt } from "@/lib/agentPrompt";
 
 type Fix = { supported?: boolean; deterministic?: boolean; suggested_location?: string | null };
 type Knowledge = { why_it_matters?: string; can_astova_generate?: string } | null;
@@ -55,6 +56,7 @@ export function AiReadyView() {
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [copied, setCopied] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
   const autoRan = useRef(false);
 
   // Arriving from the homepage CTA with ?url=... prefills the input and runs once automatically.
@@ -98,6 +100,17 @@ export function AiReadyView() {
       await navigator.clipboard.writeText(plan.markdown);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Could not copy to clipboard.");
+    }
+  }
+
+  async function copyAgentPrompt() {
+    if (!plan?.markdown) return;
+    try {
+      await navigator.clipboard.writeText(buildAgentPrompt(plan));
+      setPromptCopied(true);
+      setTimeout(() => setPromptCopied(false), 2000);
     } catch {
       setError("Could not copy to clipboard.");
     }
@@ -158,17 +171,29 @@ export function AiReadyView() {
             <Count label="Manual review" value={plan.manual_count} color={C.text3} />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
             <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Top actions</h2>
-            <button
-              onClick={copyMarkdown}
-              style={{
-                padding: "8px 14px", borderRadius: 8, border: `1px solid ${C.border}`,
-                background: C.raised, color: C.text, fontSize: 13, cursor: "pointer",
-              }}
-            >
-              {copied ? "Copied" : "Copy Markdown"}
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={copyAgentPrompt}
+                title="Copy a ready-to-paste prompt (plan + safety rules) for your AI coding agent"
+                style={{
+                  padding: "8px 14px", borderRadius: 8, border: "none",
+                  background: C.accent, color: C.ink, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                {promptCopied ? "Copied" : "Copy agent prompt"}
+              </button>
+              <button
+                onClick={copyMarkdown}
+                style={{
+                  padding: "8px 14px", borderRadius: 8, border: `1px solid ${C.border}`,
+                  background: C.raised, color: C.text, fontSize: 13, cursor: "pointer",
+                }}
+              >
+                {copied ? "Copied" : "Copy Markdown"}
+              </button>
+            </div>
           </div>
 
           {plan.items.length === 0 ? (
