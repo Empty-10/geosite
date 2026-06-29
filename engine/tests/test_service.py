@@ -7,7 +7,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from astova_engine.models import LogReport, PageSummary, Report, SiteReport
+from astova_engine.models import (Confidence, Finding, LogReport, PageSummary, Pillar, Report,
+                                  Severity, SiteReport, Status)
 from astova_engine.service import app
 
 client = TestClient(app)
@@ -58,6 +59,43 @@ def test_scan_surfaces_engine_error_as_200():
 def test_scan_missing_url_is_422():
     r = client.post("/scan", json={})
     assert r.status_code == 422
+
+
+def test_ai_ready_returns_plan_and_markdown():
+    fake = Report(
+        url="https://x.test", overall_score=70, pillar_scores={"technical": 70},
+        meta={"status_code": 200},
+    )
+    fake.findings = [
+        Finding("schema.missing", Pillar.ONPAGE, "Structured data", Status.FAIL,
+                Severity.HIGH, Confidence.VERIFIED, evidence="no JSON-LD",
+                recommendation="Add JSON-LD."),
+    ]
+    # ai_ready_loop calls scan(target); patch it where ai_ready imports it.
+    with patch("astova_engine.ai_ready.scan", return_value=fake):
+        r = client.post("/ai-ready", json={"target": "https://x.test", "target_type": "url"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["target"] == "https://x.test" and body["target_type"] == "url"
+    assert body["score"] == 70 and body["actionable_count"] >= 1
+    assert {"deterministic_fix_count", "ai_assisted_count", "manual_count", "items"} <= set(body)
+    # the reused Markdown formatter rides along
+    assert body["markdown"].startswith("# Astova AI Readiness Action Plan")
+    assert "## Summary" in body["markdown"]
+
+
+def test_ai_ready_scan_error_is_structured():
+    bad = Report(url="https://x.test", meta={"error": "could not resolve host"})
+    with patch("astova_engine.ai_ready.scan", return_value=bad):
+        r = client.post("/ai-ready", json={"target": "https://x.test"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["error"] == "Could not scan https://x.test: could not resolve host."
+    assert "Could not generate a plan" in body["markdown"]
+
+
+def test_ai_ready_missing_target_is_422():
+    assert client.post("/ai-ready", json={}).status_code == 422
 
 
 def test_crawl_job_lifecycle():

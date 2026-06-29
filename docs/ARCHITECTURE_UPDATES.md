@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-06-29 - Web: AI Ready Action Plan page + `POST /ai-ready` engine endpoint
+
+**Objective:** give a human the same agent-friendly plan the MCP/CLI expose - enter a URL in the web app and
+get the prioritised "what to fix next" plan with a copyable Markdown export.
+
+**What changed:** exposed `ai_ready_loop` over HTTP (it was MCP-only by Feature 5's deliberate choice) with
+the smallest clean endpoint, and added a simple web page + proxy that consume it. No workflow logic is
+duplicated - the engine endpoint reuses `ai_ready_loop` and the `loop_to_markdown` formatter; the web app
+only validates the URL and renders.
+
+**Files changed:**
+- `engine/astova_engine/service.py` - new `POST /ai-ready` (`{target, target_type, max_items}`); returns the
+  loop response plus a `markdown` field from `export.loop_to_markdown`.
+- `engine/tests/test_service.py` - 3 endpoint tests (plan+markdown, scan-error, 422).
+- `web/lib/engineTarget.ts` (new) - shared `normalizeUrl` + `ssrfReason` (URL guard for engine-backed routes).
+- `web/app/api/ai-ready/route.ts` (new) - thin proxy to the engine `POST /ai-ready` (gated by `ASTOVA_ENGINE_URL`).
+- `web/app/ai-ready/page.tsx` + `web/components/AiReadyView.tsx` (new) - the page (server metadata) and the
+  client view (URL input, score, summary counts, top actions with verify steps, Copy Markdown).
+- docs updated: CURRENT_CAPABILITIES.md, mcp.md.
+
+**Architecture note - why an endpoint now:** Feature 5 kept `ai_ready_loop` MCP-only because nothing consumed
+it over HTTP. The web UI is that consumer, so the endpoint is now justified (the brief explicitly allowed
+"the smallest clean engine endpoint needed"). It stays a thin wrapper; the formatter lives in `export.py`, so
+both the CLI and the endpoint share one source of truth.
+
+**Breaking changes:** none. Additive endpoint + new web files. No existing routes/pages touched (the held
+homepage batch is untouched).
+
+**Developer / user experience:** `/ai-ready` in the web app turns a URL into a ranked action plan a
+non-technical user can read and a developer can copy as Markdown into Cursor/Claude/ChatGPT. The proxy is
+HTTP-only (needs `ASTOVA_ENGINE_URL`); without it the UI shows a clear "engine not configured" message.
+
+**Known limitations:** web flow is URL-only (no project upload from the browser); HTTP-only proxy (no local
+shell-out fallback like `/api/scan` has) so local dev needs `ASTOVA_ENGINE_URL` pointed at a running engine;
+inherits `ai_ready_loop`'s live re-fetch + payload-size limits; UI is intentionally minimal (no per-item
+deep-linking into the full report yet).
+
+**Future opportunities:** a local shell-out fallback in the proxy for zero-config dev; link each item to the
+finding's report row; a "project path" mode; render the Markdown preview inline; a download-.md button.
+
+**Questions for the Product Architect:** should `/api/ai-ready` gain a local shell-out path for dev parity
+with `/api/scan`, or stay HTTP-only? Should the AI Ready page become the primary landing CTA?
+
+---
+
 ## 2026-06-29 - CLI: `astova export` - compact Markdown action plan for coding agents
 
 **Objective:** let a human or agent export the loop result as compact Markdown to paste into Claude,

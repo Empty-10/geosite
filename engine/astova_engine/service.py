@@ -31,7 +31,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from . import fixes, knowledge, monitoring, store, verify
+from . import ai_ready, export, fixes, knowledge, monitoring, store, verify
 from .cloudflare_logs import fetch_cloudflare_logs
 from .compare import compare_reports
 from .config import get_pagespeed_key
@@ -85,6 +85,12 @@ class ScanRequest(BaseModel):
 class ProjectAuditRequest(BaseModel):
     root_path: str
     framework: str = "auto"
+
+
+class AiReadyRequest(BaseModel):
+    target: str
+    target_type: str = "url"
+    max_items: int = 10
 
 
 class CrawlRequest(BaseModel):
@@ -142,6 +148,15 @@ def scan_endpoint(req: ScanRequest) -> dict:
         if prev:
             report["meta"]["diff"] = store.diff_reports(prev, report)
     return report
+
+
+@app.post("/ai-ready")
+def ai_ready_endpoint(req: AiReadyRequest) -> dict:
+    """Run the ai_ready_loop "what to fix next" workflow over HTTP and return its structured plan
+    plus a ready-to-paste Markdown action plan under `markdown`. Reuses the engine's ai_ready_loop
+    and the Markdown formatter - no logic is duplicated. No LLM, nothing applied, no files touched."""
+    resp = ai_ready.ai_ready_loop(req.target, req.target_type, req.max_items)
+    return {**resp, "markdown": export.loop_to_markdown(resp)}
 
 
 @app.post("/project/audit")
