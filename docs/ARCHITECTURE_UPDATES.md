@@ -5,6 +5,63 @@
 
 ---
 
+## 2026-06-29 - ai_ready_loop: one-call "tell me exactly what to fix next" workflow (MCP)
+
+**Objective:** the first genuinely impressive AI-agent moment - an agent calls ONE MCP tool and gets the
+complete, prioritised next-action plan to make a URL or project AI Ready, with the fix and the verify call
+already attached to each item. "Astova, what do I fix next?" answered in a single round-trip.
+
+**What changed:** added `ai_ready_loop(target, target_type, max_items)` - pure orchestration over tools that
+already exist. It assesses the target (`scan` / `scan_project`), selects the top fail/warn findings by
+severity, and for each attaches the knowledge card (`explain_finding`), the deterministic fix
+(`generate_fix`), and the `verify_fix` call. No new scan logic, no LLM, nothing applied.
+
+**Files changed:**
+- `engine/astova_engine/ai_ready.py` (new) - `ai_ready_loop()`; composes `scanner.scan`/`scan_project`,
+  `knowledge.explain`, `fixes.generate_fix`. Classifies each item by the knowledge card's
+  `can_astova_generate` taxonomy (deterministic / ai_assisted / manual).
+- `engine/astova_engine/mcp_server.py` - new MCP tool `ai_ready_loop`.
+- `engine/tests/test_ai_ready_loop.py` (new) - 10 tests.
+- docs updated: CURRENT_CAPABILITIES.md, mcp.md.
+
+**Response object:** `target`, `target_type`, `score`, `confidence` ("verified"), `summary`,
+`findings_count`, `actionable_count`, `deterministic_fix_count`, `ai_assisted_count`, `manual_count`, and
+`items[]`. Each item: `finding_id`, `title`, `status`, `severity`, `confidence`, `evidence`,
+`recommendation`, `knowledge` (the card or `null`), `fix` (the generate_fix object, `supported:false` when
+none), `verify` (`{tool, target, target_type, finding_id}`), and a one-line `agent_next_step`.
+
+**Architecture decision - MCP-only, no API endpoint:** per the brief and clean-architecture judgement, this
+is a workflow convenience that composes existing primitives, all of which already have HTTP endpoints. Adding
+a `/ai-ready` route would duplicate that surface without new capability, so it was deliberately NOT added. The
+orchestration lives in its own module (`ai_ready.py`) so it is unit-testable without the MCP layer; the MCP
+tool is a thin wrapper.
+
+**Design notes:** url targets pass the URL as fix context (html isn't retained on the report, so FAQ/richer
+fixes stay `supported:false`); project targets pass a `https://YOUR-DOMAIN` placeholder origin so the
+robots/llms/schema generators still emit ready-to-edit templates (the same placeholder convention the project
+file-fix templates use). Items are capped at `max_items` but `actionable_count` reports the true total.
+
+**Breaking changes:** none. Purely additive (one module, one MCP tool).
+
+**AI agent experience:** the headline flow. `ai_ready_loop("https://site", "url")` or
+`ai_ready_loop("/repo", "project")` → a ranked worklist where every item says what it is, why it matters, the
+exact fix to apply, and how to verify it. Then loop: apply → `verify_fix` → next item.
+
+**Known limitations:** url targets re-fetch live every call (no scan reuse); including full knowledge cards for
+up to `max_items` items makes this the largest payload of the tools (compact-ish, but not tiny); `info`-only
+findings are excluded by design (only fail/warn are actionable); the three remediation buckets come from the
+hand-maintained card taxonomy, so a card's `can_astova_generate` drives the count.
+
+**Future opportunities:** accept a prior scan token to skip the re-fetch; stream/paginate items for very large
+sites; add a `since` mode that only surfaces findings new vs the last run; optionally inline a trimmed
+knowledge card to shrink the payload.
+
+**Questions for the Product Architect:** should `ai_ready_loop` ever gain an HTTP endpoint for non-MCP
+consumers (e.g. the web report's "fix everything" button), or stay MCP-only? Should knowledge cards be trimmed
+inside this payload to a 2-3 field summary for size?
+
+---
+
 ## 2026-06-29 - verify_fix: deterministic re-scan to confirm a finding is resolved (Engine + API + MCP)
 
 **Objective:** close the remediation loop. An AI coding agent applies a change itself, then asks Astova to

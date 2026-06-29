@@ -231,6 +231,30 @@ def verify_fix(target: str, finding_id: str, target_type: str = "url") -> dict:
     return _verify_fix(target, finding_id, target_type)
 
 
+@mcp.tool()
+def ai_ready_loop(target: str, target_type: str = "url", max_items: int = 10) -> dict:
+    """"Tell me exactly what to fix next." ONE call returns the complete, prioritised next-action plan
+    to make a URL or project AI Ready - the recommended starting point for an AI coding agent.
+
+    It assesses the target (the same URL scan or project audit), selects the highest-severity fail/warn
+    findings (up to max_items), and for each attaches: the finding (id, title, status, severity,
+    confidence, evidence, recommendation), its knowledge card (explain_finding, or null if none), the
+    deterministic fix (generate_fix, with supported:false when there's no ready fix), the exact
+    verify_fix call to confirm it, and a one-line agent_next_step. No LLM, nothing applied, no files touched.
+
+    Returns summary counts (deterministic_fix_count / ai_assisted_count / manual_count) plus the items
+    array. Loop: pick an item, apply its fix (or draft per its knowledge), call verify_fix, repeat.
+
+    Args:
+        target: the URL (target_type="url") or project directory path (target_type="project").
+        target_type: "url" (default) or "project".
+        max_items: max findings to return, highest severity first (default 10).
+    """
+    from .ai_ready import ai_ready_loop as _ai_ready_loop
+
+    return _ai_ready_loop(target, target_type, max_items)
+
+
 def main() -> None:
     mcp.run()
 
