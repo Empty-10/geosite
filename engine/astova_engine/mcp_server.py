@@ -255,6 +255,31 @@ def ai_ready_loop(target: str, target_type: str = "url", max_items: int = 10) ->
     return _ai_ready_loop(target, target_type, max_items)
 
 
+@mcp.tool()
+def prepare_project_for_ai(root_path: str, max_items: int = 25) -> dict:
+    """THE recommended entry point when working inside a local repository. One read-only call returns the
+    complete context an AI coding agent needs to make the project AI Ready - no need to orchestrate the
+    other tools yourself.
+
+    It runs audit_project + ai_ready_loop and bundles, per finding (in priority order): the knowledge card
+    (what it is / why it matters / how to fix / what to never automate), the deterministic fix when one is
+    ready to apply, and the verify_fix call to confirm it afterwards. Read-only: it never modifies files,
+    generates code, applies fixes, or uses an LLM.
+
+    Returns: project, framework, score, summary, recommended_workflow (the order to work in), and findings[]
+    where each item is {finding_id, knowledge, fix, verify}. fix is null when no deterministic fix exists;
+    knowledge is null when there's no card; verify is always present. Then: apply deterministic fixes, draft
+    AI-assisted ones from real content, ask the user about manual/human-review items, and re-run to verify.
+
+    Args:
+        root_path: path to the project root (the folder with package.json / wp-config.php / etc.).
+        max_items: max findings to bundle, highest severity first (default 25).
+    """
+    from .ai_ready import prepare_project_for_ai as _prepare
+
+    return _prepare(root_path, max_items)
+
+
 def main() -> None:
     mcp.run()
 

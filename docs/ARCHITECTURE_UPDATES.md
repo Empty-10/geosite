@@ -5,6 +5,54 @@
 
 ---
 
+## 2026-06-29 - prepare_project_for_ai: one-call repo context bundle for AI coding agents (MCP)
+
+**Objective:** the first true AI-coding-agent integration - one read-only MCP call that hands an agent the
+COMPLETE context to fix a local project, so it never has to orchestrate audit_project / ai_ready_loop /
+explain_finding / generate_fix / verify_fix itself. This becomes the recommended entry point for agents in a repo.
+
+**What changed:** added `prepare_project_for_ai(root_path)` - pure orchestration over existing capabilities.
+It runs `ai_ready_loop` (project mode), reads the framework via the same `project.detect_framework` that
+`audit_project` uses, and reshapes the result into one compact agent-optimised bundle.
+
+**Files changed:**
+- `engine/astova_engine/ai_ready.py` - new `prepare_project_for_ai()` + `_project_framework()` +
+  `_RECOMMENDED_WORKFLOW`. Reuses `ai_ready_loop` (which already attaches knowledge/fix/verify per finding)
+  and the `project` module - no business logic duplicated.
+- `engine/astova_engine/mcp_server.py` - new MCP tool `prepare_project_for_ai`.
+- `engine/tests/test_prepare_project.py` (new) - 7 tests.
+- docs updated: CURRENT_CAPABILITIES.md, mcp.md.
+
+**Response:** `project`, `framework`, `score`, `summary`, `recommended_workflow` (Review findings -> Apply
+deterministic fixes first -> Complete AI-assisted tasks -> Run verify_fix for changed findings -> Run
+audit_project again), and `findings[]` where each item is `{finding_id, knowledge, fix, verify}`. Findings keep
+`ai_ready_loop`'s priority order. `fix` is null unless a deterministic fix is ready; `knowledge` is null when no
+card exists; `verify` (the verify_fix call) is present for every finding. Read-only, no LLM, nothing applied.
+
+**Compactness decisions:** only the four keys per finding (no `agent_next_step`/`title`/`evidence` bloat - the
+knowledge card carries the detail); `fix` omitted (null) when unsupported; `knowledge` only for findings that
+actually fired. Framework is derived from a cheap `os.listdir` + `detect_framework` rather than a second full
+project scan - one scan total, via `ai_ready_loop`.
+
+**Breaking changes:** none. One new MCP tool + one module function. (Doc-positioning only: `ai_ready_loop` is now
+framed as the URL / quick-plan entry, and `prepare_project_for_ai` as the in-repo entry.)
+
+**AI agent experience:** `prepare_project_for_ai("/repo")` -> a ranked worklist where every item already carries
+why it matters, the exact fix (when ready), and how to verify, plus the order to work in. The agent applies
+deterministic fixes, drafts AI-assisted ones from real content, asks before manual/identity items, and re-runs
+to verify - all from one call.
+
+**Known limitations:** MCP-only (no HTTP/CLI surface yet); `framework` auto-detected (no explicit override);
+inherits `ai_ready_loop`'s live-scan-each-call and payload-size traits; `max_items` caps the bundle (default 25).
+
+**Future opportunities:** an HTTP/CLI surface for the same bundle; a `since` mode (only findings new vs last run);
+embed the deterministic fix `generated_content` inline for one-shot apply; accept an explicit framework.
+
+**Questions for the Product Architect:** should `prepare_project_for_ai` also be exposed over HTTP/CLI, and
+should it inline the fix content so an agent can apply without a second `generate_fix` round-trip?
+
+---
+
 ## 2026-06-29 - Web: "Copy agent prompt" on the AI Ready result view
 
 **Objective:** from a generated action plan at `/ai-ready`, let a user copy ONE ready-to-paste prompt that

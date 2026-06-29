@@ -8,7 +8,9 @@ call to confirm the fix later. No new scan logic, no LLM, no fix applied, no fil
 
 from __future__ import annotations
 
-from . import knowledge
+import os
+
+from . import knowledge, project
 from .fixes import generate_fix
 from .scanner import scan, scan_project
 
@@ -129,3 +131,64 @@ def _next_step(bucket: str, fid: str, fix: dict, recommendation: str | None,
     if bucket == "ai_assisted":
         return f"Draft the edit (see knowledge.agent_guidance / how_to_fix), apply it, then {verify}"
     return f"{recommendation or 'Review and fix manually.'} Then {verify}"
+
+
+# --------------------------------------------------------------------------- project prep (agents)
+
+# The fixed loop an AI coding agent should follow with the bundle this tool returns.
+_RECOMMENDED_WORKFLOW = [
+    "Review findings",
+    "Apply deterministic fixes first",
+    "Complete AI-assisted tasks",
+    "Run verify_fix for changed findings",
+    "Run audit_project again",
+]
+
+
+def _project_framework(root_path: str) -> str | None:
+    """The detected framework (reusing the same project-module detection audit_project uses)."""
+    try:
+        markers = set(os.listdir(os.path.abspath(os.path.expanduser(root_path))))
+    except OSError:
+        return None
+    framework, _ = project.detect_framework(markers)
+    return framework
+
+
+def prepare_project_for_ai(root_path: str, max_items: int = 25) -> dict:
+    """One-call context bundle for an AI coding agent fixing a LOCAL project - the recommended MCP
+    entry point for working in a repo. Read-only: orchestrates audit_project + ai_ready_loop, then
+    returns each finding (in ai_ready_loop's priority order) with its knowledge card, the
+    deterministic fix only when one is ready, and the verify_fix call. No files modified, no code
+    generated, no fix applied, no LLM. Reuses existing modules - no logic is duplicated here.
+    """
+    plan = ai_ready_loop(root_path, "project", max_items)
+    if plan.get("error"):
+        return {
+            "project": root_path,
+            "framework": None,
+            "score": None,
+            "summary": plan.get("summary") or f"Could not prepare {root_path}.",
+            "error": plan["error"],
+            "recommended_workflow": list(_RECOMMENDED_WORKFLOW),
+            "findings": [],
+        }
+
+    findings = []
+    for it in plan["items"]:  # preserves ai_ready_loop's ordering
+        fix = it.get("fix") or {}
+        findings.append({
+            "finding_id": it["finding_id"],
+            "knowledge": it.get("knowledge"),                  # the card, or null if none exists
+            "fix": fix if fix.get("supported") else None,      # only a ready deterministic fix
+            "verify": it.get("verify"),                        # verification call for every finding
+        })
+
+    return {
+        "project": root_path,
+        "framework": _project_framework(root_path),
+        "score": plan["score"],
+        "summary": plan["summary"],
+        "recommended_workflow": list(_RECOMMENDED_WORKFLOW),
+        "findings": findings,
+    }
