@@ -280,6 +280,24 @@ def prepare_project_for_ai(root_path: str, max_items: int = 25) -> dict:
     return _prepare(root_path, max_items)
 
 
+@mcp.tool()
+def mcp_usage_guide(client: str = "generic") -> dict:
+    """Get the exact setup and usage instructions for the Astova MCP, tailored to your client. Static helper -
+    it scans nothing, reads no files, and uses no LLM.
+
+    Returns: client, purpose, recommended_entrypoints (prepare_project_for_ai for repos, ai_ready_loop for
+    URLs), setup (client-specific install + config steps), starter_prompt (the exact prompt to paste),
+    workflow, safety_rules, and available_tools (every Astova MCP tool with a one-line description).
+
+    Args:
+        client: one of "generic", "claude", "cursor", "chatgpt", "windsurf" (unknown values fall back to
+            "generic").
+    """
+    from .mcp_guide import usage_guide
+
+    return usage_guide(client)
+
+
 def main() -> None:
     mcp.run()
 

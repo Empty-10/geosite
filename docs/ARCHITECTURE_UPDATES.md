@@ -5,6 +5,51 @@
 
 ---
 
+## 2026-06-29 - mcp_usage_guide: self-documenting MCP setup + usage helper
+
+**Objective:** let a developer using Claude / Cursor / ChatGPT / Windsurf ask the Astova MCP itself for the
+exact setup and usage instructions - no docs hunt, no guesswork.
+
+**What changed:** added a static `mcp_usage_guide(client)` MCP tool. It returns a compact, client-specific
+guide (install + config steps, the exact starter prompt, the safe workflow, the safety rules, and every tool
+with a one-line description). Scans nothing, reads no files, uses no LLM - pure static content.
+
+**Files changed:**
+- `engine/astova_engine/mcp_guide.py` (new) - `usage_guide(client)` + `SUPPORTED_CLIENTS`; per-client setup
+  and starter prompt, shared purpose/workflow/safety/tool-list.
+- `engine/astova_engine/mcp_server.py` - new MCP tool `mcp_usage_guide`.
+- `engine/tests/test_mcp_guide.py` (new) - 8 tests.
+- docs updated: CURRENT_CAPABILITIES.md, mcp.md.
+
+**Response:** `client`, `purpose`, `recommended_entrypoints` (prepare_project_for_ai for repos, ai_ready_loop
+for URLs), `setup` (client-specific), `starter_prompt` (exact prompt, with the do-not-invent guardrails baked
+in), `workflow`, `safety_rules` (6 rules), and `available_tools` (all 10 tools, one line each). Supported
+clients: generic / claude / cursor / chatgpt / windsurf; unknown values fall back to generic.
+
+**Per-client tailoring:** repo agents (claude / cursor / windsurf) get the `prepare_project_for_ai` prompt and
+their respective MCP-config locations; chatgpt gets the URL-first `ai_ready_loop` prompt (it usually has no
+local repo). Everything else is shared.
+
+**Drift guard:** a test parses `@mcp.tool()` definitions out of `mcp_server.py` and asserts `available_tools`
+lists exactly the registered set - so adding a tool without documenting it here fails the build.
+
+**Breaking changes:** none. One new static MCP tool.
+
+**Developer experience:** `mcp_usage_guide("cursor")` returns copy-paste setup + the starter prompt; pair it
+with `prepare_project_for_ai` and a newcomer is productive in one round-trip.
+
+**Known limitations:** content is hand-maintained (only the tool-list is drift-checked); config snippets assume
+a stdio launch via `python -m astova_engine.mcp_server`; English-only; not exposed over HTTP/CLI (MCP-only by
+design - it documents the MCP).
+
+**Future opportunities:** generate `setup` from a single source shared with `docs/mcp.md`; add the remote
+(HTTP connector) config variant; localise; a `format="markdown"` option.
+
+**Questions for the Product Architect:** should the guide's content be generated from `docs/mcp.md` to avoid two
+hand-maintained copies?
+
+---
+
 ## 2026-06-29 - prepare_project_for_ai: one-call repo context bundle for AI coding agents (MCP)
 
 **Objective:** the first true AI-coding-agent integration - one read-only MCP call that hands an agent the
