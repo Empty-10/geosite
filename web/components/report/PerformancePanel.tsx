@@ -59,6 +59,11 @@ export function PerformancePanel({ findings }: { findings: Finding[] }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: "var(--text)" }}>{m.title}</div>
                 <div style={{ fontSize: 11.5, color: "var(--text-3)", marginTop: 1 }}>{META[m.id]?.explain ?? ""}</div>
+                {m.status !== "pass" && m.recommendation && (
+                  <div style={{ fontSize: 11.5, color: "var(--text-2)", marginTop: 4, lineHeight: 1.45 }}>
+                    <span style={{ color: C.accent }}>Fix:</span> {m.recommendation}
+                  </div>
+                )}
               </div>
               <span style={{ fontSize: 12.5, fontFamily: "var(--mono)", color: "var(--text-2)", whiteSpace: "nowrap" }}>
                 {display}

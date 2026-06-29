@@ -293,9 +293,26 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
         <ConfidenceLegend />
       </div>
 
-      <div style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 12 }}>
         <ScoreRing score={report.overall_score} />
         <PillarCards pillarScores={pillarScores} perf={perfController} onSelect={jumpToPillar} />
+      </div>
+
+      <div style={{ fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.5, marginBottom: 16 }}>
+        {perf.phase === "done" && typeof perf.score === "number" ? (
+          <>
+            This is an <strong style={{ color: "var(--text)" }}>AI-readiness score</strong> — structure,
+            content &amp; technical. Page speed is scored separately as a Lighthouse {perf.score}/100
+            below; it isn&apos;t folded into this number.
+          </>
+        ) : (
+          <>
+            <span style={{ color: C.warn }}>Page speed isn&apos;t measured yet.</span> This score covers
+            structure, content &amp; technical readiness only — run the{" "}
+            <strong style={{ color: "var(--text)" }}>Performance</strong> check (the card above) for the
+            full picture.
+          </>
+        )}
       </div>
 
       {perf.phase === "error" && perf.error && (
