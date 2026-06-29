@@ -10,7 +10,7 @@ from .config import get_pagespeed_key
 from .fetch import (BotFetch, FetchResult, fetch, fetch_as_bot, fetch_pagespeed, fetch_resource,
                     render_dom_cloudflare, tls_info)
 from .fixes import generate_fixes
-from .models import Pillar, Report
+from .models import ENGINE_VERSION, REPORT_VERSION, RULESET_VERSION, Pillar, Report
 from .modules import bot_view, geo_readiness, local, onpage, performance, technical
 from .modules.technical import NetInputs, parse_robots
 from .scorecard import build_scorecard
@@ -53,6 +53,9 @@ def scan_html(url: str, html: str, *, online: bool = False,
         "final_url": final_url,
         "word_count": word_count(text),
         "online_checks": online,
+        "engine_version": ENGINE_VERSION,
+        "ruleset_version": RULESET_VERSION,
+        "report_version": REPORT_VERSION,
     }
     report = build_report(url, findings, meta, pillar_overrides=overrides)
     report.scorecard = build_scorecard(report)
@@ -322,6 +325,9 @@ def scan_project(root_path: str, framework: str = "auto") -> Report:
         "html_analyzed": html_analyzed,
         "security_headers_configured": sorted(sec_headers),
         "online_checks": False,
+        "engine_version": ENGINE_VERSION,
+        "ruleset_version": RULESET_VERSION,
+        "report_version": REPORT_VERSION,
     }
     report = build_report(root_path, findings, meta)
     report.scorecard = build_scorecard(report)

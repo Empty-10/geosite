@@ -112,6 +112,23 @@ def test_mcp_guide_defaults_to_generic():
     assert client.get("/mcp-guide").json()["client"] == "generic"
 
 
+def test_reports_endpoint_returns_report_and_bundle():
+    stored = Report(url="https://x.test", overall_score=55, meta={"final_url": "https://x.test"}).to_dict()
+    stored["meta"]["report_id"] = 3
+    with patch("astova_engine.service.store.get_by_token", return_value=stored):
+        r = client.get("/reports/tok123")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["report"]["url"] == "https://x.test"
+    assert set(body["bundle"]) == {"metadata", "action_summary", "markdown", "agent_prompt"}
+    assert body["bundle"]["metadata"]["report_id"] == 3
+
+
+def test_reports_endpoint_404_for_unknown_token():
+    with patch("astova_engine.service.store.get_by_token", return_value=None):
+        assert client.get("/reports/nope").status_code == 404
+
+
 def test_crawl_job_lifecycle():
     fake = SiteReport(
         url="https://x.test", overall_score=88,

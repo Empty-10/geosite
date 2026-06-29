@@ -265,7 +265,12 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
             {finalUrl}
           </h1>
           <div style={{ marginLeft: "auto", display: "flex", gap: 14, alignItems: "baseline", flexWrap: "wrap" }}>
-            {report.meta?.scan_token != null && <ShareButton token={report.meta.scan_token as string} />}
+            {report.meta?.scan_token != null && (
+              <ShareButton
+                token={report.meta.scan_token as string}
+                reportId={(report.meta?.scan_id ?? report.meta?.report_id) as number | undefined}
+              />
+            )}
             <FixesExport report={report} url={finalUrl} findings={allFindings} impacts={impacts} />
             <a href={`/compare?url=${encodeURIComponent(finalUrl)}`} style={{ fontSize: 12.5, color: C.accent, whiteSpace: "nowrap" }}>
               Compare vs competitors →
@@ -397,11 +402,13 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 13, color: "var(--text)", fontWeight: 500, marginBottom: 10 }}>{children}</div>;
 }
 
-function ShareButton({ token }: { token: string }) {
+function ShareButton({ token, reportId }: { token: string; reportId?: number }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
-    // Unguessable capability link — the token (not the enumerable row id) grants access.
-    const url = `${window.location.origin}/report?id=${token}`;
+    // Unguessable capability link - the token (not the enumerable row id) grants access. The id in
+    // the path is cosmetic/stable; the ?share token is what authorises the read.
+    const idPart = reportId != null ? reportId : token;
+    const url = `${window.location.origin}/report/${idPart}?share=${token}`;
     try {
       await navigator.clipboard.writeText(url);
     } catch {

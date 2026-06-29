@@ -31,7 +31,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from . import ai_ready, export, fixes, knowledge, mcp_guide, monitoring, store, verify
+from . import ai_ready, export, fixes, knowledge, mcp_guide, monitoring, report_export, store, verify
 from .cloudflare_logs import fetch_cloudflare_logs
 from .compare import compare_reports
 from .config import get_pagespeed_key
@@ -342,6 +342,17 @@ def get_scan_endpoint(token: str) -> dict:
     if report is None:
         raise HTTPException(status_code=404, detail="scan not found")
     return report
+
+
+@app.get("/reports/{token}")
+def get_report_endpoint(token: str) -> dict:
+    """Fetch a shared AI Readiness report by token, enriched with derived views (metadata, the
+    deterministic/AI-assisted/manual action summary, a Markdown export and an agent prompt). Public
+    by capability token only; reuses the stored Report + knowledge taxonomy. No re-scan, no LLM."""
+    report = store.get_by_token(token)
+    if report is None:
+        raise HTTPException(status_code=404, detail="report not found")
+    return {"report": report, "bundle": report_export.report_bundle(report)}
 
 
 @app.post("/logs")

@@ -203,8 +203,14 @@ def get_by_token(token: str) -> dict | None:
     if not is_enabled() or not token:
         return None
     with _conn() as db:
-        row = db.execute("SELECT report FROM scans WHERE token = ?", (token,)).fetchone()
-        return json.loads(row["report"]) if row else None
+        row = db.execute("SELECT id, report FROM scans WHERE token = ?", (token,)).fetchone()
+        if not row:
+            return None
+        report = json.loads(row["report"])
+        # Stamp the stable row id so a loaded/shared report carries its own report_id (the JSON was
+        # serialised before the id existed at save time).
+        report.setdefault("meta", {})["report_id"] = row["id"]
+        return report
 
 
 def previous(url: str, *, kind: str, before_id: int) -> dict | None:

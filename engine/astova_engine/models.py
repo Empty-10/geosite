@@ -33,6 +33,11 @@ from typing import Any
 #     extracted answer-preview snippet on geo.aeo.
 SCHEMA_VERSION = "12"
 
+# Versions stamped into every report's meta so a saved/shared report is self-describing.
+ENGINE_VERSION = "1.0"        # the deterministic scan engine
+RULESET_VERSION = SCHEMA_VERSION  # the findings ruleset / check coverage (tracks SCHEMA_VERSION)
+REPORT_VERSION = "1"          # the report document format (this shape of saved report)
+
 
 class Confidence(str, Enum):
     """How much to trust a finding. See CLAUDE.md → accuracy principle."""

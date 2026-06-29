@@ -5,6 +5,65 @@
 
 ---
 
+## 2026-06-29 - AI Readiness Reports: shareable `/report/[id]?share=<token>` (Engine + Web)
+
+**Objective:** turn the action plan into a premium, shareable report a user can save, revisit and send to a
+client - reusing the existing Report object, findings, knowledge cards, deterministic fixes and verification.
+
+**What changed:** added self-describing version metadata, a derived "report bundle" (action-summary buckets +
+Markdown + agent prompt), a public token endpoint, and a `/report/[id]` page that renders it. The persistence,
+share tokens and the report renderer already existed - this layers the report product on top without a redesign.
+
+**Files changed:**
+- `engine/astova_engine/models.py` - `ENGINE_VERSION` / `RULESET_VERSION` / `REPORT_VERSION` constants.
+- `engine/astova_engine/scanner.py` - stamps those versions into every scan's meta (URL + project).
+- `engine/astova_engine/store.py` - `get_by_token` now stamps the stable row id as `meta.report_id` on load
+  (the JSON was serialised before the id existed).
+- `engine/astova_engine/report_export.py` (new) - pure derived views over a stored report: `action_summary`
+  (deterministic / ai_assisted / manual, reusing the knowledge taxonomy + the report's fixes),
+  `report_metadata`, `report_to_markdown`, `report_to_agent_prompt`, `report_bundle`.
+- `engine/astova_engine/service.py` - new `GET /reports/{token}` -> `{report, bundle}`.
+- `engine/tests/test_report_export.py` (new, 7) + `test_service.py` (2 endpoint tests).
+- `web/app/api/reports/[token]/route.ts` (new) - proxy to the engine endpoint.
+- `web/app/report/[id]/page.tsx` + `web/components/report/ReportDetailView.tsx` (new) - the page (server,
+  metadata) and the read-only view (loads by share token; reuses ScoreRing / ExecutiveSummary /
+  ScorecardPanel / ConfidenceLegend; renders breakdown, the three buckets, verification, and the 4 actions).
+- `web/components/report/ReportView.tsx` - the Share button now copies `/report/<id>?share=<token>`.
+- docs updated: CURRENT_CAPABILITIES.md.
+
+**Report metadata (self-describing):** `report_id`, `created_at` (fetched_at), `scanned_target`,
+`engine_version`, `ruleset_version`, `report_version`, `share_token` - all derived from the stored report.
+
+**Sharing / security:** access is by the unguessable capability token only (`?share=<token>` ->
+`get_by_token`); the integer row id in the path is cosmetic and is never a lookup path, preserving the
+existing no-enumeration guarantee. No auth required for a valid token (per the brief).
+
+**Reuse, not duplication:** the bundle reuses the existing findings, `report.fixes` (deterministic), and the
+`knowledge.can_astova_generate` taxonomy for the buckets; the page reuses the existing report components. No
+workflow logic duplicated, no re-scan (the report is rendered from stored data), no LLM.
+
+**Breaking changes:** none. Additive endpoint + new route + new module; the legacy `/report?id=<token>` link
+still resolves. Held positioning batch untouched.
+
+**Actions:** Copy agent prompt (plan + safety guardrails), Copy Markdown, Download Markdown (`astova-action-
+plan.md`), Open AI Ready Action Plan (`/ai-ready?url=<target>`).
+
+**Testing note:** engine round-trip verified live (save -> token+id -> `get_by_token` stamps report_id ->
+`report_bundle` with metadata, buckets, markdown, prompt). Web verified by `tsc` (clean) + `next build` (clean;
+`/report/[id]` + `/api/reports/[token]` build). Full engine suite 351 passed.
+
+**Known limitations:** needs `ASTOVA_ENGINE_URL` + persistence (Postgres/SQLite) to load shared reports;
+findings list in the buckets is recommendation-only (no inline fix content - that's a `generate_fix` round-trip
+or the AI Ready plan); ai_assisted-vs-manual split is only as good as the hand-maintained card taxonomy.
+
+**Future opportunities:** PDF/branded export (white-label, per CLAUDE.md); inline deterministic fix content;
+an owner (authenticated) view by id without a token; report diff vs the previous scan inline.
+
+**Questions for the Product Architect:** should the report support a branded/white-label PDF export next, and
+should an authenticated owner be able to open `/report/[id]` without the share token?
+
+---
+
 ## 2026-06-29 - Web: `/mcp` setup page + `GET /mcp-guide` engine endpoint
 
 **Objective:** put the MCP usage guidance in front of humans - a `/mcp` page where a developer picks their
