@@ -216,6 +216,32 @@ def audit_project(path: str, base_url: str | None = None, max_pages: int = 1) ->
     return out
 
 
+@mcp.tool()
+def explain_finding(finding_id: str) -> dict:
+    """Explain a single Astova finding: what it is, why it matters for AI answer engines, how to fix
+    it, and exactly how an AI coding agent should approach the fix - what to change, what to NEVER
+    automate (e.g. fabricating facts/identity), and how to verify. Use this after a scan once you
+    have a finding id and want to remediate it safely.
+
+    Returns structured fields: name, summary, category, can_astova_generate, agent_can_automate,
+    human_review_required, why_it_matters, how_to_fix, agent_guidance, framework_examples,
+    verification, related_findings.
+
+    Args:
+        finding_id: an Astova finding id from a scan, e.g. "geo.aeo", "schema.missing",
+            "tech.robots.ai" (a card key like "aeo" also works)."""
+    from . import knowledge
+
+    result = knowledge.explain(finding_id)
+    if result is None:
+        return {
+            "error": f"Unknown finding id '{finding_id}'.",
+            "hint": "Pass a finding id returned by audit_url / scan_url, e.g. geo.aeo or schema.missing.",
+            "known_finding_ids": knowledge.known_finding_ids(),
+        }
+    return result
+
+
 def main() -> None:
     mcp.run()
 

@@ -31,7 +31,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from . import monitoring, store
+from . import knowledge, monitoring, store
 from .cloudflare_logs import fetch_cloudflare_logs
 from .compare import compare_reports
 from .config import get_pagespeed_key
@@ -228,6 +228,22 @@ def run_due_endpoint(x_astova_cron: str | None = Header(default=None)) -> dict:
 def history_endpoint(url: str, kind: str = "page", limit: int = 20) -> dict:
     """List recent saved scans for a URL (newest first). Empty when persistence is off."""
     return {"url": url, "kind": kind, "scans": store.history(url, kind=kind, limit=max(1, min(limit, 100)))}
+
+
+@app.get("/findings")
+def list_findings_endpoint() -> dict:
+    """The knowledge index: every finding Astova can explain, with its category and automation level."""
+    return {"findings": knowledge.list_cards()}
+
+
+@app.get("/findings/{finding_id}")
+def explain_finding_endpoint(finding_id: str) -> dict:
+    """Structured fix knowledge for a single finding id (e.g. geo.aeo, schema.missing): why it
+    matters for AI engines, how to fix it, and how an AI coding agent should approach it safely."""
+    result = knowledge.explain(finding_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Unknown finding id '{finding_id}'")
+    return result
 
 
 @app.get("/notes")

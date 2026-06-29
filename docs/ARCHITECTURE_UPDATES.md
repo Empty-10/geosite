@@ -5,6 +5,49 @@
 
 ---
 
+## 2026-06-29 - explain_finding: per-finding knowledge exposed to AI agents (MCP + API)
+
+**Objective:** let an AI coding agent move from "Astova found `geo.aeo`" to "fix it safely" by querying
+Astova about a single finding - the missing bridge between detection and action.
+
+**What changed:** added a structured finding-knowledge registry and exposed it through the MCP and the
+HTTP API. The Knowledge Base is now machine-consumable, not human-only markdown.
+
+**Files changed:**
+- `engine/astova_engine/knowledge.py` (new) - 44-card registry (mirrors docs/KNOWLEDGE_BASE.md),
+  `explain(finding_id)`, `list_cards()`, `known_finding_ids()`; resolves any of 81 finding ids (and
+  variants like `title.length`) to its card.
+- `engine/astova_engine/mcp_server.py` - new MCP tool `explain_finding(finding_id)`.
+- `engine/astova_engine/service.py` - new `GET /findings` (index) and `GET /findings/{id}` (explain one).
+- `web/app/api/findings/route.ts`, `web/app/api/findings/[id]/route.ts` (new) - thin web proxies.
+- `engine/tests/test_knowledge.py` (new) - 7 tests.
+- docs updated: CURRENT_CAPABILITIES.md, mcp.md, KNOWLEDGE_BASE.md.
+
+**New capabilities:** an agent (or the web/API) can now ask "explain finding X" and get structured fix
+guidance: category, can_astova_generate, agent_can_automate, human_review_required, why_it_matters,
+how_to_fix, agent_guidance, framework_examples, verification, related_findings - all confidence VERIFIED.
+
+**Breaking changes:** none. Purely additive (one MCP tool, two GET endpoints).
+
+**Developer experience:** `curl $ENGINE/findings/geo.aeo` returns the full fix knowledge; `GET /findings`
+lists all 44 cards. From the web app, `GET /api/findings/{id}`.
+
+**AI agent experience:** after `audit_url`/`scan_url`, the agent calls `explain_finding("geo.aeo")` and
+receives exactly what to change, what to never automate (e.g. fabricating facts/identity), and how to
+verify - per-framework. This is the loop: scan -> explain -> fix -> re-scan.
+
+**Known limitations:** the registry is hand-maintained alongside the markdown KB (drift risk - update
+both together); no per-page context (it explains the finding type, not this page's specific instance);
+not yet wired into the report UI.
+
+**Future opportunities:** generate `knowledge.py` from the KB (or vice-versa) to kill drift; surface the
+guidance inline in the report UI; a `verify` primitive; an `apply` layer.
+
+**Questions for the Product Architect:** should `knowledge.py` and `docs/KNOWLEDGE_BASE.md` be unified
+into one source (generated)? Should `explain_finding` accept page context (URL) to tailor guidance?
+
+---
+
 ## 2026-06-29 - Architecture knowledge system established
 
 **Objective:** maintain Astova as a long-term platform, not a pile of features, by keeping living architecture docs.
