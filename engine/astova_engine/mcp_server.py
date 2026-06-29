@@ -207,6 +207,30 @@ def generate_fix(finding_id: str, url: str = "", html: str = "") -> dict:
     return _generate_fix(finding_id, {"url": url, "html": html or None})
 
 
+@mcp.tool()
+def verify_fix(target: str, finding_id: str, target_type: str = "url") -> dict:
+    """Deterministically verify whether a finding is RESOLVED after you applied a change. You make the
+    edit yourself, then call this - Astova re-runs the same scan and checks that one finding. No LLM, no
+    fix applied, no files touched.
+
+    target_type "url" re-scans a live page; "project" re-audits a repo directory (the same audit_project
+    runs). A finding counts as fixed when it is gone from the new scan, or present with status pass/info;
+    it is not fixed while it is warn/fail.
+
+    Returns: target, target_type, finding_id, fixed (bool), current_status, current_severity, evidence,
+    score_after, confidence, explanation, next_step. A failed re-scan returns the same shape with an
+    `error` and current_status "error".
+
+    Args:
+        target: the URL (target_type="url") or project directory path (target_type="project") to re-scan.
+        finding_id: the finding to check, e.g. "schema.missing", "tech.llms_txt", "canonical".
+        target_type: "url" (default) or "project".
+    """
+    from .verify import verify_fix as _verify_fix
+
+    return _verify_fix(target, finding_id, target_type)
+
+
 def main() -> None:
     mcp.run()
 

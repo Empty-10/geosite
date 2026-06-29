@@ -31,7 +31,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from . import fixes, knowledge, monitoring, store
+from . import fixes, knowledge, monitoring, store, verify
 from .cloudflare_logs import fetch_cloudflare_logs
 from .compare import compare_reports
 from .config import get_pagespeed_key
@@ -274,6 +274,19 @@ def generate_fix_endpoint(finding_id: str, ctx: FixContext) -> dict:
     Supported today: schema.missing, geo.faq, tech.robots.missing, tech.robots.ai, tech.llms_txt,
     canonical, tech.viewport."""
     return fixes.generate_fix(finding_id, {"url": ctx.url, "html": ctx.html})
+
+
+class VerifyRequest(BaseModel):
+    target: str
+    target_type: str = "url"
+
+
+@app.post("/findings/{finding_id}/verify")
+def verify_fix_endpoint(finding_id: str, req: VerifyRequest) -> dict:
+    """Re-scan the target and deterministically report whether `finding_id` is now resolved.
+    Body: {"target": "...", "target_type": "url" | "project"}. Reuses the standard scan / project
+    audit - no LLM, no fix applied, no files touched. Scan failures come back as a structured error."""
+    return verify.verify_fix(req.target, finding_id, req.target_type)
 
 
 @app.get("/notes")

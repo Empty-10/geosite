@@ -5,6 +5,56 @@
 
 ---
 
+## 2026-06-29 - verify_fix: deterministic re-scan to confirm a finding is resolved (Engine + API + MCP)
+
+**Objective:** close the remediation loop. An AI coding agent applies a change itself, then asks Astova to
+deterministically verify whether a SPECIFIC finding is now resolved - turning scan -> explain -> fix into a
+checkable scan -> explain -> fix -> verify cycle the agent can loop on until the finding clears.
+
+**What changed:** added `verify_fix(target, finding_id, target_type)` that re-runs the EXISTING scan
+(`scan` for a URL, `scan_project` for a directory), looks up that one finding in the fresh report, and
+returns a verdict. No new audit logic - it reuses the scanners wholesale and only interprets the result.
+
+**Files changed:**
+- `engine/astova_engine/verify.py` (new) - `verify_fix()`; reuses `scanner.scan` / `scanner.scan_project`
+  and the `fixes._FINDING_ALIASES` id map (so `onpage.canonical` resolves like generate_fix does).
+- `engine/astova_engine/service.py` - new `POST /findings/{id}/verify` (`{target, target_type}` body).
+- `engine/astova_engine/mcp_server.py` - new MCP tool `verify_fix(target, finding_id, target_type="url")`.
+- `engine/tests/test_verify_fix.py` (new) - 10 tests.
+- docs updated: CURRENT_CAPABILITIES.md, mcp.md.
+
+**Resolution rule (deterministic, exactly as specified):** the finding is **fixed** when it is gone from
+the new scan, or present with status `pass`/`info`; **not fixed** while present as `warn`/`fail`. This
+follows the engine's own severity model - `info` means "not a problem". The requested `finding_id` is
+echoed verbatim; matching is alias-normalised.
+
+**Response object:** `target`, `target_type`, `finding_id`, `fixed` (bool), `current_status`,
+`current_severity`, `evidence`, `score_after` (the new overall score), `confidence` ("verified"),
+`explanation`, `next_step`. A failed re-scan returns the same shape with `current_status: "error"` and an
+`error` field, so callers parse one schema either way.
+
+**Breaking changes:** none. Purely additive (one module, one POST endpoint, one MCP tool).
+
+**Developer experience:** `curl -X POST $ENGINE/findings/canonical/verify -d '{"target":"https://x/p"}'`
+answers "is canonical fixed yet?" with the current status and the score after.
+
+**AI agent experience:** the loop is now self-checking - after applying a `generate_fix` snippet, the agent
+calls `verify_fix` and either gets `fixed: true` or a `next_step` telling it to generate_fix and try again.
+Works for any finding id (not just the seven fixable ones) and for both URL and project targets.
+
+**Known limitations:** `url` targets re-fetch live every call (no reuse of a prior scan - cost + latency);
+verifying one finding re-runs the WHOLE scan; `info`-status findings (e.g. an absent `tech.llms_txt`) read
+as fixed by the rule even when the artifact is absent, because the engine scores them as non-problems.
+
+**Future opportunities:** reuse a cached scan / accept a prior report token to avoid the re-fetch; batch
+verify (a list of finding ids in one scan); diff `score_after` against a stored `score_before` to show the
+delta the fix produced.
+
+**Questions for the Product Architect:** should `verify_fix` accept a `scan_token` to verify against an
+already-run scan instead of re-fetching? Should it support batch verification of several findings at once?
+
+---
+
 ## 2026-06-29 - audit_project: audit a repository directly, returning the standard Report (Engine + API + MCP)
 
 **Objective:** let an AI coding agent working INSIDE a repo audit the project from source - before deploy,
