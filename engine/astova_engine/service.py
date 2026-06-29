@@ -31,7 +31,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from . import ai_ready, export, fixes, knowledge, monitoring, store, verify
+from . import ai_ready, export, fixes, knowledge, mcp_guide, monitoring, store, verify
 from .cloudflare_logs import fetch_cloudflare_logs
 from .compare import compare_reports
 from .config import get_pagespeed_key
@@ -148,6 +148,13 @@ def scan_endpoint(req: ScanRequest) -> dict:
         if prev:
             report["meta"]["diff"] = store.diff_reports(prev, report)
     return report
+
+
+@app.get("/mcp-guide")
+def mcp_guide_endpoint(client: str = "generic") -> dict:
+    """Return the static MCP setup + usage guide for a client (generic/claude/cursor/chatgpt/windsurf).
+    Reuses the same source of truth as the `mcp_usage_guide` MCP tool. Scans nothing, reads no files."""
+    return mcp_guide.usage_guide(client)
 
 
 @app.post("/ai-ready")

@@ -98,6 +98,20 @@ def test_ai_ready_missing_target_is_422():
     assert client.post("/ai-ready", json={}).status_code == 422
 
 
+def test_mcp_guide_endpoint():
+    r = client.get("/mcp-guide", params={"client": "cursor"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["client"] == "cursor"
+    assert {"purpose", "setup", "starter_prompt", "workflow", "safety_rules",
+            "available_tools", "recommended_entrypoints"} <= set(body)
+    assert body["available_tools"]
+
+
+def test_mcp_guide_defaults_to_generic():
+    assert client.get("/mcp-guide").json()["client"] == "generic"
+
+
 def test_crawl_job_lifecycle():
     fake = SiteReport(
         url="https://x.test", overall_score=88,

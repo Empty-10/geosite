@@ -32,6 +32,7 @@ export function Nav() {
       <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
         <a style={linkStyle} href="/#product">Product</a>
         <a style={linkStyle} href="/agents">For agents</a>
+        <a style={linkStyle} href="/mcp">MCP</a>
         <a style={linkStyle} href="/#pricing">Pricing</a>
         <a style={linkStyle} href="/#agencies">Agencies</a>
       </div>

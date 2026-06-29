@@ -5,6 +5,50 @@
 
 ---
 
+## 2026-06-29 - Web: `/mcp` setup page + `GET /mcp-guide` engine endpoint
+
+**Objective:** put the MCP usage guidance in front of humans - a `/mcp` page where a developer picks their
+client (Claude / Cursor / ChatGPT / Windsurf / generic) and gets setup, the starter prompt, the workflow,
+safety rules and the tool list, all copyable.
+
+**What changed:** exposed the existing `mcp_usage_guide` source of truth over HTTP and rendered it in the web
+app. No guide content is duplicated in TypeScript - the page fetches it.
+
+**Files changed:**
+- `engine/astova_engine/service.py` - new `GET /mcp-guide?client=` -> `mcp_guide.usage_guide(client)`.
+- `engine/tests/test_service.py` - 2 endpoint tests.
+- `web/app/api/mcp-guide/route.ts` (new) - thin proxy to the engine `GET /mcp-guide` (gated by `ASTOVA_ENGINE_URL`).
+- `web/app/mcp/page.tsx` + `web/components/McpSetupView.tsx` (new) - the page (server metadata) and the client
+  view (client selector, fetch-on-select, all sections, copyable starter prompt + extracted config).
+- `web/components/Nav.tsx` - "MCP" nav link; `web/app/sitemap.ts` - `/mcp` route.
+- docs updated: CURRENT_CAPABILITIES.md.
+
+**Single source of truth:** the page renders whatever `mcp_usage_guide` returns. The only client-side
+derivation is `extractConfig()`, which pulls the MCP server config JSON out of a setup step for its own Copy
+button - still from the guide, not hardcoded. Add a tool or change a prompt in `mcp_guide.py` and `/mcp`
+updates with no web change.
+
+**Breaking changes:** none. One additive engine endpoint, one web proxy, one page, one nav link, one sitemap
+entry. No existing engine behaviour changed (the endpoint returns static content). Held positioning batch
+untouched.
+
+**Developer experience:** `/mcp` -> pick "Cursor" -> copy the config + starter prompt -> connected. Pairs with
+`/agents` (CLI/prompt onboarding); both are nav-linked and in the sitemap.
+
+**Testing note:** engine endpoint covered by 2 service tests; web verified by `tsc --noEmit` (clean) and
+`next build` (clean - `/mcp` prerenders, `/api/mcp-guide` builds). Live `GET /mcp-guide` returns the guide.
+
+**Known limitations:** the page needs `ASTOVA_ENGINE_URL` (HTTP-only, like `/ai-ready`) - without it, it shows
+the "not configured" message; the config extractor assumes the `{"mcpServers"...}` shape the guide emits.
+
+**Future opportunities:** SSR the guide at request time so it works without a client-side fetch; a remote
+(HTTP connector) config variant; a "copy all setup" button.
+
+**Questions for the Product Architect:** should `/mcp` be server-rendered (one less env dependency for a static
+guide), and should `/agents` and `/mcp` merge into a single "For developers" hub?
+
+---
+
 ## 2026-06-29 - mcp_usage_guide: self-documenting MCP setup + usage helper
 
 **Objective:** let a developer using Claude / Cursor / ChatGPT / Windsurf ask the Astova MCP itself for the
