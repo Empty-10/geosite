@@ -34,12 +34,9 @@ export async function POST(req: Request): Promise<Response> {
 
   const base = ENGINE_URL ? ENGINE_URL.replace(/\/$/, "") : null;
   if (!base) {
+    // User-facing surface (homepage CTA lands here): keep the message friendly, not internal config jargon.
     return json(
-      {
-        error:
-          "The action-plan engine isn't configured on this deployment yet. Set ASTOVA_ENGINE_URL " +
-          "to a running engine service (see web/README.md).",
-      },
+      { error: "Live action plans are temporarily unavailable. Please try again in a moment." },
       503,
     );
   }

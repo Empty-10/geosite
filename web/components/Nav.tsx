@@ -29,7 +29,7 @@ export function Nav() {
         <Logo />
         <span style={{ fontSize: 17, fontWeight: 500, letterSpacing: "-0.01em" }}>Astova</span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+      <div className="nav-links" style={{ display: "flex", alignItems: "center", gap: 28 }}>
         <a style={linkStyle} href="/#product">Product</a>
         <a style={linkStyle} href="/agents">For agents</a>
         <a style={linkStyle} href="/mcp">MCP</a>
@@ -38,7 +38,7 @@ export function Nav() {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <ThemeToggle />
-        <a style={linkStyle} href="/crawlers">Crawler logs</a>
+        <a className="nav-links" style={linkStyle} href="/crawlers">Crawler logs</a>
         <a style={linkStyle} href="/login">Sign in</a>
         <a
           href="/report"

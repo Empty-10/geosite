@@ -89,6 +89,8 @@ input { font-family: inherit; }
 @media (max-width: 880px) {
   .bento { grid-template-columns: 1fr; }
   .bento .b2, .bento .b3, .bento .b4 { grid-column: auto; }
+  /* Declutter the sticky nav on small screens: keep the logo + primary CTA, drop secondary links. */
+  .nav-links { display: none !important; }
 }
 
 /* Hero backdrop: faint grid fading into a soft vignette. */

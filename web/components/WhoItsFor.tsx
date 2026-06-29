@@ -23,7 +23,7 @@ const AUDIENCES = [
 
 export function WhoItsFor() {
   return (
-    <section style={{ padding: "80px 32px", borderTop: "1px solid var(--border)", background: "var(--ink)" }}>
+    <section id="agencies" style={{ padding: "80px 32px", borderTop: "1px solid var(--border)", background: "var(--ink)", scrollMarginTop: 72 }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ maxWidth: 640, marginBottom: 44 }}>
           <span style={{ fontSize: 13, color: "var(--accent)" }}>Who it&apos;s for</span>
