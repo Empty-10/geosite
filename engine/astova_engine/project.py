@@ -42,6 +42,40 @@ def detect_framework(markers: set[str]) -> tuple[str, str]:
     return "static", "."
 
 
+# Where each framework serves its static root files from (the dir a deploy maps to "/").
+_PUBLIC_DIR = {
+    "nextjs": "public", "next": "public", "astro": "public", "gatsby": "static",
+    "node": "public", "wordpress": ".", "static": ".",
+}
+
+
+def framework_public_dir(framework: str) -> tuple[str, str]:
+    """Normalise a caller-supplied framework name to (framework, public_dir).
+
+    Used when the project audit is told the framework explicitly instead of auto-detecting it.
+    Unknown names fall back to the project root as the public dir.
+    """
+    fw = framework.strip().lower()
+    canonical = "nextjs" if fw == "next" else fw
+    return canonical, _PUBLIC_DIR.get(fw, ".")
+
+
+# The response-header security signals the technical module checks (mirrors technical._SECURITY_HEADERS).
+SECURITY_HEADER_NAMES = [
+    "content-security-policy", "x-content-type-options", "x-frame-options",
+    "referrer-policy", "permissions-policy",
+]
+
+
+def detect_configured_security_headers(config_blobs: list[str]) -> dict[str, str]:
+    """Which security headers a project configures in-repo (next.config headers(), vercel.json,
+    netlify.toml, _headers, ...). Deterministic: a header name appearing in any config file counts
+    as configured. Returns {header-name: "configured"} so it can stand in for response headers.
+    """
+    haystack = "\n".join(config_blobs).lower()
+    return {name: "configured" for name in SECURITY_HEADER_NAMES if name in haystack}
+
+
 def _robots_groups(txt: str) -> list[tuple[list[str], list[str]]]:
     """Parse robots.txt into (user-agents, disallow-paths) groups."""
     groups: list[tuple[list[str], list[str]]] = []

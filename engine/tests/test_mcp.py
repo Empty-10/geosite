@@ -69,7 +69,7 @@ def test_fix_plan_surfaces_error(monkeypatch):
     assert srv.fix_plan("https://x.test")["error"] == "could not resolve host"
 
 
-def test_audit_project_reads_files_and_targets_paths(tmp_path):
+def test_audit_project_returns_report(tmp_path):
     # a Next.js-shaped project with an AI-blocking robots.txt and no llms.txt
     (tmp_path / "next.config.js").write_text("module.exports = {}")
     pub = tmp_path / "public"
@@ -77,25 +77,28 @@ def test_audit_project_reads_files_and_targets_paths(tmp_path):
     (pub / "robots.txt").write_text("User-agent: GPTBot\nDisallow: /\n")
 
     out = srv.audit_project(str(tmp_path))
-    assert out["project"]["framework"] == "nextjs"
-    assert out["file_status"]["robots"] == "blocks_ai"
-    assert out["file_status"]["llms"] == "missing"
-    by = {f["finding_id"]: f for f in out["file_fixes"]}
-    assert by["project.llms_missing"]["target"] == "public/llms.txt"
-    assert "page_audit" not in out  # no base_url given
+    # the standard Report shape, not a bespoke payload
+    assert out["meta"]["scan_type"] == "project"
+    assert out["meta"]["framework"] == "nextjs"
+    assert out["scorecard"] is not None
+    by = {f["id"]: f for f in out["findings"]}
+    assert by["tech.robots.ai"]["status"] == "warn"   # GPTBot blocked
+    assert "tech.llms_txt" not in by or by["tech.llms_txt"]["value"] is False
+    assert "live_audit" not in out  # no base_url given
 
 
-def test_audit_project_with_base_url_includes_page_audit(tmp_path, monkeypatch):
-    (tmp_path / "index.html").write_text("<html></html>")
+def test_audit_project_with_base_url_includes_live_audit(tmp_path, monkeypatch):
+    (tmp_path / "index.html").write_text(HTML)
     monkeypatch.setattr(srv, "scan", lambda url, fixes=False: scan_html(url, HTML, online=False, fixes=fixes))
     out = srv.audit_project(str(tmp_path), base_url="http://localhost:3000")
-    assert "page_audit" in out
-    assert isinstance(out["page_audit"]["ai_retrievability"], (int, float))
-    assert isinstance(out["page_audit"]["fixes"], list)
+    assert out["meta"]["scan_type"] == "project"
+    # the live audit is itself a standard Report
+    assert "findings" in out["live_audit"] and out["live_audit"]["scorecard"] is not None
 
 
 def test_audit_project_bad_path():
-    assert "error" in srv.audit_project("/no/such/dir/here")
+    out = srv.audit_project("/no/such/dir/here")
+    assert "Not a directory" in out["meta"]["error"]
 
 
 def test_audit_project_multipage_crawl(tmp_path, monkeypatch):
@@ -109,7 +112,6 @@ def test_audit_project_multipage_crawl(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(srv, "crawl", lambda url, max_pages=25: site)
     out = srv.audit_project(str(tmp_path), base_url="http://localhost:3000", max_pages=10)
-    assert "site_audit" in out
-    assert out["site_audit"]["overall_score"] == 72
-    assert len(out["site_audit"]["pages"]) == 2
-    assert out["site_audit"]["pages"][1]["score"] == 64
+    assert out["live_audit"]["overall_score"] == 72
+    assert len(out["live_audit"]["pages"]) == 2
+    assert out["live_audit"]["pages"][1]["score"] == 64

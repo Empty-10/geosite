@@ -40,7 +40,7 @@ from .crawler_logs import analyze_logs
 from .fetch import fetch_pagespeed
 from .models import Report
 from .modules import performance as performance_mod
-from .scanner import scan
+from .scanner import scan, scan_project
 
 # Optional remote MCP endpoint (Streamable HTTP). Mounted at /mcp when the [mcp] extra is
 # installed, so claude.ai / Claude Desktop can call audit_url & scan_url over HTTP. Without the
@@ -80,6 +80,11 @@ _jobs_lock = threading.Lock()
 
 class ScanRequest(BaseModel):
     url: str
+
+
+class ProjectAuditRequest(BaseModel):
+    root_path: str
+    framework: str = "auto"
 
 
 class CrawlRequest(BaseModel):
@@ -137,6 +142,17 @@ def scan_endpoint(req: ScanRequest) -> dict:
         if prev:
             report["meta"]["diff"] = store.diff_reports(prev, report)
     return report
+
+
+@app.post("/project/audit")
+def project_audit_endpoint(req: ProjectAuditRequest) -> dict:
+    """Audit a project DIRECTORY on the engine host and return the same Report shape as /scan.
+
+    Reads the repo's files directly (robots.txt, llms.txt, sitemap.xml, framework/host config,
+    static HTML). Deterministic, read-only, no fixes. Only meaningful when the engine runs on the
+    machine that holds the project (e.g. the local MCP). Errors surface in meta.error.
+    """
+    return scan_project(req.root_path, req.framework).to_dict()
 
 
 def _safe_scan(url: str) -> Report:

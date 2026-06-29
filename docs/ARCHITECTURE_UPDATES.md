@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-06-29 - audit_project: audit a repository directly, returning the standard Report (Engine + API + MCP)
+
+**Objective:** let an AI coding agent working INSIDE a repo audit the project from source - before deploy,
+without a live URL - and get back the exact same `Report` a URL scan produces, so every existing tool
+(`explain_finding`, `generate_fix`, the scorecard, the web report) consumes it unchanged.
+
+**What changed:** added `scan_project(root_path, framework)` that reads the repo's files directly (robots.txt,
+llms.txt, sitemap.xml, framework/host config for security headers, any static HTML), runs the **existing**
+deterministic modules and scoring, and returns a `Report`. No new audit logic - it reuses the same module
+`analyze()` functions and `build_report`/`build_scorecard` the URL path uses. Exposed on all three surfaces.
+
+**Files changed:**
+- `engine/astova_engine/scanner.py` - new `scan_project()` + disk-read helpers (`_find_project_html`,
+  `_read_config_blobs`); reuses `technical/onpage/geo_readiness/local.analyze` + `build_report` +
+  `build_scorecard`. Drops deploy-only findings (`_DEPLOY_ONLY_FINDINGS`) and, when no static HTML exists,
+  DOM-derived findings (`_HTML_DERIVED_FINDINGS`).
+- `engine/astova_engine/project.py` - `framework_public_dir()` (explicit-framework normalisation) and
+  `detect_configured_security_headers()` (pure: which security headers the repo config declares).
+- `engine/astova_engine/service.py` - new `POST /project/audit` (`{root_path, framework}` → `Report`).
+- `engine/astova_engine/mcp_server.py` - `audit_project` refactored to return the project `Report` (was a
+  bespoke file-fix dict); keeps optional `base_url`/`max_pages` live augmentation under `live_audit`.
+- `engine/tests/test_project_audit.py` (new) - 16 tests; `tests/test_mcp.py` - 4 audit_project tests updated
+  to the new Report contract.
+- docs updated: CURRENT_CAPABILITIES.md, mcp.md.
+
+**Accuracy principle:** the report only carries what the source can prove. Deploy-time signals (HTTPS, TLS,
+HTTP status, redirects, compression, X-Robots-Tag) are omitted, not guessed. On-page/GEO checks run only
+when a static HTML file is present; for an un-built SSR project (e.g. Next.js with no `out/`), `audit_project`
+returns the file-based technical findings and sets `meta.html_analyzed = false`.
+
+**Breaking changes:** the MCP `audit_project` return shape changed - it now returns a `Report` (top-level
+`findings`/`scorecard`/`meta`) instead of `{project, file_status, file_fixes, page_audit}`, and it no longer
+generates fixes (that moved to `generate_fix`/`fix_plan`). The param renamed `path` → `root_path` and gained
+`framework`. The old `project.analyze_files` file-fix templates still exist (used elsewhere/tests) but are no
+longer surfaced by the tool.
+
+**Developer experience:** `curl -X POST $ENGINE/project/audit -d '{"root_path":"."}'` returns a full scorecard
+from the repo. Framework auto-detected (or pass `framework`).
+
+**AI agent experience:** the in-repo entry point - `audit_project(root_path)` is now the preferred tool for an
+agent in a codebase: one call yields a standard `Report`, then `explain_finding`/`generate_fix` on its finding
+ids close the loop, all without a deployed URL.
+
+**Known limitations:** on-page/GEO need built static HTML (no TSX/JSX metadata parsing); security-headers
+detection is substring-based on config text (presence, not correctness); reads the engine host's filesystem so
+it's only meaningful on the local MCP / a co-located engine; `analyze_files` is now dead-but-tested cruft.
+
+**Future opportunities:** parse framework metadata (Next `metadata` export, Astro frontmatter) so SSR projects
+get on-page findings without a build; let `audit_project` shell a framework build to produce HTML; a
+project-level multi-page audit (every route, not just index.html); fold `analyze_files` away.
+
+**Questions for the Product Architect:** should `audit_project` optionally run the framework's build to get real
+HTML for on-page/GEO? Is substring security-header detection honest enough, or should it parse the config?
+
+---
+
 ## 2026-06-29 - generate_fix: deterministic single-finding fix generation (Engine + API + MCP)
 
 **Objective:** let an AI coding agent ask `generate_fix(finding_id, context)` and get back a structured,

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from urllib.parse import urljoin, urlparse
 
+from . import project as project_mod
 from .config import get_pagespeed_key
 from .fetch import (BotFetch, FetchResult, fetch, fetch_as_bot, fetch_pagespeed, fetch_resource,
                     render_dom_cloudflare, tls_info)
@@ -175,4 +177,152 @@ def scan(url: str, *, render: bool = False, performance: bool = False,
         performance_psi=psi, fixes=fixes, bot=bot, normal_raw_words=normal_raw_words,
     )
     report.meta.update(meta_extra)
+    return report
+
+
+# --------------------------------------------------------------------------- project audit
+
+# Synthetic base used so the modules' URL-aware logic (scheme, canonical) behaves normally; the
+# project audit never hits the network, so the host/scheme are placeholders.
+_PROJECT_BASE = "https://project.local/"
+
+# Findings that depend on a live HTTP response / deployment and CANNOT be determined from repo
+# files - dropping them keeps the accuracy principle (we never assert what we didn't verify).
+_DEPLOY_ONLY_FINDINGS = {
+    "tech.https", "tech.hsts", "tech.tls", "tech.status",
+    "tech.compression", "tech.x_robots_tag", "tech.redirect", "tech.redirect.chain",
+}
+
+# Findings that need the page DOM - dropped when the repo has no static HTML to read (an SSR
+# framework with no build output), so we don't claim "viewport missing" we never actually saw.
+_HTML_DERIVED_FINDINGS = {
+    "tech.viewport", "tech.mixed_content", "tech.mixed_content.ok",
+    "tech.resource_hints", "tech.index_conflict",
+}
+
+# Static HTML we'll parse if present, in priority order (the project root's own pages first, then
+# common build-output dirs). Component frameworks (Next/Astro) usually have none until built.
+_HTML_CANDIDATE_DIRS = ("", "out", "dist", "build", "_site")
+_CONFIG_FILES = ("next.config.js", "next.config.mjs", "next.config.ts", "next.config.cjs",
+                 "vercel.json", "netlify.toml", "_headers", "_redirects", ".htaccess")
+_MAX_READ_BYTES = 2_000_000
+
+
+def _read_text(path: str) -> str | None:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            return fh.read(_MAX_READ_BYTES)
+    except OSError:
+        return None
+
+
+def _first_existing(*paths: str) -> str | None:
+    for p in paths:
+        content = _read_text(p)
+        if content is not None:
+            return content
+    return None
+
+
+def _find_project_html(root: str, pub: str) -> tuple[str | None, str | None]:
+    """Locate a static index.html to analyse (relpath, content), or (None, None) if the project
+    has no built/static HTML - then on-page/GEO checks are skipped rather than faked."""
+    seen = []
+    for sub in _HTML_CANDIDATE_DIRS:
+        seen.append(os.path.join(pub, sub, "index.html"))
+        seen.append(os.path.join(root, sub, "index.html"))
+    for path in dict.fromkeys(seen):  # de-dup, keep order
+        content = _read_text(path)
+        if content is not None and content.strip():
+            return os.path.relpath(path, root), content
+    return None, None
+
+
+def _read_config_blobs(root: str, pub: str) -> list[str]:
+    """Read the framework/host config files that can declare security headers (for the
+    security-headers check). Reused, deterministic - just the file text, parsed by project.py."""
+    blobs: list[str] = []
+    for name in _CONFIG_FILES:
+        text = _first_existing(os.path.join(root, name), os.path.join(pub, name))
+        if text:
+            blobs.append(text)
+    return blobs
+
+
+def scan_project(root_path: str, framework: str = "auto") -> Report:
+    """Audit a project DIRECTORY (pre-deploy) and return the SAME Report a URL scan returns.
+
+    Reads the repo's static files directly - robots.txt, llms.txt, sitemap.xml, framework/host
+    config (security headers), and any static index.html - then runs the existing deterministic
+    modules and scoring. Deploy-only signals (HTTPS, TLS, status, redirects, compression) are not
+    knowable from source and are omitted. Never fetches the network, never writes, never fixes.
+
+    `framework` may be "auto" (detect from root markers) or an explicit name (nextjs / astro /
+    wordpress / static / gatsby / node).
+    """
+    root = os.path.abspath(os.path.expanduser(root_path))
+    if not os.path.isdir(root):
+        return Report(url=root_path,
+                      meta={"scan_type": "project", "error": f"Not a directory: {root_path}"})
+    try:
+        markers = set(os.listdir(root))
+    except OSError as exc:
+        return Report(url=root_path,
+                      meta={"scan_type": "project", "error": f"Cannot read {root_path}: {exc}"})
+
+    if framework and framework.strip().lower() != "auto":
+        detected, public_dir = project_mod.framework_public_dir(framework)
+    else:
+        detected, public_dir = project_mod.detect_framework(markers)
+    pub = root if public_dir in (".", "") else os.path.join(root, public_dir)
+
+    robots = _first_existing(os.path.join(pub, "robots.txt"), os.path.join(root, "robots.txt"))
+    llms = _first_existing(os.path.join(pub, "llms.txt"), os.path.join(root, "llms.txt"))
+    sitemap = _first_existing(os.path.join(pub, "sitemap.xml"), os.path.join(root, "sitemap.xml"))
+    html_path, html = _find_project_html(root, pub)
+    html_analyzed = bool(html and html.strip())
+
+    sec_headers = project_mod.detect_configured_security_headers(_read_config_blobs(root, pub))
+    # A non-empty headers dict makes the technical module run its header cluster so the
+    # security-headers finding fires even when none are configured (compression/x-robots, which
+    # need a live response, are dropped below). The sentinel key is ignored by every check.
+    headers = {**sec_headers, "x-astova-project": "1"}
+
+    net = NetInputs(
+        robots_status=200 if robots is not None else 404, robots_txt=robots or "",
+        sitemap_url=urljoin(_PROJECT_BASE, "/sitemap.xml"),
+        sitemap_status=200 if sitemap is not None else 404, sitemap_xml=sitemap or "",
+        llms_status=200 if llms is not None else 404, llms_txt=llms or "",
+    )
+
+    soup = make_soup(html or "")
+    text = visible_text(soup)
+    findings = list(technical.analyze(soup, _PROJECT_BASE, 0, headers, net=net))
+    if html_analyzed:
+        findings += onpage.analyze(soup, text, _PROJECT_BASE)
+        findings += geo_readiness.analyze(soup, text)
+        findings += local.analyze(soup, text, _PROJECT_BASE)
+
+    drop = set(_DEPLOY_ONLY_FINDINGS)
+    if not html_analyzed:
+        drop |= _HTML_DERIVED_FINDINGS
+    findings = [f for f in findings if f.id not in drop]
+
+    meta = {
+        "scan_type": "project",
+        "root_path": root,
+        "framework": detected,
+        "public_dir": public_dir,
+        "files": {
+            "robots_txt": robots is not None,
+            "llms_txt": llms is not None,
+            "sitemap_xml": sitemap is not None,
+            "html": html_path,
+        },
+        "html_analyzed": html_analyzed,
+        "security_headers_configured": sorted(sec_headers),
+        "online_checks": False,
+    }
+    report = build_report(root_path, findings, meta)
+    report.scorecard = build_scorecard(report)
     return report
