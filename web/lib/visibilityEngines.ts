@@ -67,7 +67,9 @@ async function sampleOpenAI(prompt: string, apiKey: string): Promise<Sample | nu
       body: JSON.stringify({
         model,
         input: prompt,
-        tools: [{ type: "web_search" }],
+        // search_context_size "low" pulls less page content (cheaper input tokens) while still
+        // returning the citations we measure — verified 6 vs 7 sources at a fraction of the tokens.
+        tools: [{ type: "web_search", search_context_size: "low" }],
         tool_choice: { type: "web_search" },
       }),
       signal: AbortSignal.timeout(TIMEOUT),
