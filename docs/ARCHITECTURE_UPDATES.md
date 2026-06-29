@@ -5,6 +5,55 @@
 
 ---
 
+## 2026-06-29 - Web: `/agents` first-run onboarding for AI coding agents
+
+**Objective:** make it trivial for a developer to start using Astova from Claude / Cursor / ChatGPT /
+Windsurf - copy one prompt, one set of CLI commands, or one MCP starter instruction and go.
+
+**What changed:** added a static, indexable `/agents` page that explains the loop (Astova audits AI
+Readiness -> the agent fixes the code -> Astova verifies) and provides copyable blocks. No engine change,
+no auth, no billing, no LLM.
+
+**Files changed:**
+- `web/app/agents/page.tsx` (new) - the onboarding page (server component + metadata), wrapped in the
+  shared `Nav`/`Footer` chrome.
+- `web/components/CopyBlock.tsx` (new) - a small reusable "copy this" block (monospace content + Copy
+  button) used for the prompt, CLI commands and MCP instruction.
+- `web/components/Nav.tsx` - added a "For agents" nav link (discoverability).
+- `web/app/sitemap.ts` - registered `/agents` as a public route.
+- docs updated: CURRENT_CAPABILITIES.md.
+
+**Page content (per brief, verbatim where specified):** the three-step loop (`astova loop .` -> hand the
+Markdown plan to the agent -> `astova loop .` again); the copyable agent prompt (with the "do not invent
+facts / ask before manual items" guardrails); the three CLI commands (`astova check .`, `astova loop .`,
+`astova export . --output astova-action-plan.md`); the MCP starter instruction (`ai_ready_loop` ->
+`explain_finding` -> `generate_fix` -> `verify_fix`); and a safety section (Astova never applies changes,
+the agent edits the code, deterministic evidence + verification, human review required for
+factual/legal/identity/local claims).
+
+**Breaking changes:** none. New page + new component + one nav link + one sitemap entry. No engine change.
+The held homepage positioning batch (`Hero.tsx`/`RotatingWord.tsx`/`faq.ts`/`layout.tsx`) was not touched.
+
+**Developer experience:** `/agents` is the copy-and-go landing for agent users; the prompt and MCP
+instruction encode the safe loop so an agent stays inside the deterministic lane and asks before touching
+identity/factual claims.
+
+**Testing note:** no JS unit-test runner exists in the web app; verification is `tsc --noEmit` (clean) and
+`next build` (clean - `/agents` prerenders as static). The exact prompt and MCP strings were asserted to
+match the brief.
+
+**Known limitations:** copy depends on `navigator.clipboard` (HTTPS/secure-context only; no execCommand
+fallback); content is hardcoded English; assumes the reader has installed the engine (no install snippet on
+the page yet beyond the commands).
+
+**Future opportunities:** an install/quickstart snippet (`pip install` + MCP config JSON) on the same page;
+per-tool tabs (Claude Desktop vs Cursor vs ChatGPT) with the right MCP config; a "copy all" button.
+
+**Questions for the Product Architect:** should `/agents` carry the MCP config JSON (stdio + HTTP) inline,
+and become the primary nav CTA for the developer audience?
+
+---
+
 ## 2026-06-29 - Homepage: AI Ready Action Plan as the conversion path
 
 **Objective:** turn the AI Ready Action Plan into a clear homepage conversion path - a visitor enters a URL by
