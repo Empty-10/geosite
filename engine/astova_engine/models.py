@@ -31,7 +31,9 @@ from typing import Any
 #     local.geo / local.gbp for local-business pages; LocalBusiness schema fix.
 # v12: geo.freshness (dated/recent content), geo.entity (entity grounding via sameAs), and the
 #     extracted answer-preview snippet on geo.aeo.
-SCHEMA_VERSION = "12"
+# v13: bot-challenge detection - meta.challenge + tech.challenge finding + scorecard.unreliable when a
+#     Cloudflare/Akamai/DataDome/PerimeterX/Imperva interstitial is scored instead of the real page.
+SCHEMA_VERSION = "13"
 
 # Versions stamped into every report's meta so a saved/shared report is self-describing.
 ENGINE_VERSION = "1.0"        # the deterministic scan engine

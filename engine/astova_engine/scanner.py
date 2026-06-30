@@ -5,17 +5,43 @@ from __future__ import annotations
 import os
 from urllib.parse import urljoin, urlparse
 
+from . import detect
 from . import project as project_mod
 from .config import get_pagespeed_key
 from .fetch import (BotFetch, FetchResult, fetch, fetch_as_bot, fetch_pagespeed, fetch_resource,
                     render_dom_cloudflare, tls_info)
 from .fixes import generate_fixes
-from .models import ENGINE_VERSION, REPORT_VERSION, RULESET_VERSION, Pillar, Report
+from .models import (ENGINE_VERSION, REPORT_VERSION, RULESET_VERSION, Confidence, Finding, Pillar,
+                     Report, Severity, Status)
 from .modules import bot_view, geo_readiness, local, onpage, performance, technical
 from .modules.technical import NetInputs, parse_robots
 from .scorecard import build_scorecard
 from .scoring import build_report
 from .util import make_soup, visible_text, word_count
+
+
+# Findings that are ARTIFACTS of a bot-challenge holding page (its own noindex, ~0 words, JS gate),
+# not real problems with the site - dropped before scoring when a challenge is detected.
+_CHALLENGE_ARTIFACTS = frozenset({
+    "robots.noindex", "tech.x_robots_tag", "tech.index_conflict",
+    "geo.js_rendered", "geo.no_content", "geo.thin_content", "geo.depth",
+})
+
+
+def _challenge_finding(challenge: dict) -> Finding:
+    vendor, status, marker = challenge["vendor"], challenge["status"], challenge["marker"]
+    return Finding(
+        "tech.challenge", Pillar.TECHNICAL, "Bot-protection challenge", Status.FAIL,
+        Severity.HIGH, Confidence.VERIFIED, value=challenge,
+        evidence=f"{vendor} challenge page - HTTP {status}, matched marker '{marker}'",
+        recommendation=(
+            "This URL is serving a bot/security challenge page (" + vendor + "), not your content, so "
+            "the score and findings below reflect the challenge page and are NOT representative of "
+            "your site. Astova cannot reliably audit the real content until the challenge is removed "
+            "or bypassed for legitimate crawlers (allowlist verified GPTBot/ClaudeBot or scan from an "
+            "allowlisted IP), or until you scan a page that isn't behind the challenge. Then re-scan."
+        ),
+    )
 
 
 def scan_html(url: str, html: str, *, online: bool = False,
@@ -32,6 +58,11 @@ def scan_html(url: str, html: str, *, online: bool = False,
     final_url = final_url or url
     soup = make_soup(html)
     text = visible_text(soup)
+    title = (soup.title.string or "").strip() if soup.title and soup.title.string else ""
+
+    # Bot-challenge / interstitial detection: if this is a Cloudflare/Akamai/etc. holding page, the
+    # HTML we're about to score is NOT the real site. Flag it as unreliable (accuracy principle).
+    challenge = detect.challenge_info(status_code, headers, title, text, final_url)
 
     findings = []
     findings += onpage.analyze(soup, text, final_url)
@@ -57,8 +88,21 @@ def scan_html(url: str, html: str, *, online: bool = False,
         "ruleset_version": RULESET_VERSION,
         "report_version": REPORT_VERSION,
     }
+
+    if challenge is not None:
+        # Drop the challenge-page artifacts so they don't read as real problems, then emit one
+        # prominent finding in their place - before scoring.
+        findings = [f for f in findings if f.id not in _CHALLENGE_ARTIFACTS]
+        findings.append(_challenge_finding(challenge))
+        meta["challenge"] = {"detected": True, "vendor": challenge["vendor"],
+                             "status": challenge["status"]}
+
     report = build_report(url, findings, meta, pillar_overrides=overrides)
     report.scorecard = build_scorecard(report)
+    if challenge is not None and report.scorecard is not None:
+        # The number isn't trustworthy - mark it loudly rather than present a confident-but-wrong score.
+        report.scorecard["unreliable"] = True
+        report.scorecard["challenge"] = meta["challenge"]
     if fixes:
         report.fixes = generate_fixes(soup, report, final_url)
     return report

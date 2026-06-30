@@ -45,7 +45,8 @@ def _audit_payload(report) -> dict:
     if d["meta"].get("error"):
         return {"url": report.url, "error": d["meta"]["error"]}
     sc = d.get("scorecard") or {}
-    return {
+    challenge = d["meta"].get("challenge")
+    payload = {
         "url": d["meta"].get("final_url", report.url),
         "ai_retrievability": sc.get("headline_score"),
         "technical_score": sc.get("technical_score"),
@@ -58,6 +59,18 @@ def _audit_payload(report) -> dict:
         "note": "Deterministic audit — reads the live HTML with real parsers and reproduces "
                 "identically on re-run. Not an LLM estimate.",
     }
+    if challenge:
+        # A bot-protection challenge was scored instead of the real page: surface it loudly so an
+        # agent doesn't act on the (unreliable) number below.
+        payload["unreliable"] = True
+        payload["challenge"] = challenge
+        payload["note"] = (
+            f"UNRELIABLE: this URL returned a {challenge.get('vendor')} bot-protection challenge "
+            f"(HTTP {challenge.get('status')}), not the real page. The score and issues reflect the "
+            "challenge page, not your site. Re-scan once the challenge is removed or allowlisted for "
+            "legitimate crawlers."
+        )
+    return payload
 
 
 @mcp.tool()

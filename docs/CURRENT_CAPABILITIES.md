@@ -9,6 +9,7 @@
 The deterministic audit engine (`engine/astova_engine/`) assesses a single page (or a crawl) by reading the live HTML and reproducing the result on re-run. Every finding is confidence **VERIFIED**. No LLM runs in the engine.
 
 - Fetches the page as a normal client and as **GPTBot** (the "bot view").
+- **Bot-challenge detection** (`detect.py`): if a Cloudflare / Akamai / DataDome / PerimeterX / Imperva interstitial is scored instead of the real page, the engine sets `meta.challenge = {detected, vendor, status}`, emits one `tech.challenge` finding (Technical, FAIL, HIGH, VERIFIED), drops the challenge-page artifacts (`robots.noindex`, `tech.x_robots_tag`, `tech.index_conflict`, `geo.js_rendered`, `geo.no_content`, `geo.thin_content`, `geo.depth`) before scoring, and flags `scorecard.unreliable = true`. Surfaced in MCP `audit_url`/`scan_url` and a web-report warning banner. False-positive-safe (a normal Cloudflare-fronted 200 page is not flagged).
 - **Auto-renders** JavaScript-heavy pages via Cloudflare Browser Rendering when the raw HTML looks like an SPA shell; otherwise scans raw HTML.
 - Gathers robots.txt, sitemap.xml, llms.txt, TLS certificate, redirect chain.
 - Runs ~58 checks across five areas:

@@ -258,6 +258,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
 
   return (
     <div style={{ animation: "dmFade 0.3s ease both" }}>
+      <ChallengeBanner meta={report.meta} />
       {/* report header */}
       <div style={{ marginBottom: 18 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
@@ -393,6 +394,24 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
         <FindingsList key={section.key} findings={sectionFindings} fixes={fixMap} url={finalUrl} openFirst={false} impacts={impacts} />
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ChallengeBanner({ meta }: { meta?: Record<string, unknown> | null }) {
+  const ch = meta?.challenge as { detected?: boolean; vendor?: string; status?: number } | undefined;
+  if (!ch?.detected) return null;
+  return (
+    <div style={{ border: `1px solid ${C.fail}`, background: "rgba(229,72,77,0.12)", borderRadius: 12, padding: "14px 16px", marginBottom: 18 }}>
+      <div style={{ fontWeight: 600, color: C.fail, marginBottom: 4 }}>
+        ⚠ Bot challenge detected - this report isn&apos;t reliable
+      </div>
+      <div style={{ fontSize: 13.5, color: "var(--text-2)", lineHeight: 1.5 }}>
+        {ch.vendor ?? "A bot-protection service"} served a security challenge
+        {ch.status ? ` (HTTP ${ch.status})` : ""} instead of the real page, so the score and findings
+        below reflect the challenge page, not your site. Re-scan once the challenge is removed or
+        allowlisted for legitimate crawlers (e.g. verified GPTBot/ClaudeBot).
       </div>
     </div>
   );

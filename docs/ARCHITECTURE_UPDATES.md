@@ -5,6 +5,44 @@
 
 ---
 
+## 2026-06-30 - Bot-challenge / interstitial detection (Engine + MCP + Web)
+
+**Objective:** stop scoring a Cloudflare/Akamai/etc. challenge holding page as if it were the real site.
+Scanning a protected URL (e.g. mitel.com) returned the interstitial - its own noindex + ~0 words - producing
+a confident-but-wrong scorecard. Detect it and mark the result UNRELIABLE (the accuracy principle).
+
+**What changed:**
+- `engine/astova_engine/detect.py` (new) - pure `detect_challenge(status, headers, title, text, final_url)
+  -> vendor|None` + `challenge_info(...) -> {vendor, marker, status}|None`. Vendors: Cloudflare (markers /
+  cf-mitigated / server+cf-ray@403/503), Akamai (gated by 403/503), PerimeterX, DataDome, Imperva. Narrowed
+  to be false-positive-safe (dropped the bare `__cf` cookie prefix - normal CF sites set `__cf_bm`).
+- `engine/astova_engine/scanner.py` - `scan_html` calls `challenge_info`; on a hit it sets `meta.challenge`,
+  drops the 7 artifact findings, appends one `tech.challenge` (Technical / FAIL / HIGH / VERIFIED) with
+  vendor+status+marker evidence, and flags `scorecard.unreliable = true` + `scorecard.challenge`.
+- `engine/astova_engine/models.py` - `SCHEMA_VERSION` 12 -> 13.
+- `engine/astova_engine/mcp_server.py` - `audit_url` payload surfaces `unreliable` + `challenge` + a loud note;
+  `scan_url` already returns the full report (meta.challenge + scorecard.unreliable).
+- `web/components/report/ReportView.tsx` - a `ChallengeBanner` at the top of the report when
+  `meta.challenge.detected`.
+- `engine/tests/test_detect.py` (13) + `test_challenge_integration.py` (7); `test_schema.py` bumped to 13.
+- docs: CURRENT_CAPABILITIES.md.
+
+**Accuracy principle:** prefer flagging over a confident-but-wrong number - the score is kept but loudly marked
+`unreliable` with a dedicated finding and banner, and the artifacts that the challenge page would otherwise
+emit are removed so they don't read as real site problems.
+
+**Breaking changes:** `SCHEMA_VERSION` is now "13" (additive meta/scorecard fields, conditional finding).
+
+**Testing:** detector fixtures per vendor + clean-page negatives (incl. a normal Cloudflare-fronted 200 page,
+not flagged); integration tests for meta, the finding, artifact removal, the unreliable flag, and MCP exposure.
+Full engine suite 371 passed; web tsc + build clean.
+
+**Known limitations:** detection is signal-based (markers/headers/status), not a render; a challenge that
+returns 200 with no script/title marker and no CF headers wouldn't be caught; the numeric score is retained
+(flagged) rather than suppressed at the data layer.
+
+---
+
 ## 2026-06-29 - Web: print-friendly PDF-style report (`/report/[id]/print`)
 
 **Objective:** let users and agencies export a clean, client-friendly report - a print-optimised HTML page
