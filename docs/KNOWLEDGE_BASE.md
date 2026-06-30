@@ -3,7 +3,7 @@
 > The canonical explanation of every finding the Astova engine can produce. This is the source of
 > truth an AI coding agent (or a human) uses to understand and safely fix an AI Readiness issue.
 > Maintained alongside the engine: every finding has a corresponding Knowledge Card here.
-> Last updated: 2026-06-29. Engine report schema: v12.
+> Last updated: 2026-06-30. Engine report schema: v13.
 >
 > **Machine-readable now:** this knowledge is exposed to AI coding agents via the MCP tool
 > `explain_finding(finding_id)` and the HTTP API `GET /findings/{id}`. The structured registry lives
@@ -325,6 +325,34 @@ See RB-6. Re-run: a parseable JSON-LD block with `@type` clears `schema.missing`
 
 # Related Findings
 geo.faq (FAQPage generation), local (LocalBusiness/NAP), opengraph (entity hints).
+
+## Expert Schema Review (deeper schema findings, v13)
+
+`schema_review.py` adds a deeper deterministic pass over the JSON-LD graph (`jsonld.parse_nodes` flattens
+`@graph`/lists). All findings are on-page, VERIFIED, and worded to avoid overclaiming ranking impact. The
+structured cards live in `knowledge.py` (six families, exposed via `explain_finding`):
+
+- **Entity duplication & conflicts** (`schema_entity_conflicts`): `schema.duplicate_organization`,
+  `schema.duplicate_localbusiness`, `schema.duplicate_website`, `schema.conflicting_organization_name`,
+  `schema.conflicting_organization_url`, `schema.conflicting_organization_logo`,
+  `schema.duplicate_id_conflict`. *Why:* engines resolve a page to one entity before citing it; duplicates /
+  contradictory name/url/logo / one @id reused for different @types make that ambiguous. *Human review:*
+  choosing the correct identity value is a business decision - never guess.
+- **Graph wiring** (`schema_graph_wiring`): `schema.missing_id`, `schema.orphan_node`,
+  `schema.breadcrumb_disconnected`. *Why:* a connected @id graph lets engines follow relationships. *Fix:*
+  mechanical wiring (add @ids/references), no factual changes.
+- **WebSite SearchAction** (`schema_searchaction`): `schema.website_missing_searchaction` (only when the page
+  has a search box). *The one with a deterministic Astova fix* (`generate_fix` emits the SearchAction snippet
+  with a urlTemplate placeholder).
+- **sameAs quality** (`schema_sameas`): `schema.invalid_sameas`, `schema.weak_sameas`. *Human review:*
+  choosing real profile URLs (never invent them).
+- **Article relationships** (`schema_article_rel`): `schema.article_missing_publisher`,
+  `schema.article_missing_author`. *Human review:* the author is a real person's identity.
+- **URL & type hygiene** (`schema_url_hygiene`): `schema.canonical_mismatch`, `schema.insecure_url`,
+  `schema.image_missing_dimensions`, `schema.generic_type`.
+
+Detection is deterministic from the parsed graph + page canonical + final URL. **Verification:** re-scan; each
+finding clears once corrected. These feed scorecard row 20 and the web report's "Expert Schema Review" card.
 
 # Future Improvements
 Surface invalid-JSON as a distinct finding (currently silently treated as missing); validate property *values* (URL/date formats), not just presence.

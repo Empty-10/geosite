@@ -5,6 +5,58 @@
 
 ---
 
+## 2026-06-30 - Expert Review Pack #1: Schema Review (Engine + Knowledge + Web)
+
+**Objective:** upgrade schema from presence/validation to an expert-level deterministic review that emits
+deeper findings and reads like a review, not a flat list. Bolted on as a new module - no Report-shape change.
+
+**What changed:**
+- `engine/astova_engine/jsonld.py` (new) - shared JSON-LD parser (`parse_nodes` / `node_types` / `type_labels`).
+- `engine/astova_engine/modules/schema_review.py` (new) - 19 deterministic checks over the JSON-LD graph +
+  page canonical + final URL; on-page pillar, VERIFIED. Wired into `scan_html` after `onpage`.
+- `engine/astova_engine/scorecard.py` - the new schema.* ids feed row 20 (Structured Data & Schema).
+- `engine/astova_engine/knowledge.py` - 6 new Knowledge Cards covering all 19 finding ids.
+- `engine/astova_engine/fixes.py` - one safe deterministic fix added: `schema.website_missing_searchaction`
+  (SearchAction snippet with a urlTemplate placeholder). No other new auto-fixes (the rest need identity/URL
+  judgment or a network check - guidance only).
+- `web/components/report/SchemaReviewCard.tsx` (new) + `ReportView.tsx` - an "Expert Schema Review" card
+  (status, # issues, critical/high, deterministic fixes, manual review + the issue list), derived from the
+  report's findings/fixes.
+- `engine/tests/test_schema_review.py` (new, 23). docs: CURRENT_CAPABILITIES.md, KNOWLEDGE_BASE.md (v13).
+
+**New finding ids (19):** schema.duplicate_organization / duplicate_localbusiness / duplicate_website /
+conflicting_organization_name / conflicting_organization_url / conflicting_organization_logo / missing_id /
+duplicate_id_conflict / orphan_node / invalid_sameas / weak_sameas / article_missing_publisher /
+article_missing_author / website_missing_searchaction / breadcrumb_disconnected / canonical_mismatch /
+insecure_url / image_missing_dimensions / generic_type.
+
+**Deliberate conservatism (to stay false-positive-safe):** `orphan_node` only fires in a ≥2-node graph for a
+non-primary node nothing references (INFO, no score penalty); `generic_type` only flags a bare `Thing` (the
+broader "a more specific type would fit" needs page understanding - skipped); `website_missing_searchaction`
+only fires when the page actually has a search box; `image_missing_dimensions` only for ImageObject dicts (a
+bare URL string can't carry dimensions). `weak_sameas` fires only on a present-but-empty sameAs (so it does
+not double-flag with geo.entity, which owns "no grounding").
+
+**Breaking changes:** none. Report shape unchanged; new findings are additive on the on-page pillar (so a
+messy schema now costs on-page points, which is the intent). No SCHEMA_VERSION bump needed (no meta shape
+change) - KNOWLEDGE_BASE notes v13 to match the prior engine bump.
+
+**Wording:** all recommendations frame issues as entity-clarity / extraction / rich-result-eligibility, never
+"this will rank you higher."
+
+**Testing:** 23 schema-review tests (clean pass + every check + regression guards that `schema.missing` and
+the existing `schema.missing` fix are unchanged). Full engine suite 394 passed; ruff clean; web tsc + build clean.
+
+**Known limitations:** checks are graph/canonical/URL-derived, not a render or a network probe - `insecure_url`
+flags http URLs but can't auto-fix (the https target may not exist); `canonical_mismatch` compares to the
+page canonical only; orphan/generic detection is intentionally narrow; only one deterministic fix shipped.
+
+**Questions for the Product Architect:** should messy-schema findings penalise the on-page pillar as they do
+now, or sit in a separate non-scoring "review" lane? Should the Schema Review card also appear on the shared
+`/report/[id]` view (it's currently on the live report)?
+
+---
+
 ## 2026-06-30 - Bot-challenge / interstitial detection (Engine + MCP + Web)
 
 **Objective:** stop scoring a Cloudflare/Akamai/etc. challenge holding page as if it were the real site.

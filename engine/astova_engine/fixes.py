@@ -308,6 +308,29 @@ def _fix_canonical(url: str) -> Fix:
     )
 
 
+def _fix_searchaction(url: str) -> Fix:
+    parsed = urlparse(url)
+    root = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else url
+    website = {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "url": root,
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": {"@type": "EntryPoint", "urlTemplate": f"{root}/search?q={{search_term_string}}"},
+            "query-input": "required name=search_term_string",
+        },
+    }
+    body = json.dumps(website, indent=2, ensure_ascii=False)
+    return Fix(
+        finding_id="schema.website_missing_searchaction", title="Add WebSite SearchAction",
+        kind="json-ld", language="html",
+        content=f'<script type="application/ld+json">\n{body}\n</script>',
+        note="Set the urlTemplate to your real search URL (the part before {search_term_string}). "
+        "If you already emit a WebSite entity, add the potentialAction to it rather than duplicating it.",
+    )
+
+
 def _fix_viewport() -> Fix:
     return Fix(
         finding_id="tech.viewport", title="Add a mobile viewport tag", kind="meta", language="html",
@@ -389,12 +412,13 @@ DETERMINISTIC_FINDINGS = {
     "title.missing", "meta.description.missing", "canonical", "tech.viewport",
     "schema.missing", "geo.faq", "tech.robots.missing", "tech.robots.ai",
     "geo.bot_access", "local.business_schema", "tech.llms_txt",
+    "schema.website_missing_searchaction",
 }
 
 # Findings generate_fix() currently supports (the initial agent-facing set).
 SUPPORTED_FIX_FINDINGS = {
     "schema.missing", "geo.faq", "tech.robots.missing", "tech.robots.ai",
-    "tech.llms_txt", "canonical", "tech.viewport",
+    "tech.llms_txt", "canonical", "tech.viewport", "schema.website_missing_searchaction",
 }
 
 # Accept the alternate id an agent might pass.
@@ -409,7 +433,8 @@ _TARGET_BY_KIND = {
 }
 
 # Findings whose generator needs the page URL.
-_NEEDS_URL = {"schema.missing", "tech.robots.missing", "tech.robots.ai", "tech.llms_txt", "canonical"}
+_NEEDS_URL = {"schema.missing", "tech.robots.missing", "tech.robots.ai", "tech.llms_txt", "canonical",
+              "schema.website_missing_searchaction"}
 
 
 def _fix_response(finding_id: str, *, deterministic: bool, supported: bool,
@@ -483,6 +508,8 @@ def generate_fix(finding_id: str, context: dict | None = None) -> dict:
         fix = _fix_llms(soup, url)
     elif fid == "canonical":
         fix = _fix_canonical(url)
+    elif fid == "schema.website_missing_searchaction":
+        fix = _fix_searchaction(url)
     else:  # tech.viewport
         fix = _fix_viewport()
 

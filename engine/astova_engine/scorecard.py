@@ -53,7 +53,19 @@ ROWS: list[tuple[int, str, list[str]]] = [
                                                  "onpage.hreflang", "geo.js_rendered", "geo.bot_access",
                                                  "tech.llms_txt"]),
     (20, "Structured Data & Schema", ["schema.jsonld", "schema.missing", "schema.validation",
-                                      "local.business_schema"]),
+                                      "local.business_schema",
+                                      # deeper Schema Review (schema_review.py)
+                                      "schema.duplicate_organization", "schema.duplicate_localbusiness",
+                                      "schema.duplicate_website", "schema.conflicting_organization_name",
+                                      "schema.conflicting_organization_url",
+                                      "schema.conflicting_organization_logo", "schema.missing_id",
+                                      "schema.duplicate_id_conflict", "schema.orphan_node",
+                                      "schema.invalid_sameas", "schema.weak_sameas",
+                                      "schema.article_missing_publisher", "schema.article_missing_author",
+                                      "schema.website_missing_searchaction",
+                                      "schema.breadcrumb_disconnected", "schema.canonical_mismatch",
+                                      "schema.insecure_url", "schema.image_missing_dimensions",
+                                      "schema.generic_type"]),
 ]
 
 CATEGORIES: list[tuple[str, list[int]]] = [

@@ -13,7 +13,7 @@ from .fetch import (BotFetch, FetchResult, fetch, fetch_as_bot, fetch_pagespeed,
 from .fixes import generate_fixes
 from .models import (ENGINE_VERSION, REPORT_VERSION, RULESET_VERSION, Confidence, Finding, Pillar,
                      Report, Severity, Status)
-from .modules import bot_view, geo_readiness, local, onpage, performance, technical
+from .modules import bot_view, geo_readiness, local, onpage, performance, schema_review, technical
 from .modules.technical import NetInputs, parse_robots
 from .scorecard import build_scorecard
 from .scoring import build_report
@@ -66,6 +66,7 @@ def scan_html(url: str, html: str, *, online: bool = False,
 
     findings = []
     findings += onpage.analyze(soup, text, final_url)
+    findings += schema_review.analyze(soup, final_url)
     findings += technical.analyze(soup, final_url, status_code, headers, net=net)
     findings += geo_readiness.analyze(soup, text, render_delta=net.render_delta if net else None)
     findings += local.analyze(soup, text, final_url)
