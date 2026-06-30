@@ -14,6 +14,7 @@ import { ScanProgress } from "./ScanProgress";
 import { PillarCards } from "./PillarCards";
 import { ScorecardPanel } from "./ScorecardPanel";
 import { SchemaReviewCard } from "./SchemaReviewCard";
+import { AnswerabilityReviewCard } from "./AnswerabilityReviewCard";
 import { BotView } from "./BotView";
 import { ScoreRing } from "./ScoreRing";
 import { RenderTag } from "./RenderTag";
@@ -293,6 +294,8 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
       <ExecutiveSummary scorecard={report.scorecard} />
 
       <ScorecardPanel scorecard={report.scorecard} findings={allFindings} />
+
+      <AnswerabilityReviewCard report={report} />
 
       <SchemaReviewCard report={report} />
 

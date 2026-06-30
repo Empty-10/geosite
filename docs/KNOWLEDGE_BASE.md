@@ -3,7 +3,7 @@
 > The canonical explanation of every finding the Astova engine can produce. This is the source of
 > truth an AI coding agent (or a human) uses to understand and safely fix an AI Readiness issue.
 > Maintained alongside the engine: every finding has a corresponding Knowledge Card here.
-> Last updated: 2026-06-30. Engine report schema: v13.
+> Last updated: 2026-06-30. Engine report schema: v14.
 >
 > **Machine-readable now:** this knowledge is exposed to AI coding agents via the MCP tool
 > `explain_finding(finding_id)` and the HTTP API `GET /findings/{id}`. The structured registry lives
@@ -353,6 +353,39 @@ structured cards live in `knowledge.py` (six families, exposed via `explain_find
 
 Detection is deterministic from the parsed graph + page canonical + final URL. **Verification:** re-scan; each
 finding clears once corrected. These feed scorecard row 20 and the web report's "Expert Schema Review" card.
+
+## Expert Answerability Review (deeper answerability findings, v14)
+
+`answerability_review.py` adds the deeper deterministic validations that the existing `geo.*` checks don't
+cover (it reuses `geo.aeo`'s exact answer-block extraction via `content.py`). All findings are GEO, VERIFIED,
+and answer one question: *could ChatGPT/Claude/Gemini confidently quote this page?* The existing geo
+answerability findings are all kept first-class (including `geo.frontload`). Three new card families
+(`knowledge.py`, exposed via `explain_finding`):
+
+- **Self-contained answer & definition** (`answerability_answer`): `geo.answer_self_contained` (the up-front
+  answer must not open with an unresolved 'It/This/They' an engine can't resolve in isolation),
+  `geo.definition_present` (a 'X is a…' near the top is the ideal quote for 'what is' prompts). *Human review:*
+  rewriting the sentence is editorial - draft from real content, never invent.
+- **Section coverage & table extractability** (`answerability_structure`): `geo.heading_coverage` (~one H2/H3
+  per ≤400 words), `geo.table_extractability` (data tables need `<th>`/`<thead>`).
+- **Question coverage** (`answerability_questions`): `geo.question_coverage` (every '?' heading must be
+  answered beneath it). *Human review:* writing the answer is editorial.
+
+**The Expert Review contract (v14, `reviews.py`).** Every review (Answerability now; Schema/Crawlability/Trust/
+Metadata/Internal-Linking later) renders from one shape attached additively under `scorecard.reviews[<key>]`:
+`review`, `key`, `verdict` (strong/partial/weak), `confidence` (`{level, reasons}` - Astova's deterministic
+confidence in its OWN review, lowered by a bot challenge, JS-rendered content, near-empty content or missing
+canonical context; NOT page quality), `summary` (deterministic consultant templates), `likely_ai_quote` (the
+extracted sentence, or `null` where N/A), `sections`, `counts` (issues / critical_high / deterministic_fixes /
+ai_assisted / manual), `related_findings`. Built by shared helpers `review_confidence` / `classify_findings` /
+`build_review` (a design contract enforced by reuse, not a base class). **No new deterministic fixes** -
+answerability remediation is editorial (AI-assisted/manual).
+
+### Future review ideas (documented, NOT built - require semantic understanding, out of deterministic scope)
+- **Answer Consistency** - does the page answer the same question consistently, or contradict itself across
+  sections? Needs comparing meaning between passages → deferred to a future MEASURED/AI-assisted lane.
+- **Primary Answer Dominance** - is there one clear dominant answer, or several introductions competing to be
+  "the answer"? Needs judging which passage is primary → deferred. Neither will be a deterministic check.
 
 # Future Improvements
 Surface invalid-JSON as a distinct finding (currently silently treated as missing); validate property *values* (URL/date formats), not just presence.

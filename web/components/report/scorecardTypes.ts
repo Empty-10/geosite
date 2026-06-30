@@ -25,6 +25,21 @@ export type CitationReadiness = {
   reasons: { n: number; text: string }[];
 };
 
+// The standard Expert Review contract (engine: reviews.build_review). Every review renders from this.
+export type ReviewConfidence = { level: "high" | "medium" | "low"; reasons: string[] };
+export type ReviewSection = { name: string; status: "pass" | "attention" | "fail"; findings: string[] };
+export type ReviewReport = {
+  review: string;
+  key: string;
+  verdict: "strong" | "partial" | "weak";
+  confidence: ReviewConfidence;
+  summary: string[];
+  likely_ai_quote: string | null;
+  sections: ReviewSection[];
+  counts: { issues: number; critical_high: number; deterministic_fixes: number; ai_assisted: number; manual: number };
+  related_findings: string[];
+};
+
 export type Scorecard = {
   confidence: "verified";
   headline_score: number;
@@ -34,4 +49,5 @@ export type Scorecard = {
   categories: { label: string; score: number | null }[];
   summary?: ScorecardSummary;
   citation?: CitationReadiness;
+  reviews?: Record<string, ReviewReport>;
 };

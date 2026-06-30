@@ -33,7 +33,9 @@ from typing import Any
 #     extracted answer-preview snippet on geo.aeo.
 # v13: bot-challenge detection - meta.challenge + tech.challenge finding + scorecard.unreliable when a
 #     Cloudflare/Akamai/DataDome/PerimeterX/Imperva interstitial is scored instead of the real page.
-SCHEMA_VERSION = "13"
+# v14: Expert Reviews container - scorecard.reviews (the standard Review contract); first review is
+#     Answerability (verdict/confidence/Likely AI Quote/summary/sections/counts) + 5 new geo findings.
+SCHEMA_VERSION = "14"
 
 # Versions stamped into every report's meta so a saved/shared report is self-describing.
 ENGINE_VERSION = "1.0"        # the deterministic scan engine
