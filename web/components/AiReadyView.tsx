@@ -39,13 +39,13 @@ type Plan = {
 };
 
 const SEV_COLOR: Record<string, string> = {
-  critical: C.fail, high: C.fail, medium: C.warn, low: C.text3, info: C.text3,
+  critical: C.fail, high: C.fail, medium: C.warn, low: "var(--text-3)", info: "var(--text-3)",
 };
 
 function bucketLabel(it: Item): { text: string; color: string } {
   if (it.fix?.supported) return { text: "Deterministic fix ready", color: C.accent };
   if (it.knowledge?.can_astova_generate === "ai_assisted") return { text: "AI-assisted", color: C.measured };
-  return { text: "Manual review", color: C.text3 };
+  return { text: "Manual review", color: "var(--text-3)" };
 }
 
 export function AiReadyView() {
@@ -117,9 +117,9 @@ export function AiReadyView() {
   }
 
   return (
-    <main style={{ maxWidth: 820, margin: "0 auto", padding: "48px 20px 80px", color: C.text }}>
+    <main style={{ maxWidth: 820, margin: "0 auto", padding: "48px 20px 80px", color: "var(--text)" }}>
       <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 8px" }}>AI Ready Action Plan</h1>
-      <p style={{ color: C.text2, margin: "0 0 24px", lineHeight: 1.5 }}>
+      <p style={{ color: "var(--text-2)", margin: "0 0 24px", lineHeight: 1.5 }}>
         Scan a URL and get the same prioritised, agent-friendly plan Astova gives coding agents via MCP and
         the CLI: what to fix, in what order, and how to verify each fix. Deterministic - no AI guesswork.
       </p>
@@ -132,8 +132,8 @@ export function AiReadyView() {
           placeholder="example.com"
           aria-label="URL to assess"
           style={{
-            flex: 1, padding: "12px 14px", borderRadius: 10, border: `1px solid ${C.border}`,
-            background: C.surface, color: C.text, fontSize: 15,
+            flex: 1, padding: "12px 14px", borderRadius: 10, border: `1px solid var(--border)`,
+            background: "var(--surface)", color: "var(--text)", fontSize: 15,
           }}
         />
         <button
@@ -150,7 +150,7 @@ export function AiReadyView() {
       </div>
 
       {error && (
-        <div style={{ padding: 14, borderRadius: 10, border: `1px solid ${C.fail}`, background: "rgba(229,72,77,0.1)", color: C.text, marginBottom: 24 }}>
+        <div style={{ padding: 14, borderRadius: 10, border: `1px solid ${C.fail}`, background: "rgba(229,72,77,0.1)", color: "var(--text)", marginBottom: 24 }}>
           {error}
         </div>
       )}
@@ -159,16 +159,16 @@ export function AiReadyView() {
         <section>
           <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap", marginBottom: 16 }}>
             <div style={{ fontSize: 40, fontWeight: 700, color: scoreColor(plan.score ?? 0) }}>
-              {plan.score}<span style={{ fontSize: 18, color: C.text3 }}>/100</span>
+              {plan.score}<span style={{ fontSize: 18, color: "var(--text-3)" }}>/100</span>
             </div>
-            <div style={{ color: C.text2, fontSize: 14, lineHeight: 1.5, flex: 1, minWidth: 220 }}>{plan.summary}</div>
+            <div style={{ color: "var(--text-2)", fontSize: 14, lineHeight: 1.5, flex: 1, minWidth: 220 }}>{plan.summary}</div>
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
-            <Count label="Actionable" value={plan.actionable_count} color={C.text} />
+            <Count label="Actionable" value={plan.actionable_count} color={"var(--text)"} />
             <Count label="Deterministic fixes" value={plan.deterministic_fix_count} color={C.accent} />
             <Count label="AI-assisted" value={plan.ai_assisted_count} color={C.measured} />
-            <Count label="Manual review" value={plan.manual_count} color={C.text3} />
+            <Count label="Manual review" value={plan.manual_count} color={"var(--text-3)"} />
           </div>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
@@ -179,7 +179,7 @@ export function AiReadyView() {
                 title="Copy a ready-to-paste prompt (plan + safety rules) for your AI coding agent"
                 style={{
                   padding: "8px 14px", borderRadius: 8, border: "none",
-                  background: C.accent, color: C.ink, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  background: C.accent, color: "var(--ink)", fontSize: 13, fontWeight: 600, cursor: "pointer",
                 }}
               >
                 {promptCopied ? "Copied" : "Copy agent prompt"}
@@ -187,8 +187,8 @@ export function AiReadyView() {
               <button
                 onClick={copyMarkdown}
                 style={{
-                  padding: "8px 14px", borderRadius: 8, border: `1px solid ${C.border}`,
-                  background: C.raised, color: C.text, fontSize: 13, cursor: "pointer",
+                  padding: "8px 14px", borderRadius: 8, border: `1px solid var(--border)`,
+                  background: "var(--raised)", color: "var(--text)", fontSize: 13, cursor: "pointer",
                 }}
               >
                 {copied ? "Copied" : "Copy Markdown"}
@@ -197,19 +197,19 @@ export function AiReadyView() {
           </div>
 
           {plan.items.length === 0 ? (
-            <p style={{ color: C.text2 }}>Nothing to fix - this URL looks AI Ready.</p>
+            <p style={{ color: "var(--text-2)" }}>Nothing to fix - this URL looks AI Ready.</p>
           ) : (
             <ol style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 12 }}>
               {plan.items.map((it, i) => {
                 const b = bucketLabel(it);
                 return (
-                  <li key={`${it.finding_id}-${i}`} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.surface, padding: 16 }}>
+                  <li key={`${it.finding_id}-${i}`} style={{ border: `1px solid var(--border)`, borderRadius: 12, background: "var(--surface)", padding: 16 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: SEV_COLOR[it.severity] || C.text3 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: SEV_COLOR[it.severity] || "var(--text-3)" }}>
                         {it.severity}
                       </span>
                       <span style={{ fontSize: 15, fontWeight: 600 }}>{it.title}</span>
-                      <code style={{ fontSize: 12, color: C.text3 }}>{it.finding_id}</code>
+                      <code style={{ fontSize: 12, color: "var(--text-3)" }}>{it.finding_id}</code>
                       <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, color: b.color, border: `1px solid ${b.color}`, borderRadius: 999, padding: "2px 8px" }}>
                         {b.text}
                       </span>
@@ -236,9 +236,9 @@ export function AiReadyView() {
 
 function Count({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surface, padding: "10px 14px", minWidth: 110 }}>
+    <div style={{ border: `1px solid var(--border)`, borderRadius: 10, background: "var(--surface)", padding: "10px 14px", minWidth: 110 }}>
       <div style={{ fontSize: 22, fontWeight: 700, color }}>{value}</div>
-      <div style={{ fontSize: 12, color: C.text2 }}>{label}</div>
+      <div style={{ fontSize: 12, color: "var(--text-2)" }}>{label}</div>
     </div>
   );
 }
@@ -246,8 +246,8 @@ function Count({ label, value, color }: { label: string; value: number; color: s
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div style={{ display: "flex", gap: 8, fontSize: 13, lineHeight: 1.5, marginTop: 4 }}>
-      <span style={{ color: C.text3, minWidth: 104, flexShrink: 0 }}>{label}</span>
-      <span style={{ color: C.text2, fontFamily: mono ? "ui-monospace, monospace" : undefined, wordBreak: "break-word" }}>{value}</span>
+      <span style={{ color: "var(--text-3)", minWidth: 104, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: "var(--text-2)", fontFamily: mono ? "ui-monospace, monospace" : undefined, wordBreak: "break-word" }}>{value}</span>
     </div>
   );
 }

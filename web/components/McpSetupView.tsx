@@ -43,7 +43,7 @@ function extractConfig(setup: string[]): string | null {
 }
 
 const h2: React.CSSProperties = { fontSize: 18, fontWeight: 600, margin: "32px 0 10px" };
-const li: React.CSSProperties = { color: C.text2, lineHeight: 1.6, marginBottom: 6 };
+const li: React.CSSProperties = { color: "var(--text-2)", lineHeight: 1.6, marginBottom: 6 };
 
 export function McpSetupView() {
   const [client, setClient] = useState("generic");
@@ -72,11 +72,11 @@ export function McpSetupView() {
   const config = guide ? extractConfig(guide.setup) : null;
 
   return (
-    <article style={{ maxWidth: 780, margin: "0 auto", padding: "56px 20px 80px", color: C.text }}>
+    <article style={{ maxWidth: 780, margin: "0 auto", padding: "56px 20px 80px", color: "var(--text)" }}>
       <h1 style={{ fontSize: 30, fontWeight: 700, margin: "0 0 12px" }}>
         Use Astova with your AI coding agent
       </h1>
-      <p style={{ color: C.text2, lineHeight: 1.6, margin: "0 0 8px", fontSize: 17 }}>
+      <p style={{ color: "var(--text-2)", lineHeight: 1.6, margin: "0 0 8px", fontSize: 17 }}>
         Astova provides the AI Readiness expertise. Your AI agent applies the changes. Astova verifies the
         result - deterministically, with no LLM guesswork.
       </p>
@@ -90,9 +90,9 @@ export function McpSetupView() {
               onClick={() => setClient(c.id)}
               style={{
                 padding: "8px 16px", borderRadius: 999, fontSize: 14, fontWeight: 600, cursor: "pointer",
-                border: `1px solid ${active ? C.accent : C.border}`,
-                background: active ? C.accent : C.surface,
-                color: active ? C.ink : C.text,
+                border: `1px solid ${active ? C.accent : "var(--border)"}`,
+                background: active ? C.accent : "var(--surface)",
+                color: active ? "var(--ink)" : "var(--text)",
               }}
             >
               {c.label}
@@ -101,10 +101,10 @@ export function McpSetupView() {
         })}
       </div>
 
-      {loading && <p style={{ color: C.text3, marginTop: 24 }}>Loading guide...</p>}
+      {loading && <p style={{ color: "var(--text-3)", marginTop: 24 }}>Loading guide...</p>}
 
       {error && (
-        <div style={{ padding: 14, borderRadius: 10, border: `1px solid ${C.warn}`, background: "rgba(224,162,43,0.1)", color: C.text, marginTop: 24 }}>
+        <div style={{ padding: 14, borderRadius: 10, border: `1px solid ${C.warn}`, background: "rgba(224,162,43,0.1)", color: "var(--text)", marginTop: 24 }}>
           {error}
         </div>
       )}
@@ -112,7 +112,7 @@ export function McpSetupView() {
       {guide && !error && (
         <section>
           <h2 style={h2}>Purpose</h2>
-          <p style={{ color: C.text2, lineHeight: 1.6 }}>{guide.purpose}</p>
+          <p style={{ color: "var(--text-2)", lineHeight: 1.6 }}>{guide.purpose}</p>
 
           <h2 style={h2}>Recommended entrypoints</h2>
           <ul style={{ paddingLeft: 18, margin: 0 }}>
@@ -132,7 +132,7 @@ export function McpSetupView() {
           {config && <CopyBlock text={config} label="MCP server config" />}
 
           <h2 style={h2}>Starter prompt</h2>
-          <p style={{ color: C.text3, fontSize: 13, margin: "0 0 4px" }}>
+          <p style={{ color: "var(--text-3)", fontSize: 13, margin: "0 0 4px" }}>
             Paste this into {CLIENTS.find((c) => c.id === client)?.label} once Astova is connected.
           </p>
           <CopyBlock text={guide.starter_prompt} label="starter prompt" />
@@ -154,9 +154,9 @@ export function McpSetupView() {
           <h2 style={h2}>Available tools</h2>
           <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
             {guide.available_tools.map((t) => (
-              <li key={t.tool} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surface, padding: "10px 14px" }}>
+              <li key={t.tool} style={{ border: `1px solid var(--border)`, borderRadius: 10, background: "var(--surface)", padding: "10px 14px" }}>
                 <code style={{ color: C.accent, fontSize: 13 }}>{t.tool}</code>
-                <div style={{ color: C.text2, fontSize: 13, lineHeight: 1.5, marginTop: 2 }}>{t.description}</div>
+                <div style={{ color: "var(--text-2)", fontSize: 13, lineHeight: 1.5, marginTop: 2 }}>{t.description}</div>
               </li>
             ))}
           </ul>

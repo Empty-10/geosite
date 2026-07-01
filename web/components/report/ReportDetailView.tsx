@@ -82,11 +82,11 @@ export function ReportDetailView({ reportId, share }: { reportId: string; share:
     URL.revokeObjectURL(url);
   }
 
-  if (loading) return <Wrap><p style={{ color: C.text3 }}>Loading report...</p></Wrap>;
+  if (loading) return <Wrap><p style={{ color: "var(--text-3)" }}>Loading report...</p></Wrap>;
   if (error || !data)
     return (
       <Wrap>
-        <div style={{ padding: 16, borderRadius: 10, border: `1px solid ${C.warn}`, background: "rgba(224,162,43,0.1)", color: C.text }}>
+        <div style={{ padding: 16, borderRadius: 10, border: `1px solid ${C.warn}`, background: "rgba(224,162,43,0.1)", color: "var(--text)" }}>
           {error || "Report unavailable."}
         </div>
       </Wrap>
@@ -104,7 +104,7 @@ export function ReportDetailView({ reportId, share }: { reportId: string; share:
         <div style={{ flex: 1, minWidth: 240 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 4px", wordBreak: "break-all" }}>{target}</h1>
           <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor(report.overall_score) }}>
-            {report.overall_score}<span style={{ fontSize: 13, color: C.text3 }}>/100 AI Readiness</span>
+            {report.overall_score}<span style={{ fontSize: 13, color: "var(--text-3)" }}>/100 AI Readiness</span>
           </div>
         </div>
       </div>
@@ -132,9 +132,9 @@ export function ReportDetailView({ reportId, share }: { reportId: string; share:
       <H2>Readiness breakdown</H2>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
         {Object.entries(report.pillar_scores).map(([k, v]) => (
-          <div key={k} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surface, padding: "10px 14px", minWidth: 120 }}>
+          <div key={k} style={{ border: `1px solid var(--border)`, borderRadius: 10, background: "var(--surface)", padding: "10px 14px", minWidth: 120 }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: scoreColor(v) }}>{v}</div>
-            <div style={{ fontSize: 12, color: C.text2 }}>{PILLAR_LABEL[k] || k}</div>
+            <div style={{ fontSize: 12, color: "var(--text-2)" }}>{PILLAR_LABEL[k] || k}</div>
           </div>
         ))}
       </div>
@@ -143,17 +143,17 @@ export function ReportDetailView({ reportId, share }: { reportId: string; share:
 
       <H2>Action summary</H2>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-        <Count label="Actionable" value={s.actionable_count} color={C.text} />
+        <Count label="Actionable" value={s.actionable_count} color={"var(--text)"} />
         <Count label="Deterministic fixes" value={s.deterministic_fix_count} color={C.accent} />
         <Count label="AI-assisted" value={s.ai_assisted_count} color={C.measured} />
-        <Count label="Manual review" value={s.manual_count} color={C.text3} />
+        <Count label="Manual review" value={s.manual_count} color={"var(--text-3)"} />
       </div>
 
       <Bucket title="Deterministic fixes available" items={s.deterministic} color={C.accent}
         note="Astova can generate ready-to-apply content for these." />
       <Bucket title="AI-assisted fixes" items={s.ai_assisted} color={C.measured}
         note="Your AI agent drafts these from real page content." />
-      <Bucket title="Manual review items" items={s.manual} color={C.text3}
+      <Bucket title="Manual review items" items={s.manual} color={"var(--text-3)"}
         note="Need human judgement (facts, identity, local-business, legal)." />
 
       <div style={{ marginTop: 18 }}>
@@ -165,7 +165,7 @@ export function ReportDetailView({ reportId, share }: { reportId: string; share:
 }
 
 function Wrap({ children }: { children: React.ReactNode }) {
-  return <article style={{ maxWidth: 860, margin: "0 auto", padding: "40px 20px 80px", color: C.text }}>{children}</article>;
+  return <article style={{ maxWidth: 860, margin: "0 auto", padding: "40px 20px 80px", color: "var(--text)" }}>{children}</article>;
 }
 
 function H2({ children }: { children: React.ReactNode }) {
@@ -182,7 +182,7 @@ function Meta({ m }: { m: Metadata }) {
     `Format ${m.report_version ?? "?"}`,
   ];
   return (
-    <div style={{ fontSize: 12, color: C.text3, fontFamily: "var(--mono)", marginBottom: 16 }}>
+    <div style={{ fontSize: 12, color: "var(--text-3)", fontFamily: "var(--mono)", marginBottom: 16 }}>
       {bits.join("  ·  ")}
     </div>
   );
@@ -196,8 +196,8 @@ function ActionsBar({
 }) {
   const btn = (primary: boolean): React.CSSProperties => ({
     padding: "9px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
-    border: primary ? "none" : `1px solid ${C.border}`,
-    background: primary ? C.accent : C.raised, color: primary ? C.ink : C.text,
+    border: primary ? "none" : `1px solid var(--border)`,
+    background: primary ? C.accent : "var(--raised)", color: primary ? "var(--ink)" : "var(--text)",
     textDecoration: "none", display: "inline-block",
   });
   return (
@@ -213,9 +213,9 @@ function ActionsBar({
 
 function Count({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.surface, padding: "10px 14px", minWidth: 110 }}>
+    <div style={{ border: `1px solid var(--border)`, borderRadius: 10, background: "var(--surface)", padding: "10px 14px", minWidth: 110 }}>
       <div style={{ fontSize: 22, fontWeight: 700, color }}>{value}</div>
-      <div style={{ fontSize: 12, color: C.text2 }}>{label}</div>
+      <div style={{ fontSize: 12, color: "var(--text-2)" }}>{label}</div>
     </div>
   );
 }
@@ -224,17 +224,17 @@ function Bucket({ title, items, color, note }: { title: string; items: Item[]; c
   if (!items.length) return null;
   return (
     <div style={{ marginBottom: 16 }}>
-      <H2>{title} <span style={{ fontSize: 13, color: C.text3, fontWeight: 400 }}>({items.length})</span></H2>
-      <p style={{ color: C.text3, fontSize: 12.5, margin: "0 0 8px" }}>{note}</p>
+      <H2>{title} <span style={{ fontSize: 13, color: "var(--text-3)", fontWeight: 400 }}>({items.length})</span></H2>
+      <p style={{ color: "var(--text-3)", fontSize: 12.5, margin: "0 0 8px" }}>{note}</p>
       <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
         {items.map((it) => (
-          <li key={it.finding_id} style={{ border: `1px solid ${C.border}`, borderLeft: `3px solid ${color}`, borderRadius: 8, background: C.surface, padding: "10px 14px" }}>
+          <li key={it.finding_id} style={{ border: `1px solid var(--border)`, borderLeft: `3px solid ${color}`, borderRadius: 8, background: "var(--surface)", padding: "10px 14px" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: C.text3 }}>{it.severity}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--text-3)" }}>{it.severity}</span>
               <span style={{ fontSize: 14, fontWeight: 600 }}>{it.title}</span>
-              <code style={{ fontSize: 11, color: C.text3 }}>{it.finding_id}</code>
+              <code style={{ fontSize: 11, color: "var(--text-3)" }}>{it.finding_id}</code>
             </div>
-            {it.recommendation && <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.5, marginTop: 3 }}>{it.recommendation}</div>}
+            {it.recommendation && <div style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.5, marginTop: 3 }}>{it.recommendation}</div>}
           </li>
         ))}
       </ul>
