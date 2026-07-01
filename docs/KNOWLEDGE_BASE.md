@@ -3,7 +3,7 @@
 > The canonical explanation of every finding the Astova engine can produce. This is the source of
 > truth an AI coding agent (or a human) uses to understand and safely fix an AI Readiness issue.
 > Maintained alongside the engine: every finding has a corresponding Knowledge Card here.
-> Last updated: 2026-06-30. Engine report schema: v14.
+> Last updated: 2026-06-30. Engine report schema: v15.
 >
 > **Machine-readable now:** this knowledge is exposed to AI coding agents via the MCP tool
 > `explain_finding(finding_id)` and the HTTP API `GET /findings/{id}`. The structured registry lives

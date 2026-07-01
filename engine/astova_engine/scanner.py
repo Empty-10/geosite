@@ -13,7 +13,7 @@ from .fetch import (BotFetch, FetchResult, fetch, fetch_as_bot, fetch_pagespeed,
 from .fixes import generate_fixes
 from .models import (ENGINE_VERSION, REPORT_VERSION, RULESET_VERSION, Confidence, Finding, Pillar,
                      Report, Severity, Status)
-from . import answerability
+from . import answerability, assessment
 from .modules import (answerability_review, bot_view, geo_readiness, local, onpage, performance,
                      schema_review, technical)
 from .modules.technical import NetInputs, parse_robots
@@ -110,9 +110,13 @@ def scan_html(url: str, html: str, *, online: bool = False,
     if fixes:
         report.fixes = generate_fixes(soup, report, final_url)
 
-    # Expert Reviews: attach the standard review contract additively under scorecard["reviews"].
+    # Expert Reviews: attach the standard review contract additively under scorecard["reviews"],
+    # then the consultant assessment (Implementation Programme + comparison) under scorecard["assessment"].
     if report.scorecard is not None:
-        report.scorecard.setdefault("reviews", {})["answerability"] = answerability.summarize(report.to_dict())
+        d = report.to_dict()
+        report.scorecard.setdefault("reviews", {})["answerability"] = answerability.summarize(d)
+        report.scorecard["reviews"]["schema"] = schema_review.summarize(d)
+        report.scorecard["assessment"] = assessment.build_assessment(report.to_dict())
     return report
 
 

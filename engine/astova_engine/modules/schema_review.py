@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
+from .. import reviews
 from ..jsonld import node_types, parse_nodes, type_labels
 from ..models import Confidence, Finding, Pillar, Severity, Status
 
@@ -301,3 +302,42 @@ def _imageobject_missing_dims(nodes: list[dict]) -> bool:
                     if "width" not in v or "height" not in v:
                         return True
     return False
+
+
+# --------------------------------------------------------------------------- review contract
+
+NAME = "Schema Review"
+KEY = "schema"
+SECTIONS: list[tuple[str, list[str]]] = [
+    ("Presence & validity", ["schema.jsonld", "schema.missing", "schema.validation"]),
+    ("Entity duplication & conflicts", ["schema.duplicate_organization", "schema.duplicate_localbusiness",
+                                        "schema.duplicate_website", "schema.conflicting_organization_name",
+                                        "schema.conflicting_organization_url",
+                                        "schema.conflicting_organization_logo",
+                                        "schema.duplicate_id_conflict"]),
+    ("Graph wiring", ["schema.missing_id", "schema.orphan_node", "schema.breadcrumb_disconnected"]),
+    ("sameAs quality", ["schema.invalid_sameas", "schema.weak_sameas"]),
+    ("Article relationships", ["schema.article_missing_publisher", "schema.article_missing_author"]),
+    ("URL & type hygiene", ["schema.canonical_mismatch", "schema.insecure_url",
+                            "schema.image_missing_dimensions", "schema.generic_type"]),
+]
+_ALL_IDS = [fid for _, ids in SECTIONS for fid in ids]
+
+
+def summarize(report: dict) -> dict:
+    """Build the standard Expert Review contract for schema (so it joins the Review Comparison)."""
+    findings = report.get("findings", [])
+    by_id = {f["id"]: f for f in findings}
+    statuses = [by_id[f]["status"] for f in _ALL_IDS if f in by_id]
+    verdict = "weak" if "fail" in statuses else ("partial" if "warn" in statuses else "strong")
+    extra = ["no structured data on the page"] if by_id.get("schema.missing", {}).get("status") == "warn" else []
+    fix_ids = {fx.get("finding_id") for fx in report.get("fixes", []) if fx.get("finding_id")}
+    sections = [{"name": name, "status": reviews.section_status(ids, by_id),
+                 "findings": [fid for fid in ids if fid in by_id]} for name, ids in SECTIONS]
+    return reviews.build_review(
+        key=KEY, name=NAME, verdict=verdict,
+        confidence=reviews.review_confidence(report.get("meta", {}), findings, extra_reasons=extra),
+        summary=[], likely_ai_quote=None, sections=sections,
+        counts=reviews.classify_findings(_ALL_IDS, by_id, fix_ids),
+        related_findings=[fid for fid in _ALL_IDS if fid in by_id],
+    )

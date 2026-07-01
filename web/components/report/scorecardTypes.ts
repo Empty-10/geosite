@@ -40,6 +40,31 @@ export type ReviewReport = {
   related_findings: string[];
 };
 
+// The consultant assessment (engine: assessment.build_assessment) - deterministic Implementation
+// Programme + Review Comparison + Highest-ROI + programme-aware verdict.
+export type ProgrammeFix = { finding_id: string; title: string; severity: string; impact: number };
+export type ProgrammePhase = {
+  key: string; name: string; objective: string; effort: string; effort_minutes: number;
+  improvement: number; fixes_count: number; ai_agent_suitability: number; manual_review: string;
+  fixes: ProgrammeFix[];
+};
+export type ReviewComparison = {
+  key: string; name: string; verdict: "strong" | "partial" | "weak"; confidence: string;
+  issues: number; critical_high: number; recoverable: number; maturity: number;
+};
+export type Assessment = {
+  headline_score: number | null;
+  band: string;
+  band_label: string;
+  confidence: ReviewConfidence;
+  verdict: string[];
+  programme: ProgrammePhase[];
+  total_recoverable: number;
+  total_effort: string;
+  reviews: ReviewComparison[];
+  highest_roi_review: string | null;
+};
+
 export type Scorecard = {
   confidence: "verified";
   headline_score: number;
@@ -50,4 +75,5 @@ export type Scorecard = {
   summary?: ScorecardSummary;
   citation?: CitationReadiness;
   reviews?: Record<string, ReviewReport>;
+  assessment?: Assessment;
 };

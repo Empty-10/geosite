@@ -91,6 +91,27 @@ def _findings_by_pillar(report: dict) -> list[tuple[str, list[dict]]]:
     return [(p, sorted(groups[p], key=lambda f: _SEV_RANK.get(f.get("severity"), 9))) for p in ordered]
 
 
+def _programme_markdown(report: dict) -> list[str]:
+    """Render the deterministic Implementation Programme from scorecard.assessment (no recompute)."""
+    a = (report.get("scorecard") or {}).get("assessment")
+    if not a:
+        return []
+    out = ["## Executive assessment", ""]
+    out += [line for line in a.get("verdict", [])]
+    out.append("")
+    if a.get("programme"):
+        out += ["## Implementation programme", ""]
+        for p in a["programme"]:
+            stars = "★" * p["ai_agent_suitability"]
+            out.append(f"### {p['name']} - {p['effort']}, +{p['improvement']:g} AI Readiness, "
+                       f"{p['fixes_count']} fix(es)")
+            out.append(f"- Objective: {p['objective']}")
+            out.append(f"- AI-agent suitability: {stars}  |  Manual review: {p['manual_review']}")
+            out.append("- Fixes: " + ", ".join(f"{f['finding_id']} (+{f['impact']:g})" for f in p["fixes"]))
+            out.append("")
+    return out
+
+
 def report_to_markdown(report: dict) -> str:
     """A clean Markdown AI Readiness report - score, action summary, findings by category, verify."""
     m = report_metadata(report)
@@ -111,6 +132,9 @@ def report_to_markdown(report: dict) -> str:
         f"* AI-assisted fixes: {s['ai_assisted_count']}",
         f"* Manual review items: {s['manual_count']}",
         "",
+    ]
+    out += _programme_markdown(report)
+    out += [
         "## Findings",
         "",
     ]

@@ -15,6 +15,8 @@ import { PillarCards } from "./PillarCards";
 import { ScorecardPanel } from "./ScorecardPanel";
 import { SchemaReviewCard } from "./SchemaReviewCard";
 import { AnswerabilityReviewCard } from "./AnswerabilityReviewCard";
+import { ExecutiveAssessment, ConsultantVerdict, ExpertReviewsPanel, ImplementationProgramme,
+  VerificationPanel, AppendixSection } from "./ConsultantReport";
 import { BotView } from "./BotView";
 import { ScoreRing } from "./ScoreRing";
 import { RenderTag } from "./RenderTag";
@@ -291,13 +293,22 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
 
       <DiffBanner meta={report.meta} />
 
-      <ExecutiveSummary scorecard={report.scorecard} />
+      {/* Consultant report hierarchy: assessment → verdict → reviews → programme → verification → appendix */}
+      <ExecutiveAssessment report={report} />
+      <ConsultantVerdict report={report} />
+
+      <ExpertReviewsPanel report={report} />
+      <AnswerabilityReviewCard report={report} />
+      <SchemaReviewCard report={report} />
+
+      <ImplementationProgramme report={report} />
+
+      <VerificationPanel report={report} />
+
+      <AppendixSection title="Detailed findings & evidence - scorecard, all checks, performance">
+      {!report.scorecard?.assessment && <ExecutiveSummary scorecard={report.scorecard} />}
 
       <ScorecardPanel scorecard={report.scorecard} findings={allFindings} />
-
-      <AnswerabilityReviewCard report={report} />
-
-      <SchemaReviewCard report={report} />
 
       <BotView report={report} />
 
@@ -337,7 +348,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
         <CitationBridge citation={report.scorecard?.citation} url={finalUrl} />
       </div>
 
-      <SectionTitle>Priority fixes — highest score gain first</SectionTitle>
+      <SectionTitle>All priority fixes - highest score gain first</SectionTitle>
       <div style={{ marginBottom: 28 }}>
         <FindingsList findings={fixes} fixes={fixMap} url={finalUrl} impacts={impacts} />
       </div>
@@ -401,6 +412,7 @@ function Body({ report, tab, setTab }: { report: Report; tab: number; setTab: (n
           </>
         )}
       </div>
+      </AppendixSection>
     </div>
   );
 }

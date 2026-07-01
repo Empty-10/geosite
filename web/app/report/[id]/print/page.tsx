@@ -110,6 +110,39 @@ export default async function PrintReportPage({
         reproducible on re-run. AI citation sampling (MEASURED) is reported separately.
       </div>
 
+      {scorecard.assessment && (
+        <>
+          <div className="sec">
+            <h2>Executive assessment</h2>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
+              {scorecard.assessment.band_label} · Astova confidence: {scorecard.assessment.confidence?.level}
+            </div>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {(scorecard.assessment.verdict || []).map((line: string, i: number) => (
+              <p key={i} style={{ margin: "4px 0", fontSize: 13 }}>{line}</p>
+            ))}
+          </div>
+
+          {scorecard.assessment.programme?.length > 0 && (
+            <div className="sec">
+              <h2>Implementation programme - one-week plan</h2>
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {scorecard.assessment.programme.map((p: any, i: number) => (
+                <div key={p.key} style={{ marginBottom: 8, pageBreakInside: "avoid" }}>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>
+                    Phase {i + 1}: {p.name} - {p.effort}, +{p.improvement} AI Readiness, {p.fixes_count} fix(es)
+                  </div>
+                  <div className="muted" style={{ fontSize: 12 }}>{p.objective}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {"★".repeat(p.ai_agent_suitability)} AI-agent · Manual review: {p.manual_review}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       {(summary.verdict || (summary.opportunities && summary.opportunities.length)) && (
         <div className="sec">
           <h2>Executive summary</h2>

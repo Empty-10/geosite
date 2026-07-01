@@ -10,6 +10,9 @@ import { ScoreRing } from "@/components/report/ScoreRing";
 import { ExecutiveSummary } from "@/components/report/ExecutiveSummary";
 import { ScorecardPanel } from "@/components/report/ScorecardPanel";
 import { ConfidenceLegend } from "@/components/report/ConfidenceLegend";
+import { ConsultantVerdict, ExpertReviewsPanel, ImplementationProgramme, VerificationPanel,
+  AppendixSection } from "@/components/report/ConsultantReport";
+import type { Report } from "@/components/report/types";
 
 type Item = {
   finding_id: string; title: string; pillar: string; severity: string;
@@ -117,6 +120,13 @@ export function ReportDetailView({ reportId, share }: { reportId: string; share:
         printHref={`/report/${encodeURIComponent(reportId)}/print?share=${encodeURIComponent(share)}`}
       />
 
+      {/* Consultant report hierarchy (same as the live report) */}
+      <ConsultantVerdict report={report as unknown as Report} />
+      <ExpertReviewsPanel report={report as unknown as Report} />
+      <ImplementationProgramme report={report as unknown as Report} />
+      <VerificationPanel report={report as unknown as Report} />
+
+      <AppendixSection title="Detailed findings & evidence">
       <ExecutiveSummary scorecard={report.scorecard} />
 
       <H2>Readiness breakdown</H2>
@@ -146,16 +156,10 @@ export function ReportDetailView({ reportId, share }: { reportId: string; share:
       <Bucket title="Manual review items" items={s.manual} color={C.text3}
         note="Need human judgement (facts, identity, local-business, legal)." />
 
-      <H2>Verification guidance</H2>
-      <p style={{ color: C.text2, lineHeight: 1.6, fontSize: 14 }}>
-        Apply the fixes, then re-scan the target (or use Astova&apos;s <code>verify_fix</code> per finding) to
-        confirm the score improved. Every finding here is <strong>VERIFIED</strong> - read from the live page
-        and reproducible on re-run.
-      </p>
-
       <div style={{ marginTop: 18 }}>
         <ConfidenceLegend />
       </div>
+      </AppendixSection>
     </Wrap>
   );
 }

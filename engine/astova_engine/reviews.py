@@ -76,29 +76,30 @@ def review_confidence(meta: dict, findings: list[dict], extra_reasons: list[str]
     return {"level": level, "reasons": reasons}
 
 
-def classify_findings(finding_ids: list[str], by_id: dict[str, dict], fix_ids: set[str]) -> dict:
-    """Issue counts + the standard remediation buckets for a review's findings.
+def finding_class(fid: str, fix_ids: set[str]) -> str:
+    """The remediation class of a single finding: 'deterministic' (a ready Astova fix, or the card
+    says deterministic), 'ai_assisted' (editorial, draftable from real content), or 'manual'."""
+    card = knowledge.explain(fid) or {}
+    if fid in fix_ids or card.get("can_astova_generate") == "deterministic":
+        return "deterministic"
+    if fid in AI_ASSISTED_FINDINGS or card.get("can_astova_generate") == "ai_assisted":
+        return "ai_assisted"
+    return "manual"
 
-    deterministic_fixes: a ready Astova fix exists (or the card says deterministic).
-    ai_assisted: editorial, draftable from real content. manual: everything else.
-    """
+
+def classify_findings(finding_ids: list[str], by_id: dict[str, dict], fix_ids: set[str]) -> dict:
+    """Issue counts + the standard remediation buckets for a review's findings."""
     issues = [fid for fid in finding_ids if by_id.get(fid, {}).get("status") in _ACTIONABLE]
     critical_high = sum(1 for fid in issues if by_id[fid].get("severity") in ("critical", "high"))
-    deterministic = ai_assisted = manual = 0
+    buckets = {"deterministic": 0, "ai_assisted": 0, "manual": 0}
     for fid in issues:
-        card = knowledge.explain(fid) or {}
-        if fid in fix_ids or card.get("can_astova_generate") == "deterministic":
-            deterministic += 1
-        elif fid in AI_ASSISTED_FINDINGS or card.get("can_astova_generate") == "ai_assisted":
-            ai_assisted += 1
-        else:
-            manual += 1
+        buckets[finding_class(fid, fix_ids)] += 1
     return {
         "issues": len(issues),
         "critical_high": critical_high,
-        "deterministic_fixes": deterministic,
-        "ai_assisted": ai_assisted,
-        "manual": manual,
+        "deterministic_fixes": buckets["deterministic"],
+        "ai_assisted": buckets["ai_assisted"],
+        "manual": buckets["manual"],
     }
 
 

@@ -30,7 +30,7 @@ most pour-over brewers and keeps the total brew time near three minutes.</p>
 def test_scorecard_structure():
     c = _card(GOOD)
     assert set(c) == {"confidence", "headline_score", "technical_score", "overlay", "rows",
-                      "categories", "summary", "citation", "reviews"}
+                      "categories", "summary", "citation", "reviews", "assessment"}
     assert c["confidence"] == "verified"
     assert len(c["rows"]) == 20
     assert all(r["n"] == i + 1 for i, r in enumerate(c["rows"]))
